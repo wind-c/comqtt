@@ -1,6 +1,6 @@
 # Cluster Start
 
-A basic cluster is implemented using [hashicorp/memberlist](https://github.com/hashicorp/memberlist)
+A basic cluster is implemented using [hashicorp/memberlist](https://github.com/hashicorp/memberlist) and [hashicorp/raft](https://github.com/hashicorp/raft)
 
 Cluster uses redis to store inflight and retain messages and subscriptions across nodes.
 
