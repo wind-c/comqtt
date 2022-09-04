@@ -1,0 +1,42 @@
+
+run-mode: 2   #Program running mode，1 single or 2 cluster
+redis-storage: true  #Whether to enable redis storage in cluster mode
+file-storage: false  #Whether to enable file storage in single-node mode
+
+cluster:
+  node-name: co-003  #The name of this node. This must be unique in the cluster.If nodename is not set, use the local hostname.
+  bind-port: 7948
+  members:  localhost:7946  #seeds member list, format such as 192.168.0.103:7946,192.168.0.104:7946
+  queue-depth: 1024000 #size of Memberlist's internal channel which handles UDP messages.
+  raft-port: 8703
+  raft-dir: ./raft/node3
+
+mqtt:
+  tcp: :1887
+  ws: :1888
+  http: :8082
+  buffer-size: 0 #0(indicates that use default values 1024 * 256),BufferSize overrides the default buffer size (circ.DefaultBufferSize) for the client buffers.
+  buffer-block-size: 0 #0(indicates that use default values 1024 * 256),BufferBlockSize overrides the default buffer block size (DefaultBlockSize) for the client buffers.
+  receive-maximum: 512 #receive-maximum is the maximum number of QOS1 & 2 messages allowed to be 'inflight' (not having received a PUBACK/PUBCOMP response for)
+  inflight-handling: 1 #If the receive-maximum is exceeded, 0 closes the connection or 1 overwrites the old inflight message
+
+redis:
+  addr: 127.0.0.1:6379
+  password:
+  db: 0
+
+log:
+  enable: true
+  env: 0  #0 dev or 1 prod
+  format: 1  #output format 0console or 1json
+  info-file: ./logs/co-info.log
+  error-file: ./logs/co-error.log
+  maxsize: 100      #100M
+  max-age: 30        #30day
+  max-backups: 10    #number of log files
+  localtime: true   #true or false
+  compress:  true   #true or false
+  level: 1          #-1Trace 0Debug 1Info 2Warn 3Error(default) 4Fatal 5Panic 6NoLevel 7Off
+  sampler:
+    burst: 3
+    period: 1       #second
