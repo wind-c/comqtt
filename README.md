@@ -32,7 +32,7 @@ MQTT stands for MQ Telemetry Transport. It is a publish/subscribe, extremely sim
 - Directly Publishing from embedding service (`s.Publish(topic, message, retain)`).
 - Basic Event Hooks (`OnMessage`, `onSubscribe`, `onUnsubscribe`, `OnConnect`, `OnDisconnect`, `onProcessMessage`, `OnError`, `OnStorage`).
 - ARM32 Compatible.
-- [Cluster Supported](cmd/cluster/README.md).
+- [Distributed Cluster](cmd/cluster/README.md).
 
 #### Roadmap
 - Auth plugin
