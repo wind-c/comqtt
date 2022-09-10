@@ -1,0 +1,8 @@
+
+addr: 127.0.0.1:6379
+password:
+db: 0
+auth_prefix: comqtt_user
+acl_prefix: comqtt_acl
+acl_publish: 1
+acl_subscribe: 2

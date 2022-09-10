@@ -2,10 +2,11 @@
 run-mode: 2   #Program running mode，1 single or 2 cluster
 redis-storage: true  #Whether to enable redis storage in cluster mode
 file-storage: false  #Whether to enable file storage in single-node mode
+auth-datasource: free   #Optional items:free、redis、mysql、http ...
 
 cluster:
   node-name: co-003  #The name of this node. This must be unique in the cluster.If nodename is not set, use the local hostname.
-  bind-port: 7948
+  bind-port: 7948 #The port is used for both UDP and TCP gossip.Used for member discovery and communication.
   members:  localhost:7946  #seeds member list, format such as 192.168.0.103:7946,192.168.0.104:7946
   queue-depth: 1024000 #size of Memberlist's internal channel which handles UDP messages.
   raft-port: 8703

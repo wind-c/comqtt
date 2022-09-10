@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"github.com/go-redis/redis/v8"
 	"github.com/logrusorgru/aurora"
+	iauth "github.com/wind-c/comqtt/plugin/auth"
+	rauth "github.com/wind-c/comqtt/plugin/auth/redis"
 	mqtt "github.com/wind-c/comqtt/server"
 	cs "github.com/wind-c/comqtt/server/cluster"
 	red "github.com/wind-c/comqtt/server/cluster/persistence/redis"
@@ -38,7 +40,7 @@ func main() {
 	flag.StringVar(&cfg.Mqtt.WS, "ws", ":1882", "network address for Websocket listener")
 	flag.StringVar(&cfg.Mqtt.HTTP, "http", ":8080", "network address for web info dashboard listener")
 	flag.IntVar(&cfg.Mqtt.ReceiveMaximum, "receive-maximum", 512, "the maximum number of QOS1 & 2 messages allowed to be 'inflight'")
-	flag.IntVar(&cfg.Cluster.BindPort, "port", 0, "listening port for cluster node,if this parameter is not set,then port is dynamically bound")
+	flag.IntVar(&cfg.Cluster.BindPort, "gossip-port", 0, "listening port for cluster node,if this parameter is not set,then port is dynamically bound")
 	flag.IntVar(&cfg.Cluster.RaftPort, "raft-port", 0, "listening port for raft node,if this parameter is not set,then port is dynamically bound")
 	flag.StringVar(&cfg.Cluster.Members, "members", "", "seeds member list of cluster,such as 192.168.0.103:7946,192.168.0.104:7946")
 	flag.StringVar(&cfg.Redis.Addr, "redis", "localhost:6379", "redis address for cluster mode")
@@ -118,19 +120,32 @@ func main() {
 		}
 	}
 
-	tcp := listeners.NewTCP("t1", mqttCfg.TCP)
+	var auth iauth.Auth
+	if cfg.AuthDatasource == "redis" {
+		auth, err = rauth.New("./plugin/auth/redis/conf.yml")
+		if err != nil {
+			log.Fatal(err)
+		}
+		err = auth.Open()
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer auth.Close()
+	}
+
+	tcp := listeners.NewT("t1", mqttCfg.TCP, auth)
 	err = server.AddListener(tcp, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	ws := listeners.NewWebsocket("ws1", mqttCfg.WS)
+	ws := listeners.NewW("ws1", mqttCfg.WS, auth)
 	err = server.AddListener(ws, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	stats := listeners.NewHTTPStats("stats", mqttCfg.HTTP)
+	stats := listeners.NewH("stats", mqttCfg.HTTP, nil)
 	err = server.AddListener(stats, nil)
 	if err != nil {
 		log.Fatal(err)
@@ -146,7 +161,7 @@ func main() {
 
 	if cfg.RunMode == mqtt.Cluster {
 		ops := make([]cs.Option, 3)
-		ops[0] = cs.WithLogOutput(nil, cs.LogLevelDebug) //Used to filter memberlist logs
+		ops[0] = cs.WithLogOutput(nil, cs.LogLevelInfo) //Used to filter memberlist logs
 		ops[1] = cs.WithBindPort(csCfg.BindPort)
 		ops[2] = cs.WithHandoffQueueDepth(csCfg.QueueDepth)
 		if csCfg.NodeName != "" {

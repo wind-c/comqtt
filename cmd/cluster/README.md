@@ -33,13 +33,17 @@ Usage of ./comqtt:
         read the program parameters from the config file
 ```
 
+### Configure Redis
+
+Start redis and configure redis addr in conf*.yml
+
 ### Create Cluster
 
-*Start two nodes on one laptop*
+*Start three nodes on one laptop*
 
-Start first node
+#### 1. Start first node
 ```shell
-./comqtt --mode=2 --port=7946
+./comqtt --mode=2 --gossip-port=7946 --raft-port=8701
 or
 ./comqtt --conf=./conf.yml
 ```
@@ -56,9 +60,9 @@ Local member 192.168.0.103:7946
 Cluster Node Created! 
 ```
 
-Start second node with first node as part of the member list
+#### 2. Start second node with first node as part of the member list
 ```shell
-./comqtt --mode=true --port=7947 --members=192.168.0.103:7946 --tcp=:1885 --ws=:1886 --http=:1887
+./comqtt --mode=true --gossip-port=7947 --raft-port=8702 --members=localhost:7946 --tcp=:1885 --ws=:1886 --http=:1881
 or
 ./comqtt --conf=./conf2.yml
 ```
@@ -81,6 +85,12 @@ First node output will log the new connection
 ```shell
 2022/03/17 00:20:44 [DEBUG] memberlist: Stream connection from=192.168.0.103:49756
 2022/03/17 00:20:45 [DEBUG] memberlist: Initiating push/pull sync with: 18d26675-d04f-4114-bea2-163e7a68a219 192.168.0.103:7947
+```
+#### 3. Start third node with first node as part of the member list
+```shell
+./comqtt --mode=true --gossip-port=7948 --raft-port=8703 --members=localhost:7946 --tcp=:1887 --ws=:1888 --http=:1882
+or
+./comqtt --conf=./conf3.yml
 ```
 
 ### Performance (messages/second)

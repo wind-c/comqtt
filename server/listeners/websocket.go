@@ -77,16 +77,23 @@ func (ws *wsConn) Close() error {
 	return ws.Conn.Close()
 }
 
-// NewWebsocket initialises and returns a new Websocket listener, listening on an address.
-func NewWebsocket(id, address string) *Websocket {
+func NewW(id, address string, ctl auth.Controller) *Websocket {
+	if ctl == nil {
+		ctl = new(auth.Allow)
+	}
 	return &Websocket{
 		id:      id,
 		address: address,
 		config: &Config{
-			Auth: new(auth.Allow),
+			Auth: ctl,
 			TLS:  new(TLS),
 		},
 	}
+}
+
+// NewWebsocket initialises and returns a new Websocket listener, listening on an address.
+func NewWebsocket(id, address string) *Websocket {
+	return NewW(id, address, nil)
 }
 
 // SetConfig sets the configuration values for the listener config.

@@ -17,23 +17,29 @@ import (
 // HTTPStats is a listener for presenting the server $SYS stats on a JSON http endpoint.
 type HTTPStats struct {
 	sync.RWMutex
-	id      string       // the internal id of the listener.
-	address string       // the network address to bind to.
-	config  *Config      // configuration values for the listener.
-	system  *system.Info // pointers to the server data.
-	listen  *http.Server // the http server.
-	end     uint32       // ensure the close methods are only called once.}
+	id       string       // the internal id of the listener.
+	address  string       // the network address to bind to.
+	config   *Config      // configuration values for the listener.
+	system   *system.Info // pointers to the server data.
+	listen   *http.Server // the http server.
+	end      uint32       // ensure the close methods are only called once.}
+	handlers map[string]func(http.ResponseWriter, *http.Request)
 }
 
-// NewHTTPStats initialises and returns a new HTTP listener, listening on an address.
-func NewHTTPStats(id, address string) *HTTPStats {
+func NewH(id, address string, handlers map[string]func(http.ResponseWriter, *http.Request)) *HTTPStats {
 	return &HTTPStats{
 		id:      id,
 		address: address,
 		config: &Config{
 			Auth: new(auth.Allow),
 		},
+		handlers: handlers,
 	}
+}
+
+// NewHTTPStats initialises and returns a new HTTP listener, listening on an address.
+func NewHTTPStats(id, address string) *HTTPStats {
+	return NewH(id, address, nil)
 }
 
 // SetConfig sets the configuration values for the listener config.
@@ -65,6 +71,11 @@ func (l *HTTPStats) Listen(s *system.Info) error {
 	l.system = s
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", l.jsonHandler)
+
+	for path, handler := range l.handlers {
+		mux.HandleFunc(path, handler)
+	}
+
 	l.listen = &http.Server{
 		Addr:    l.address,
 		Handler: mux,

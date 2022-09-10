@@ -21,17 +21,24 @@ type TCP struct {
 	end      uint32       // ensure the close methods are only called once.
 }
 
-// NewTCP initialises and returns a new TCP listener, listening on an address.
-func NewTCP(id, address string) *TCP {
+func NewT(id, address string, ctl auth.Controller) *TCP {
+	if ctl == nil {
+		ctl = new(auth.Allow)
+	}
 	return &TCP{
 		id:       id,
 		protocol: "tcp",
 		address:  address,
 		config: &Config{ // default configuration.
-			Auth: new(auth.Allow),
+			Auth: ctl,
 			TLS:  new(TLS),
 		},
 	}
+}
+
+// NewTCP initialises and returns a new TCP listener, listening on an address.
+func NewTCP(id, address string) *TCP {
+	return NewT(id, address, nil)
 }
 
 // SetConfig sets the configuration values for the listener config.
