@@ -21,8 +21,10 @@ Usage of ./comqtt:
         seeds member list of cluster,such as 192.168.0.103:7946,192.168.0.104:7946
   -mode
         optional value 1 single or 2 cluster (default 1)
-  -port int
+  -gossip-port int
         listening port for cluster node,if this parameter is not set,then port is dynamically bound
+  -raft-port int
+        listening port for raft node,if this parameter is not set,then port is dynamically bound      
   -redis string
         redis address for cluster mode (default "localhost:6379")
   -tcp string
