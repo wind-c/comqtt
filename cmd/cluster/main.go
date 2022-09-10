@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/go-redis/redis/v8"
@@ -15,7 +16,9 @@ import (
 	colog "github.com/wind-c/comqtt/server/log"
 	"github.com/wind-c/comqtt/server/persistence/bolt"
 	"go.etcd.io/bbolt"
+	"io"
 	"log"
+	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
@@ -99,6 +102,7 @@ func main() {
 
 	// Add store
 	if cfg.RunMode == mqtt.Cluster {
+		// use redis storage
 		if cfg.RedisStorage {
 			err = server.AddStore(red.New(&redis.Options{
 				Addr:     redisCfg.Addr,
@@ -109,57 +113,8 @@ func main() {
 				log.Fatal(err)
 			}
 		}
-	} else {
-		if cfg.FileStorage {
-			err = server.AddStore(bolt.New("comqtt.db", &bbolt.Options{
-				Timeout: 500 * time.Millisecond,
-			}))
-			if err != nil {
-				log.Fatal(err)
-			}
-		}
-	}
 
-	var auth iauth.Auth
-	if cfg.AuthDatasource == "redis" {
-		auth, err = rauth.New("./plugin/auth/redis/conf.yml")
-		if err != nil {
-			log.Fatal(err)
-		}
-		err = auth.Open()
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer auth.Close()
-	}
-
-	tcp := listeners.NewT("t1", mqttCfg.TCP, auth)
-	err = server.AddListener(tcp, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	ws := listeners.NewW("ws1", mqttCfg.WS, auth)
-	err = server.AddListener(ws, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	stats := listeners.NewH("stats", mqttCfg.HTTP, nil)
-	err = server.AddListener(stats, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	go func() {
-		err := server.Serve()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}()
-	fmt.Println(aurora.BgMagenta("Mqtt Server Started!  "))
-
-	if cfg.RunMode == mqtt.Cluster {
+		//init cluster node
 		ops := make([]cs.Option, 3)
 		ops[0] = cs.WithLogOutput(nil, cs.LogLevelInfo) //Used to filter memberlist logs
 		ops[1] = cs.WithBindPort(csCfg.BindPort)
@@ -188,7 +143,58 @@ func main() {
 		}
 
 		fmt.Println(aurora.BgMagenta("Cluster Node Created! "))
+	} else {
+		if cfg.FileStorage {
+			err = server.AddStore(bolt.New("comqtt.db", &bbolt.Options{
+				Timeout: 500 * time.Millisecond,
+			}))
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
 	}
+
+	//init and start mqtt server
+	var auth iauth.Auth
+	if cfg.AuthDatasource == "redis" {
+		auth, err = rauth.New("./plugin/auth/redis/conf.yml")
+		if err != nil {
+			log.Fatal(err)
+		}
+		err = auth.Open()
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer auth.Close()
+	}
+
+	tcp := listeners.NewT("t1", mqttCfg.TCP, auth)
+	err = server.AddListener(tcp, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ws := listeners.NewW("ws1", mqttCfg.WS, auth)
+	err = server.AddListener(ws, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	handles := make(map[string]func(http.ResponseWriter, *http.Request), 1)
+	handles["/cluster/stat"] = StatHandler
+	stats := listeners.NewH("stats", mqttCfg.HTTP, handles)
+	err = server.AddListener(stats, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	go func() {
+		err := server.Serve()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+	fmt.Println(aurora.BgMagenta("Mqtt Server Started!  "))
 
 	<-done
 	colog.Sync() //flushing any buffered log entries
@@ -196,4 +202,14 @@ func main() {
 
 	//server.Close()
 	fmt.Println(aurora.BgGreen("  Finished  "))
+}
+
+func StatHandler(w http.ResponseWriter, req *http.Request) {
+	info, err := json.MarshalIndent(cluster.Stat(), "", "\t")
+	if err != nil {
+		io.WriteString(w, err.Error())
+		return
+	}
+
+	w.Write(info)
 }

@@ -52,6 +52,7 @@ func (s *Server) readStore() error {
 // loadServerInfo restores server info from the datastore.
 func (s *Server) loadServerInfo(v persistence.ServerInfo) {
 	version := s.System.Version
+	v.ClientsConnected = 0
 	copySystemInfo(s.System, &v)
 	s.System.Version = version
 }

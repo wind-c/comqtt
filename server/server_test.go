@@ -1941,7 +1941,7 @@ func TestServerProcessSubscribe(t *testing.T) {
 
 	subscribeEvent := ""
 	subscribeClient := ""
-	s.Events.OnSubscribe = func(filter string, cl events.Client, qos byte) {
+	s.Events.OnSubscribe = func(filter string, cl events.Client, qos byte, isFirst bool) {
 		if filter == "a/b/c" {
 			subscribeEvent = "a/b/c"
 			subscribeClient = cl.ID
@@ -2125,7 +2125,7 @@ func TestServerProcessUnsubscribe(t *testing.T) {
 
 	unsubscribeEvent := ""
 	unsubscribeClient := ""
-	s.Events.OnUnsubscribe = func(filter string, cl events.Client) {
+	s.Events.OnUnsubscribe = func(filter string, cl events.Client, isLast bool) {
 		if filter == "a/b/c" {
 			unsubscribeEvent = "a/b/c"
 			unsubscribeClient = cl.ID
@@ -2551,7 +2551,7 @@ func TestServerResendClientInflight(t *testing.T) {
 
 	cl.Inflight.Set(pk1.PacketID, im)
 
-	err := s.ResendClientInflight(cl, im, true)
+	err := s.resendClientInflight(cl, im, true)
 	require.NoError(t, err)
 
 	time.Sleep(time.Millisecond)
@@ -2613,13 +2613,13 @@ func TestServerResendClientInflightBackoff(t *testing.T) {
 
 	cl.Inflight.Set(pk1.PacketID, im)
 
-	err := s.ResendClientInflight(cl, im, true)
+	err := s.resendClientInflight(cl, im, true)
 	require.NoError(t, err)
 
 	time.Sleep(time.Millisecond)
 
 	// Attempt to send twice, but backoff should kick in stopping second resend.
-	err = s.ResendClientInflight(cl, im, false)
+	err = s.resendClientInflight(cl, im, false)
 	require.NoError(t, err)
 
 	r.Close()
@@ -2648,7 +2648,7 @@ func TestServerResendClientInflightNoMessages(t *testing.T) {
 	r, _ := net.Pipe()
 	cl := clients.NewClient(r, circ.NewReader(128, 8), circ.NewWriter(128, 8), new(system.Info), s.Options.ReceiveMaximum)
 	out := []packets.Packet{}
-	cl.SendInflight(s.ResendClientInflight)
+	cl.SendInflight(s.resendClientInflight)
 	require.Equal(t, 0, len(out))
 	r.Close()
 }
@@ -2679,7 +2679,7 @@ func TestServerResendClientInflightDropMessage(t *testing.T) {
 
 	cl.Inflight.Set(pk1.PacketID, im)
 
-	err := s.ResendClientInflight(cl, im, true)
+	err := s.resendClientInflight(cl, im, true)
 	require.NoError(t, err)
 	r.Close()
 
@@ -2700,6 +2700,6 @@ func TestServerResendClientInflightError(t *testing.T) {
 	}
 	cl.Inflight.Set(1, im)
 	r.Close()
-	err := s.ResendClientInflight(cl, im, true)
+	err := s.resendClientInflight(cl, im, true)
 	require.Error(t, err)
 }

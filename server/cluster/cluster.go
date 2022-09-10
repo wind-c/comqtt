@@ -13,11 +13,11 @@ import (
 	"github.com/wind-c/comqtt/server/events"
 	"github.com/wind-c/comqtt/server/internal/packets"
 	"github.com/wind-c/comqtt/server/log"
+	"github.com/wind-c/comqtt/server/system"
 	"net"
 	"runtime"
 	"strconv"
 	"strings"
-	"time"
 )
 
 type Cluster struct {
@@ -216,6 +216,10 @@ func (c *Cluster) Broadcast(msg []byte) {
 	c.delegate.Broadcast(msg)
 }
 
+func (c *Cluster) Stat() map[string]*system.Info {
+	return c.delegate.State
+}
+
 func (c *Cluster) Stop() {
 	c.delegate.Stop()
 	c.outPool.Release()
@@ -251,7 +255,7 @@ func (c *Cluster) processInboundMsg() {
 					c.raftNode.Join(na[0], na[1]+":"+na[2])
 				}
 			case message.RaftApply:
-				c.raftNode.Apply(msg.Data, 5*time.Second)
+				c.raftNode.Apply(msg.Data, raft.DefaultRaftTimeout)
 			case packets.Publish:
 				pk := &packets.Packet{FixedHeader: packets.FixedHeader{Type: packets.Publish}}
 				pk.FixedHeader.Decode(msg.Data[0])    // Unpack fixedheader.
@@ -312,7 +316,7 @@ func (c *Cluster) OnUnsubscribe(filter string, cl events.Client, isLast bool) {
 
 func (c *Cluster) triggerRaftApply(cmd []byte) {
 	if c.raftNode.IsLeader() {
-		err := c.raftNode.Apply([]byte(cmd), 3*time.Second)
+		err := c.raftNode.Apply([]byte(cmd), raft.DefaultRaftTimeout)
 		if err != nil {
 			log.Error(err)
 		}
