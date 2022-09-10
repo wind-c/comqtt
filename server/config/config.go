@@ -2,7 +2,7 @@ package config
 
 import (
 	"gopkg.in/yaml.v3"
-	"io/ioutil"
+	"os"
 )
 
 func New() *config {
@@ -10,7 +10,7 @@ func New() *config {
 }
 
 func Load(yamlFile string) (*config, error) {
-	bs, err := ioutil.ReadFile(yamlFile)
+	bs, err := os.ReadFile(yamlFile)
 	if err != nil {
 		return nil, err
 	}
@@ -27,13 +27,14 @@ func parse(buf []byte) (*config, error) {
 }
 
 type config struct {
-	RunMode      uint    `json:"run-mode" yaml:"run-mode"`
-	RedisStorage bool    `json:"redis-storage" yaml:"redis-storage"`
-	FileStorage  bool    `json:"file-storage" yaml:"file-storage"`
-	Mqtt         mqtt    `json:"mqtt" yaml:"mqtt"`
-	Cluster      cluster `json:"cluster" yaml:"cluster"`
-	Redis        redis   `json:"redis" yaml:"redis"`
-	Log          Log     `json:"log" yaml:"log"`
+	RunMode        uint    `json:"run-mode" yaml:"run-mode"`
+	RedisStorage   bool    `json:"redis-storage" yaml:"redis-storage"`
+	FileStorage    bool    `json:"file-storage" yaml:"file-storage"`
+	AuthDatasource string  `json:"auth-datasource" yaml:"auth-datasource"`
+	Mqtt           mqtt    `json:"mqtt" yaml:"mqtt"`
+	Cluster        cluster `json:"cluster" yaml:"cluster"`
+	Redis          redis   `json:"redis" yaml:"redis"`
+	Log            Log     `json:"log" yaml:"log"`
 }
 
 type mqtt struct {

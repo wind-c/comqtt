@@ -10,7 +10,14 @@ import (
 	"time"
 
 	"github.com/hashicorp/raft"
-	raftdb "github.com/hashicorp/raft-boltdb"
+	raftdb "github.com/hashicorp/raft-boltdb/v2"
+)
+
+const (
+	retainSnapshotCount = 2
+	DefaultRaftTimeout  = 5 * time.Second
+	leaderWaitDelay     = 100 * time.Millisecond
+	appliedWaitDelay    = 100 * time.Millisecond
 )
 
 type Node struct {
@@ -21,6 +28,7 @@ type Node struct {
 func NewRaftNode(raftAddr, raftId, raftDir string) (*Node, error) {
 	config := raft.DefaultConfig()
 	config.LocalID = raft.ServerID(raftId)
+	config.LogLevel = "INFO"
 	// config.HeartbeatTimeout = 1000 * time.Millisecond
 	// config.ElectionTimeout = 1000 * time.Millisecond
 	// config.CommitTimeout = 1000 * time.Millisecond
@@ -33,7 +41,7 @@ func NewRaftNode(raftAddr, raftId, raftDir string) (*Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	snapshots, err := raft.NewFileSnapshotStore(raftDir, 2, os.Stderr)
+	snapshots, err := raft.NewFileSnapshotStore(raftDir, retainSnapshotCount, os.Stderr)
 	if err != nil {
 		return nil, err
 	}
@@ -159,4 +167,56 @@ func (n *Node) Leave(nodeID string) error {
 func (n *Node) Snapshot() error {
 	f := n.raft.Snapshot()
 	return f.Error()
+}
+
+// WaitForLeader blocks until a leader is detected, or the timeout expires.
+func (n *Node) WaitForLeader(timeout time.Duration) (string, error) {
+	tck := time.NewTicker(leaderWaitDelay)
+	defer tck.Stop()
+	tmr := time.NewTimer(timeout)
+	defer tmr.Stop()
+
+	for {
+		select {
+		case <-tck.C:
+			addr, _ := n.GetLeader()
+			if addr != "" {
+				return addr, nil
+			}
+		case <-tmr.C:
+			return "", fmt.Errorf("timeout expired")
+		}
+	}
+}
+
+// WaitForAppliedIndex blocks until a given log index has been applied,
+// or the timeout expires.
+func (n *Node) WaitForAppliedIndex(idx uint64, timeout time.Duration) error {
+	tck := time.NewTicker(appliedWaitDelay)
+	defer tck.Stop()
+	tmr := time.NewTimer(timeout)
+	defer tmr.Stop()
+
+	for {
+		select {
+		case <-tck.C:
+			if n.raft.AppliedIndex() >= idx {
+				return nil
+			}
+		case <-tmr.C:
+			return fmt.Errorf("timeout expired")
+		}
+	}
+}
+
+// WaitForApplied waits for all Raft log entries to to be applied to the
+// underlying database.
+func (n *Node) WaitForApplied(timeout time.Duration) error {
+	if timeout == 0 {
+		return nil
+	}
+	if err := n.WaitForAppliedIndex(n.raft.LastIndex(), timeout); err != nil {
+		return errors.New("timeout waiting for initial logs application")
+	}
+	return nil
 }

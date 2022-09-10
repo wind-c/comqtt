@@ -12,7 +12,7 @@ require (
 	github.com/hashicorp/logutils v1.0.0
 	github.com/hashicorp/memberlist v0.3.1
 	github.com/hashicorp/raft v1.3.9
-	github.com/hashicorp/raft-boltdb v0.0.0-20220329195025-15018e9b97e0
+	github.com/hashicorp/raft-boltdb/v2 v2.2.2
 	github.com/jinzhu/copier v0.3.5
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/panjf2000/ants/v2 v2.4.8
@@ -41,6 +41,7 @@ require (
 	github.com/hashicorp/go-msgpack v0.5.5 // indirect
 	github.com/hashicorp/go-multierror v1.0.0 // indirect
 	github.com/hashicorp/golang-lru v0.5.0 // indirect
+	github.com/hashicorp/raft-boltdb v0.0.0-20220329195025-15018e9b97e0 // indirect
 	github.com/miekg/dns v1.1.26 // indirect
 	github.com/philhofer/fwd v1.1.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect

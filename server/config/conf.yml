@@ -2,6 +2,7 @@
 run-mode: 2   #Program running mode，1 single or 2 cluster
 redis-storage: true  #Whether to enable redis storage in cluster mode
 file-storage: false  #Whether to enable file storage in single-node mode
+auth-datasource: free   #Optional items:free、redis、mysql、http ...
 
 cluster:
   node-name: co-001  #The name of this node. This must be unique in the cluster.If nodename is not set, use the local hostname.
