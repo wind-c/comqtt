@@ -15,7 +15,7 @@ CoMQTT is an embeddable high-performance MQTT broker server written in Go, and c
 
 CoMQTT is based on mochi-co/mqtt, its a very nice code base, thank you so much Mochi!
 
-<font color="#00dd00">If you like or useful to you, please give a STAR, let more know and participate in maintenance together!</font><br />
+:+1: If you like or useful to you, please give a STAR, let more know and participate in maintenance together! :muscle:
 
 > #### 📦 💬 See Github Discussions for discussions about releases
 > Ongoing discussion about current and future releases can be found at https://github.com/wind-c/comqtt/discussions
