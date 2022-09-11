@@ -150,7 +150,7 @@ func NewServer(opts *Options) *Server {
 		sysTicker: time.NewTicker(SysTopicInterval * time.Millisecond),
 		inline: inlineMessages{
 			done: make(chan bool),
-			pub:  make(chan packets.Packet, 1024),
+			pub:  make(chan packets.Packet, 4096),
 		},
 		Events:  events.Events{},
 		Options: opts,
