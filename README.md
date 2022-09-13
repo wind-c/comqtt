@@ -13,8 +13,6 @@
 
 CoMQTT is an embeddable high-performance MQTT broker server written in Go, and compliant with the MQTT v3.0 and v3.1.1 and v5.0 specification for the development of IoT and smarthome projects. The server can be used either as a standalone binary or embedded as a library in your own projects. CoMQTT message throughput is comparable with everyone's favourites such as Mosquitto, Mosca, and VerneMQ.
 
-CoMQTT is based on mochi-co/mqtt, its a very nice code base, thank you so much Mochi!
-
 :+1: If you like or useful to you, please give a STAR, let more know and participate in maintenance together! :muscle:
 
 > #### 📦 💬 See Github Discussions for discussions about releases
