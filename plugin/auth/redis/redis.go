@@ -10,10 +10,11 @@ type config struct {
 	Addr         string `json:"addr" yaml:"addr"`
 	Password     string `json:"password" yaml:"password"`
 	DB           int    `json:"db" yaml:"db"`
-	AuthPrefix   string `json:"auth_prefix" yaml:"auth_prefix"`
-	AclPrefix    string `json:"acl_prefix" yaml:"acl_prefix"`
-	AclPublish   string `json:"acl_publish" yaml:"acl_publish"`
-	AclSubscribe string `json:"acl_subscribe" yaml:"acl_subscribe"`
+	AuthPrefix   string `json:"auth-prefix" yaml:"auth-prefix"`
+	AclPrefix    string `json:"acl-prefix" yaml:"acl-prefix"`
+	AclPublish   string `json:"acl-publish" yaml:"acl-publish"`
+	AclSubscribe string `json:"acl-subscribe" yaml:"acl-subscribe"`
+	AclPubSub    string `json:"acl-pubsub" yaml:"acl-pubsub"`
 }
 
 // Auth is an auth controller which allows access to all connections and topics.
@@ -22,9 +23,9 @@ type Auth struct {
 	db   *redis.Client
 }
 
-func New(path string) (*Auth, error) {
+func New(confFile string) (*Auth, error) {
 	conf := config{}
-	err := plugin.LoadYaml(path, &conf)
+	err := plugin.LoadYaml(confFile, &conf)
 	if err != nil {
 		return nil, err
 	}
@@ -75,15 +76,13 @@ func (a *Auth) ACL(user []byte, topic string, write bool) bool {
 	if err != nil && err != redis.Nil {
 		return false
 	}
-	if res != "" {
-		if res == a.conf.AclPublish && write { //publish
-			return true
-		} else if res == a.conf.AclSubscribe && !write { //subscribe
-			return true
-		} else {
-			return false
-		}
+	if res == a.conf.AclPubSub {
+		return true
+	} else if res == a.conf.AclPublish && write { //publish
+		return true
+	} else if res == a.conf.AclSubscribe && !write { //subscribe
+		return true
+	} else {
+		return false
 	}
-
-	return false
 }

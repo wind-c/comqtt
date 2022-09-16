@@ -2,7 +2,8 @@
 addr: 127.0.0.1:6379
 password:
 db: 0
-auth_prefix: comqtt_user
-acl_prefix: comqtt_acl
-acl_publish: 1
-acl_subscribe: 2
+auth-prefix: comqtt_user
+acl-prefix: comqtt_acl
+acl-publish: 1  #result returned with publish permission
+acl-subscribe: 2  #result returned with subscribe permission
+acl-pubsub: 3  #result returned with publish and subscribe permission

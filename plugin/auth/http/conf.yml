@@ -1,0 +1,11 @@
+tls-enable: false #true(https) or false(http)
+tls-cert:
+tls-key:
+method: post  #get or post
+content-type: application/json  # application/json、 application/x-www-form-urlencoded
+auth-url: http://localhost:8080/comqtt/auth
+auth-success: 1  #result of successful authentication
+acl-url: http://localhost:8080/comqtt/acl
+acl-publish: 1  #result returned with publish permission
+acl-subscribe: 2  #result returned with subscribe permission
+acl-pubsub: 3  #result returned with publish and subscribe permission
