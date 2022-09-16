@@ -27,7 +27,7 @@ MQTT stands for MQ Telemetry Transport. It is a publish/subscribe, extremely sim
 - Trie-based Subscription model.
 - Ring Buffer packet codec.
 - TCP, Websocket, (including SSL/TLS) and Dashboard listeners.
-- Interfaces for Client Authentication and Topic access control,Redis and HTTP and Mysql authentication are already supported.
+- Interfaces for Client Authentication and Topic access control. Auth&ACL based on Redis/HTTP/Mysql is already supported.
 - Bolt persistence and storage interfaces (see examples folder).
 - Directly Publishing from embedding service (`s.Publish(topic, message, retain)`).
 - Basic Event Hooks (`OnMessage`, `onSubscribe`, `onUnsubscribe`, `OnConnect`, `OnDisconnect`, `onProcessMessage`, `OnError`, `OnStorage`).
