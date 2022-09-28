@@ -23,7 +23,7 @@ func main() {
 		done <- true
 	}()
 
-	fmt.Println(aurora.Magenta("Mochi MQTT Server initializing..."), aurora.Cyan("TCP"))
+	fmt.Println(aurora.Magenta("CoMQTT Server initializing..."), aurora.Cyan("TCP"))
 
 	// An example of configuring various server options...
 	options := &mqtt.Options{

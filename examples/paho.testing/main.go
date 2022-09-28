@@ -22,7 +22,7 @@ func main() {
 		done <- true
 	}()
 
-	fmt.Println(aurora.Magenta("Mochi MQTT Server initializing..."), aurora.Cyan("PAHO Testing Suite"))
+	fmt.Println(aurora.Magenta("CoMQTT Server initializing..."), aurora.Cyan("PAHO Testing Suite"))
 
 	server := mqtt.New()
 	tcp := listeners.NewTCP("t1", ":1883")

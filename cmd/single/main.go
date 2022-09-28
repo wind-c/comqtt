@@ -31,7 +31,7 @@ func main() {
 		done <- true
 	}()
 
-	fmt.Println(aurora.Magenta("Mochi MQTT Broker initializing..."))
+	fmt.Println(aurora.Magenta("CoMQTT Broker initializing..."))
 	fmt.Println(aurora.Cyan("TCP"), *tcpAddr)
 	fmt.Println(aurora.Cyan("Websocket"), *wsAddr)
 	fmt.Println(aurora.Cyan("$SYS Dashboard"), *infoAddr)
@@ -61,7 +61,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = server.AddStore(bolt.New("mochi-test.db", &bbolt.Options{
+	err = server.AddStore(bolt.New("comqtt-test.db", &bbolt.Options{
 		Timeout: 500 * time.Millisecond,
 	}))
 	if err != nil {

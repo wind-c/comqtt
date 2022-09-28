@@ -55,7 +55,7 @@ func main() {
 		done <- true
 	}()
 
-	fmt.Println(aurora.Magenta("Mochi MQTT Server initializing..."), aurora.Cyan("TLS/SSL"))
+	fmt.Println(aurora.Magenta("CoMQTT Server initializing..."), aurora.Cyan("TLS/SSL"))
 
 	server := mqtt.New()
 	tcp := listeners.NewTCP("t1", ":1883")

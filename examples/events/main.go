@@ -25,7 +25,7 @@ func main() {
 		done <- true
 	}()
 
-	fmt.Println(aurora.Magenta("Mochi MQTT Server initializing..."), aurora.Cyan("TCP"))
+	fmt.Println(aurora.Magenta("CoMQTT Server initializing..."), aurora.Cyan("TCP"))
 
 	server := mqtt.New()
 	tcp := listeners.NewTCP("t1", ":1883")
@@ -52,6 +52,16 @@ func main() {
 	// Add OnDisconnect Event Hook
 	server.Events.OnDisconnect = func(cl events.Client, err error) {
 		fmt.Printf("<< OnDisconnect client disconnected %s: %v\n", cl.ID, err)
+	}
+
+	// Add OnSubscribe Event Hook
+	server.Events.OnSubscribe = func(filter string, cl events.Client, qos byte, isFirst bool) {
+		fmt.Printf("<< OnSubscribe client subscribed %s: %s %d %t \n", cl.ID, filter, qos, isFirst)
+	}
+
+	// Add OnError Event Hook
+	server.Events.OnError = func(cl events.Client, err error) {
+		fmt.Printf("<< OnError client %s: %v \n", cl.ID, err)
 	}
 
 	// Add OnMessage Event Hook

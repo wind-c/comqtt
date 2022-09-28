@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	defaultPath    = "mochi.db"
+	defaultPath    = "comqtt.db"
 	defaultTimeout = 250 * time.Millisecond
 )
 
@@ -277,7 +277,7 @@ func (s *Store) ReadRetained() (v []persistence.Message, err error) {
 	return v, nil
 }
 
-//ReadServerInfo loads the server info from the boltdb instance.
+// ReadServerInfo loads the server info from the boltdb instance.
 func (s *Store) ReadServerInfo() (v persistence.ServerInfo, err error) {
 	if s.db == nil {
 		return v, errNotOpened
@@ -291,7 +291,7 @@ func (s *Store) ReadServerInfo() (v persistence.ServerInfo, err error) {
 	return v, nil
 }
 
-//ReadSubscriptionsByCid loads all the subscriptions from the boltdb instance by the client id.
+// ReadSubscriptionsByCid loads all the subscriptions from the boltdb instance by the client id.
 func (s *Store) ReadSubscriptionsByCid(cid string) (v []persistence.Subscription, err error) {
 	if s.db == nil {
 		return v, errNotOpened
@@ -305,7 +305,7 @@ func (s *Store) ReadSubscriptionsByCid(cid string) (v []persistence.Subscription
 	return v, nil
 }
 
-//ReadInflightByCid loads all the inflight messages from the boltdb instance by the client id.
+// ReadInflightByCid loads all the inflight messages from the boltdb instance by the client id.
 func (s *Store) ReadInflightByCid(cid string) (v []persistence.Message, err error) {
 	if s.db == nil {
 		return v, errNotOpened
@@ -319,7 +319,7 @@ func (s *Store) ReadInflightByCid(cid string) (v []persistence.Message, err erro
 	return v, nil
 }
 
-//ReadRetainedByTopic loads the retained message from the boltdb instance by the topic.
+// ReadRetainedByTopic loads the retained message from the boltdb instance by the topic.
 func (s *Store) ReadRetainedByTopic(topic string) (v persistence.Message, err error) {
 	if s.db == nil {
 		return v, errNotOpened
@@ -333,7 +333,7 @@ func (s *Store) ReadRetainedByTopic(topic string) (v persistence.Message, err er
 	return v, nil
 }
 
-//ReadClientByCid loads the client info from the boltdb instance.
+// ReadClientByCid loads the client info from the boltdb instance.
 func (s *Store) ReadClientByCid(cid string) (v persistence.Client, err error) {
 	if s.db == nil {
 		return v, errNotOpened
