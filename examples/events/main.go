@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"github.com/wind-c/comqtt/server/persistence/bolt"
+	"go.etcd.io/bbolt"
 	"log"
 	"os"
 	"os/signal"
@@ -32,6 +34,13 @@ func main() {
 	err := server.AddListener(tcp, &listeners.Config{
 		Auth: new(auth.Allow),
 	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = server.AddStore(bolt.New("comqtt-test.db", &bbolt.Options{
+		Timeout: 500 * time.Millisecond,
+	}))
 	if err != nil {
 		log.Fatal(err)
 	}

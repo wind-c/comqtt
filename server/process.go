@@ -275,14 +275,18 @@ func (s *Server) processSubscribe(cl *clients.Client, pk packets.Packet) error {
 		}
 		hasRetained := false
 		for _, pkv := range s.Topics.Messages(pk.Topics[i]) {
+			pkv.FixedHeader.Qos = 0 //retained message no ack
 			s.onError(ci, s.writeClient(cl, pkv))
 			hasRetained = true
 		}
 		// If local does not retained messages, read from Redis
 		if !hasRetained && s.Store != nil {
-			if msg, err := s.Store.ReadRetainedByTopic(pk.Topics[i]); err != nil {
+			msg, err := s.Store.ReadRetainedByTopic(pk.Topics[i])
+			if err != nil {
 				s.onError(ci, err)
-			} else {
+			}
+
+			if msg.TopicName != "" && msg.Payload != nil {
 				var pe uint32
 				if &msg.Properties != nil && msg.Properties.Expiry != 0 {
 					pe = uint32(msg.Properties.Expiry - time.Now().Unix())
@@ -291,6 +295,7 @@ func (s *Server) processSubscribe(cl *clients.Client, pk packets.Packet) error {
 				if pe > 0 {
 					pk.Properties.MessageExpiry = &pe
 				}
+				pk.FixedHeader.Qos = 0 //retained message no ack
 				s.onError(ci, s.writeClient(cl, *pk))
 			}
 		}

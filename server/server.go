@@ -595,6 +595,7 @@ func (s *Server) retainMessage(cl events.Clientlike, pk *packets.Packet) {
 // publishToSubscribers publishes a publish packet to all subscribers with
 // matching topic filters.
 func (s *Server) publishToSubscribers(pk packets.Packet) {
+	// Send to all subscribers
 	for id, qos := range s.Topics.Subscribers(pk.TopicName) {
 		if client, ok := s.Clients.Get(id); ok {
 			if client.ID == pk.ClientIdentifier {
