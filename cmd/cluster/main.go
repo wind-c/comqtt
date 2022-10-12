@@ -122,6 +122,15 @@ func main() {
 		if csCfg.NodeName != "" {
 			ops = append(ops, cs.WithNodeName(csCfg.NodeName))
 		}
+		if csCfg.BindAddr != "" {
+			ops = append(ops, cs.WithBindAddr(csCfg.BindAddr))
+		}
+		if csCfg.AdvertiseAddr != "" {
+			ops = append(ops, cs.WithAdvertiseAddr(csCfg.AdvertiseAddr))
+		}
+		if csCfg.AdvertisePort != 0 {
+			ops = append(ops, cs.WithAdvertisePort(csCfg.AdvertisePort))
+		}
 
 		cluster, err = cs.LaunchNode(csCfg.Members, ops...)
 		if err != nil {

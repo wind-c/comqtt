@@ -6,11 +6,14 @@ auth-datasource: free   #Optional items:free、redis、mysql、http ...
 
 cluster:
   node-name: co-002  #The name of this node. This must be unique in the cluster.If nodename is not set, use the local hostname.
-  bind-port: 7947 #The port is used for both UDP and TCP gossip.Used for member discovery and communication.
-  members:  localhost:7946  #seeds member list, format such as 192.168.0.103:7946,192.168.0.104:7946
+  bind-addr: 127.0.0.1 #Configuration related to what address to bind to and ports to listen on.
+  bind-port: 7947 #The port is used for both UDP and TCP gossip. Used for member discovery and join.
+  advertise-addr:  #Configuration related to what address to advertise to other cluster members. Used for nat traversal. The default value is bind-addr.
+  advertise-port:  #Used for member communication. If this port is not set, the default value is bind-port.
+  members: 127.0.0.1:7946  #seeds member list, format such as 192.168.0.103:7946,192.168.0.104:7946
   queue-depth: 1024000 #size of Memberlist's internal channel which handles UDP messages.
-  raft-port: 8702
-  raft-dir: ./raft/node2
+  raft-port: 8702 #Distributed consistency coordination communication port
+  raft-dir: ./raft/node2 #Distributed data storage directory
 
 mqtt:
   tcp: :1885

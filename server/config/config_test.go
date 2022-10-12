@@ -9,7 +9,10 @@ import (
 var buf = []byte(`
 cluster:
   mode: false   #true or false
-  bindport: 7946
+  bind-addr: 0.0.0.0
+  bind-port: 7946
+  advertise-addr: 0.0.0.0
+  advertise-port: 7946
   members:   #seeds member list, format such as 192.168.0.103:7946,192.168.0.104:7946
   queuedepth: 10240 #size of Memberlist's internal channel which handles UDP messages.
 
@@ -38,7 +41,7 @@ log:
     period: 1       #second
 `)
 
-var file  = "conf.yml"
+var file = "conf.yml"
 
 func TestLoadConfigFromNilFile(t *testing.T) {
 	_, err := Load("")
@@ -66,4 +69,3 @@ func TestParse(t *testing.T) {
 	require.Equal(t, 10240, cfg.Cluster.QueueDepth)
 	require.Equal(t, 3, cfg.Log.Sampler.Burst)
 }
-

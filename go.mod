@@ -11,8 +11,8 @@ require (
 	github.com/gorilla/websocket v1.5.0
 	github.com/hashicorp/go-sockaddr v1.0.2
 	github.com/hashicorp/logutils v1.0.0
-	github.com/hashicorp/memberlist v0.3.1
-	github.com/hashicorp/raft v1.3.9
+	github.com/hashicorp/memberlist v0.5.0
+	github.com/hashicorp/raft v1.3.11
 	github.com/hashicorp/raft-boltdb/v2 v2.2.2
 	github.com/jinzhu/copier v0.3.5
 	github.com/jmoiron/sqlx v1.3.5
@@ -56,5 +56,5 @@ require (
 	go.uber.org/multierr v1.6.0 // indirect
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9 // indirect
 	golang.org/x/net v0.0.0-20210428140749-89ef3d95e781 // indirect
-	golang.org/x/sys v0.0.0-20211216021012-1d35b9e2eb4e // indirect
+	golang.org/x/sys v0.0.0-20220728004956-3c1f35247d10 // indirect
 )

@@ -20,24 +20,45 @@ const (
 type Option func(conf *memberlist.Config)
 
 func NewOptions(opts ...Option) *memberlist.Config {
-	conf := memberlist.DefaultLANConfig()  // or memberlist.DefaultLocalConfig()
+	conf := memberlist.DefaultLANConfig() // or memberlist.DefaultLocalConfig()
 	for _, o := range opts {
 		o(conf)
 	}
 	return conf
 }
 
-//WithNodeName the name of this node. This must be unique in the cluster.
+// WithNodeName the name of this node. This must be unique in the cluster.
 func WithNodeName(name string) Option {
 	return func(conf *memberlist.Config) {
 		conf.Name = name
 	}
 }
 
-//WithBindPort 0 dynamically bind a port
+// WithBindAddr "" default "0.0.0.0"
+func WithBindAddr(bindAddr string) Option {
+	return func(conf *memberlist.Config) {
+		conf.BindAddr = bindAddr
+	}
+}
+
+// WithBindPort 0 dynamically bind a port
 func WithBindPort(bindPort int) Option {
 	return func(conf *memberlist.Config) {
 		conf.BindPort = bindPort
+	}
+}
+
+// WithAdvertiseAddr "" default "0.0.0.0"
+func WithAdvertiseAddr(advertiseAddr string) Option {
+	return func(conf *memberlist.Config) {
+		conf.AdvertiseAddr = advertiseAddr
+	}
+}
+
+// WithAdvertisePort 0 dynamically bind a port
+func WithAdvertisePort(advertisePort int) Option {
+	return func(conf *memberlist.Config) {
+		conf.AdvertisePort = advertisePort
 	}
 }
 
@@ -92,4 +113,3 @@ func WithCIDRsAllowed(ips []net.IPNet) Option {
 		conf.CIDRsAllowed = ips
 	}
 }
-

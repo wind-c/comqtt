@@ -54,12 +54,15 @@ type redis struct {
 }
 
 type cluster struct {
-	NodeName   string `json:"node-name" yaml:"node-name"`
-	BindPort   int    `json:"bind-port" yaml:"bind-port"`
-	Members    string `json:"members" yaml:"members"`
-	QueueDepth int    `json:"queue-depth" yaml:"queue-depth"`
-	RaftPort   int    `json:"raft-port" yaml:"raft-port"`
-	RaftDir    string `json:"raft-dir" yaml:"raft-dir"`
+	NodeName      string `json:"node-name" yaml:"node-name"`
+	BindAddr      string `json:"bind-addr" yaml:"bind-addr"`
+	BindPort      int    `json:"bind-port" yaml:"bind-port"`
+	AdvertiseAddr string `json:"advertise-addr" yaml:"advertise-addr"`
+	AdvertisePort int    `json:"advertise-port" yaml:"advertise-port"`
+	Members       string `json:"members" yaml:"members"`
+	QueueDepth    int    `json:"queue-depth" yaml:"queue-depth"`
+	RaftPort      int    `json:"raft-port" yaml:"raft-port"`
+	RaftDir       string `json:"raft-dir" yaml:"raft-dir"`
 }
 
 type Log struct {
