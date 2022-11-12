@@ -91,7 +91,7 @@ func Create(conf *memberlist.Config) (c *Cluster, err error) {
 	op, err := ants.NewPoolWithFunc(gps, func(i interface{}) {
 		v, ok := i.(packets.Packet)
 		if ok {
-			c.processPacket(v)
+			c.processOutboundPacket(v)
 		}
 	})
 	if err != nil {
@@ -314,15 +314,20 @@ func (c *Cluster) OnUnsubscribe(filter string, cl events.Client, isLast bool) {
 	c.raftPool.Invoke([]byte(cmd))
 }
 
+// triggerRaftApply send the message to the leader apply
 func (c *Cluster) triggerRaftApply(cmd []byte) {
 	if c.raftNode.IsLeader() {
-		err := c.raftNode.Apply([]byte(cmd), raft.DefaultRaftTimeout)
+		err := c.raftNode.Apply(cmd, raft.DefaultRaftTimeout)
 		if err != nil {
-			log.Error(err)
+			log.Error(err, log.String("node", c.LocalNode().Name), log.String("apply", string(cmd)))
 		}
 	} else { //send to leader apply
-		msg := message.Message{Type: message.RaftApply, Data: []byte(cmd)}
+		msg := message.Message{Type: message.RaftApply, Data: cmd}
 		_, leaderId := c.raftNode.GetLeader()
+		if leaderId == "" {
+			log.Error(errors.New("No leader found, failed to send the apply command!"), log.String("apply", string(cmd)))
+			return
+		}
 		c.SendToNode(leaderId, msg.Bytes())
 	}
 }
@@ -331,7 +336,8 @@ func (c *Cluster) OnError(cl events.Client, err error) {
 	log.Error(err, log.String("cid", cl.ID), log.String("rm", cl.Remote), log.String("lt", cl.Listener))
 }
 
-func (c *Cluster) processPacket(pk packets.Packet) {
+// processOutboundPacket process outbound msg
+func (c *Cluster) processOutboundPacket(pk packets.Packet) {
 	msg := message.Message{}
 	switch pk.FixedHeader.Type {
 	case packets.Publish:

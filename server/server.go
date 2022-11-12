@@ -458,7 +458,7 @@ func (s *Server) unsubscribeClient(cl *clients.Client) {
 	}
 }
 
-// LoadClientHistory loads its history info for the connected client,
+// loadClientHistory loads its history info for the connected client,
 func (s *Server) loadClientHistory(cl *clients.Client) {
 	if s.Store == nil {
 		return
@@ -494,7 +494,7 @@ func (s *Server) loadClientHistory(cl *clients.Client) {
 	}
 }
 
-// ResendClientInflight attempts to resend all undelivered inflight messages
+// resendClientInflight attempts to resend all undelivered inflight messages
 // to a client.
 func (s *Server) resendClientInflight(cl *clients.Client, im *clients.InflightMessage, force bool) error {
 	nt := time.Now().Unix()
