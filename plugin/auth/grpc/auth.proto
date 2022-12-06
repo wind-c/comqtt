@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+option go_package = ".;pb";
+
+message AuthReq {
+  bytes user = 1;
+  bytes password=2;
+}
+
+message AuthResp {
+  bool code = 1;
+}
+
+message  ACLReq{
+  bytes  user=1;
+  string  topic=2;
+  bool  write=3;
+}
+
+service Authenticate{
+  rpc Authenticate(AuthReq) returns(AuthResp){}
+  rpc Acl(ACLReq) returns(AuthResp){}
+}

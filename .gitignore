@@ -23,3 +23,4 @@ go.work
 .idea/
 *.db
 .DS_Store
+*.pb.go
