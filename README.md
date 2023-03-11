@@ -48,7 +48,6 @@ Comqtt can be used as a standalone broker. Simply checkout this repository and r
 ```
 cd cmd/single
 go build -o comqtt cmd/single/main.go
-
 ```
 ### Start
 ```
