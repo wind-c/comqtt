@@ -1,17 +1,21 @@
+auth-mode: 1  # 0 Anonymous, 1 Username, 2 ClientID
+acl-mode: 2  # 0 Anonymous, 1 Username, 2 ClientID
 
-host: localhost
-port: 5432
-schema: comqtt
-sslmode: disable
-login-name: postgres
-login-password: 12345678
-max-open-conns: 200
-max-idle-conns: 100
+dsn:
+  host: localhost
+  port: 5432
+  schema: comqtt
+  sslmode: disable
+  login-name: postgres
+  login-password: 12345678
+  max-open-conns: 200
+  max-idle-conns: 100
 
 auth:
   table: auth
   user-column: username
   password-column: password
+  allow-column: allow
 
 acl:
   table: acl

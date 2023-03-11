@@ -1,23 +1,24 @@
+auth-mode: 1  # 0 Anonymous, 1 Username, 2 ClientID
+acl-mode: 2  # 0 Anonymous, 1 Username, 2 ClientID
 
-host: localhost
-port: 3306
-schema: comqtt
-charset: utf8
-login-name: root
-login-password: 12345678
-max-open-conns: 200
-max-idle-conns: 100
+dsn:
+  host: localhost
+  port: 3306
+  schema: comqtt
+  charset: utf8
+  login-name: root
+  login-password: 12345678
+  max-open-conns: 200
+  max-idle-conns: 100
 
 auth:
   table: auth
   user-column: username
   password-column: password
+  allow-column: allow
 
 acl:
   table: acl
   user-column: username
   topic-column: topic
-  access-column: access  # 1 publish、2 subscribe、3 pubsub
-  publish: 1  #result returned with publish permission
-  subscribe: 2  #result returned with subscribe permission
-  pubsub: 3  #result returned with publish and subscribe permission
+  access-column: access  # 0 Deny、1 publish (Write)、2 subscribe (Read)、3 pubsub (ReadWrite)

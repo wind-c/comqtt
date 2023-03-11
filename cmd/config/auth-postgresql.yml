@@ -1,0 +1,27 @@
+auth-mode: 1  # 0 Anonymous, 1 Username, 2 ClientID
+acl-mode: 2  # 0 Anonymous, 1 Username, 2 ClientID
+
+dsn:
+  host: localhost
+  port: 5432
+  schema: comqtt
+  sslmode: disable
+  login-name: postgres
+  login-password: 12345678
+  max-open-conns: 200
+  max-idle-conns: 100
+
+auth:
+  table: auth
+  user-column: username
+  password-column: password
+  allow-column: allow
+
+acl:
+  table: acl
+  user-column: username  # or client_id, set this parameter based on the actual field name
+  topic-column: topic
+  access-column: access  # 1 publish、2 subscribe、3 pubsub
+  publish: 1  #result returned with publish permission
+  subscribe: 2  #result returned with subscribe permission
+  pubsub: 3  #result returned with publish and subscribe permission

@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+option go_package = "github.com/wind-c/cluster/rpc";
+
+service Relays {
+  rpc PublishPacket(PublishRequest) returns (Response) {}
+  rpc ConnectNotify(ConnectRequest) returns (Response) {}
+  rpc RaftApply(ApplyRequest) returns (Response) {}
+  rpc RaftJoin(JoinRequest) returns (Response) {}
+}
+
+message PublishRequest {
+  string nodeId = 1;
+  string clientId = 2;
+  uint32 protocolVersion = 3;
+  bytes  payload = 4;
+}
+
+message ConnectRequest {
+  string nodeId = 1;
+  string clientId = 2;
+}
+
+message Response {
+  bool ok = 1;
+}
+
+message ApplyRequest {
+  uint32 action = 1;
+  string nodeId = 2;
+  bytes  filter = 3;
+}
+
+message JoinRequest {
+  string nodeId = 1;
+  string addr = 2;
+  uint32 port = 3;
+}
+

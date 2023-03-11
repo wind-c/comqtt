@@ -1,0 +1,23 @@
+auth:
+    - client: comqtt_7e8af7a4
+      allow: false
+    - remote: 116.205.234.66:*
+      allow: false
+    - remote: 127.0.0.1:*
+      allow: true
+    - remote: localhost:*
+      allow: true
+acl:
+    # 0 = deny, 1 = read only, 2 = write only, 3 = read and write
+    # check from top to bottom，
+    - remote: 127.0.0.1:*
+    - username: dashboard
+      filters:
+        $SYS/#: 1
+    - username:
+      filters:
+        $SYS/#: 0
+        /#: 0
+        '#': 0
+        +: 0
+        +/+: 0

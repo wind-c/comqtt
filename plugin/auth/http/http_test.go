@@ -1,48 +1,99 @@
 package http
 
 import (
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
+	"github.com/wind-c/comqtt/mqtt"
+	"github.com/wind-c/comqtt/mqtt/hooks/auth"
+	"github.com/wind-c/comqtt/mqtt/packets"
+	"github.com/wind-c/comqtt/plugin"
 	"gopkg.in/h2non/gock.v1"
+	"os"
 	"testing"
 )
 
 const path = "./conf.yml"
 
-func TestAuthenticateWithPost(t *testing.T) {
-	a, _ := New(path)
-	a.conf.Method = "post"
-	user := "zhangsan"
-	password := "127834"
+var (
+	logger = zerolog.New(os.Stderr).With().Timestamp().Logger().Level(zerolog.Disabled)
 
+	client = &mqtt.Client{
+		ID: "test",
+		Net: mqtt.ClientConnection{
+			Remote:   "test.addr",
+			Listener: "listener",
+		},
+		Properties: mqtt.ClientProperties{
+			Username: []byte("zhangsan"),
+			Clean:    false,
+		},
+	}
+
+	pkf = packets.Packet{Filters: packets.Subscriptions{{Filter: "a/b/c"}}}
+
+	pkc = packets.Packet{Connect: packets.ConnectParams{Password: []byte("321654")}}
+)
+
+func newAuth(t *testing.T) *Auth {
+	a := new(Auth)
+	a.SetOpts(&logger, nil)
+
+	err := a.Init(&Options{
+		AuthMode:    byte(auth.AuthUsername),
+		AclMode:     byte(auth.AuthUsername),
+		Method:      "post",
+		ContentType: "application/json",
+		AuthUrl:     "http://localhost:8080/comqtt/auth",
+		AclUrl:      "http://localhost:8080/comqtt/acl",
+	})
+	require.NoError(t, err)
+
+	return a
+}
+
+func TestInitFromConfFile(t *testing.T) {
+	a := new(Auth)
+	a.SetOpts(&logger, nil)
+	opts := Options{}
+	err := plugin.LoadYaml(path, &opts)
+	require.NoError(t, err)
+
+	err = a.Init(&opts)
+	require.NoError(t, err)
+}
+
+func TestAuthenticateWithPost(t *testing.T) {
+	a := newAuth(t)
+	user := "zhangsan"
+	password := "321654"
 	defer gock.Off() // Flush pending mocks after test execution
 	gock.New("http://localhost:8080").
 		Post("/comqtt/auth").
 		JSON(map[string]string{"user": user, "password": password}).
-		Reply(200).BodyString(a.conf.AuthSuccess)
-	result := a.Authenticate([]byte(user), []byte(password))
+		Reply(200).BodyString("1")
+	result := a.OnConnectAuthenticate(client, pkc)
 	require.Equal(t, true, result)
 }
 
 func TestAuthenticateWithGet(t *testing.T) {
-	a, _ := New(path)
-	a.conf.Method = "get"
+	a := newAuth(t)
+	a.config.Method = "get"
 	user := "zhangsan"
-	password := "127834"
+	password := "321654"
 
 	defer gock.Off() // Flush pending mocks after test execution
 	gock.New("http://localhost:8080").
 		Get("/comqtt/auth").
 		MatchParam("user", user).
 		MatchParam("password", password).
-		Reply(200).BodyString(a.conf.AuthSuccess)
+		Reply(200).BodyString("1")
 
-	result := a.Authenticate([]byte(user), []byte(password))
+	result := a.OnConnectAuthenticate(client, pkc)
 	require.Equal(t, true, result)
 }
 
 func TestAclWithPost(t *testing.T) {
-	a, _ := New(path)
-	a.conf.Method = "post"
+	a := newAuth(t)
 	user := "zhangsan"
 	topic := "topictest/1"
 	topic2 := "topictest/2"
@@ -52,53 +103,53 @@ func TestAclWithPost(t *testing.T) {
 	gock.New("http://localhost:8080").
 		Post("/comqtt/acl").
 		JSON(map[string]string{"user": user, "topic": topic}).
-		Reply(200).BodyString(a.conf.AuthSuccess)
-	result := a.ACL([]byte(user), topic, true)
+		Reply(200).BodyString("2")
+	result := a.OnACLCheck(client, topic, true)
 	require.Equal(t, true, result)
 
 	//subscribe
 	gock.New("http://localhost:8080").
 		Post("/comqtt/acl").
 		JSON(map[string]string{"user": user, "topic": topic}).
-		Reply(200).BodyString(a.conf.AuthSuccess)
-	result = a.ACL([]byte(user), topic, false)
-	require.Equal(t, false, result)
+		Reply(200).BodyString("1")
+	result = a.OnACLCheck(client, topic, false)
+	require.Equal(t, true, result)
 
 	//publish topic2, topic2 does not exist
 	gock.New("http://localhost:8080").
 		Post("/comqtt/acl").
-		JSON(map[string]string{"user": user, "topic": topic}).
-		Reply(200).BodyString(a.conf.AuthSuccess)
-	result = a.ACL([]byte(user), topic2, true)
+		JSON(map[string]string{"user": user, "topic": topic2}).
+		Reply(200).BodyString("0")
+	result = a.OnACLCheck(client, topic2, true)
 	require.Equal(t, false, result)
 
 	//subscribe topic2, topic2 does not exist
 	gock.New("http://localhost:8080").
 		Post("/comqtt/acl").
-		JSON(map[string]string{"user": user, "topic": topic}).
-		Reply(200).BodyString(a.conf.AuthSuccess)
-	result = a.ACL([]byte(user), topic2, false)
+		JSON(map[string]string{"user": user, "topic": topic2}).
+		Reply(200).BodyString("0")
+	result = a.OnACLCheck(client, topic2, false)
 	require.Equal(t, false, result)
 
 	//pubsub
 	gock.New("http://localhost:8080").
 		Post("/comqtt/acl").
 		JSON(map[string]string{"user": user, "topic": topic2}).
-		Reply(200).BodyString(a.conf.AclPubSub)
-	result = a.ACL([]byte(user), topic2, true)
+		Reply(200).BodyString("3")
+	result = a.OnACLCheck(client, topic2, true)
 	require.Equal(t, true, result)
 
 	gock.New("http://localhost:8080").
 		Post("/comqtt/acl").
 		JSON(map[string]string{"user": user, "topic": topic2}).
-		Reply(200).BodyString(a.conf.AclPubSub)
-	result = a.ACL([]byte(user), topic2, false)
+		Reply(200).BodyString("3")
+	result = a.OnACLCheck(client, topic2, false)
 	require.Equal(t, true, result)
 }
 
 func TestAclWithGet(t *testing.T) {
-	a, _ := New(path)
-	a.conf.Method = "get"
+	a := newAuth(t)
+	a.config.Method = "get"
 	user := "zhangsan"
 	topic := "topictest/1"
 	topic2 := "topictest/2"
@@ -106,29 +157,29 @@ func TestAclWithGet(t *testing.T) {
 	defer gock.Off() // Flush pending mocks after test execution
 
 	//publish
-	gock.New("http://localhost:8080").
-		Get("/comqtt/acl").
+	gock.NewRequest().
+		Get("http://localhost:8080/comqtt/acl").
 		MatchParam("user", user).
 		MatchParam("topic", topic).
-		Reply(200).BodyString(a.conf.AclPublish)
-	result := a.ACL([]byte(user), topic, true)
+		Reply(200).BodyString("2")
+	result := a.OnACLCheck(client, topic, true)
 	require.Equal(t, true, result)
 
 	//subscribe
-	gock.New("http://localhost:8080").
-		Get("/comqtt/acl").
+	gock.NewRequest().
+		Get("http://localhost:8080/comqtt/acl").
 		MatchParam("user", user).
 		MatchParam("topic", topic).
-		Reply(200).BodyString(a.conf.AclPublish)
-	result = a.ACL([]byte(user), topic, false)
-	require.Equal(t, false, result)
+		Reply(200).BodyString("1")
+	result = a.OnACLCheck(client, topic, false)
+	require.Equal(t, true, result)
 
 	//publish topic2, topic2 does not exist
-	gock.New("http://localhost:8080").
-		Get("/comqtt/acl").
+	gock.NewRequest().
+		Get("http://localhost:8080/comqtt/acl").
 		MatchParam("user", user).
 		MatchParam("topic", topic).
-		Reply(200).BodyString(a.conf.AclPublish)
-	result = a.ACL([]byte(user), topic2, true)
+		Reply(200).BodyString("0")
+	result = a.OnACLCheck(client, topic2, true)
 	require.Equal(t, false, result)
 }

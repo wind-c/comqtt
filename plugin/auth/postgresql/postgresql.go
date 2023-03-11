@@ -1,13 +1,27 @@
 package postgresql
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
+	"github.com/wind-c/comqtt/mqtt"
+	"github.com/wind-c/comqtt/mqtt/hooks/auth"
+	"github.com/wind-c/comqtt/mqtt/packets"
 	"github.com/wind-c/comqtt/plugin"
+	pa "github.com/wind-c/comqtt/plugin/auth"
 )
 
-type config struct {
+type Options struct {
+	pa.Blacklist
+	AuthMode byte      `json:"auth-mode" yaml:"auth-mode"`
+	AclMode  byte      `json:"acl-mode" yaml:"acl-mode"`
+	Dsn      DsnInfo   `json:"dsn" yaml:"dsn"`
+	Auth     AuthTable `json:"auth" yaml:"auth"`
+	Acl      AclTable  `json:"acl" yaml:"acl"`
+}
+
+type DsnInfo struct {
 	Host          string `json:"host" yaml:"host"`
 	Port          int    `json:"port" yaml:"port"`
 	Schema        string `json:"schema" yaml:"schema"`
@@ -16,103 +30,161 @@ type config struct {
 	LoginPassword string `json:"login-password" yaml:"login-password"`
 	MaxOpenConns  int    `json:"max-open-conns" yaml:"max-open-conns"`
 	MaxIdleConns  int    `json:"max-idle-conns" yaml:"max-idle-conns"`
-	Auth          auth   `json:"auth" yaml:"auth"`
-	Acl           acl    `json:"acl" yaml:"acl"`
 }
 
-type auth struct {
+type AuthTable struct {
 	Table          string `json:"table" yaml:"table"`
 	UserColumn     string `json:"user-column" yaml:"user-column"`
 	PasswordColumn string `json:"password-column" yaml:"password-column"`
+	AllowColumn    string `json:"allow-column" yaml:"allow-column"`
 }
 
-type acl struct {
+type AclTable struct {
 	Table        string `json:"table" yaml:"table"`
 	UserColumn   string `json:"user-column" yaml:"user-column"`
 	TopicColumn  string `json:"topic-column" yaml:"topic-column"`
 	AccessColumn string `json:"access-column" yaml:"access-column"`
-	Publish      string `json:"publish" yaml:"publish"`
-	Subscribe    string `json:"subscribe" yaml:"subscribe"`
-	PubSub       string `json:"pubsub" yaml:"pubsub"`
 }
 
 // Auth is an auth controller which allows access to all connections and topics.
 type Auth struct {
-	conf     config
+	mqtt.HookBase
+	config   *Options
 	db       *sqlx.DB
 	authStmt *sqlx.Stmt
 	aclStmt  *sqlx.Stmt
 }
 
-func New(confFile string) (*Auth, error) {
-	conf := config{}
-	err := plugin.LoadYaml(confFile, &conf)
-	if err != nil {
-		return nil, err
-	}
-	return &Auth{
-		conf: conf,
-	}, nil
+// ID returns the ID of the hook.
+func (a *Auth) ID() string {
+	return "auth-postgresql"
 }
 
-func (a *Auth) Open() error {
+// Provides indicates which hook methods this hook provides.
+func (a *Auth) Provides(b byte) bool {
+	return bytes.Contains([]byte{
+		mqtt.OnConnectAuthenticate,
+		mqtt.OnACLCheck,
+	}, []byte{b})
+}
+
+func (a *Auth) Init(config any) error {
+	if _, ok := config.(*Options); config == nil || (!ok && config != nil) {
+		return mqtt.ErrInvalidConfigType
+	}
+
+	a.config = config.(*Options)
+	a.Log.Info().
+		Str("host", a.config.Dsn.Host).
+		Str("username", a.config.Dsn.LoginName).
+		Int("password-len", len(a.config.Dsn.LoginPassword)).
+		Str("db", a.config.Dsn.Schema).
+		Msg("connecting to postgresql")
+
 	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		a.conf.Host, a.conf.Port, a.conf.LoginName, a.conf.LoginPassword, a.conf.Schema, a.conf.SslMode)
+		a.config.Dsn.Host, a.config.Dsn.Port, a.config.Dsn.LoginName, a.config.Dsn.LoginPassword, a.config.Dsn.Schema, a.config.Dsn.SslMode)
 	sqlxDB, err := sqlx.Connect("postgres", dsn)
 	if err != nil {
 		return err
 	}
-	sqlxDB.SetMaxOpenConns(a.conf.MaxOpenConns)
-	sqlxDB.SetMaxIdleConns(a.conf.MaxIdleConns)
+	sqlxDB.SetMaxOpenConns(a.config.Dsn.MaxOpenConns)
+	sqlxDB.SetMaxIdleConns(a.config.Dsn.MaxIdleConns)
 
-	authSql := fmt.Sprintf("select %s from %s where %s=? and %s=?",
-		a.conf.Auth.UserColumn, a.conf.Auth.Table, a.conf.Auth.UserColumn, a.conf.Auth.PasswordColumn)
-	aclSql := fmt.Sprintf("select %s from %s where %s=? and %s=?",
-		a.conf.Acl.AccessColumn, a.conf.Acl.Table, a.conf.Acl.UserColumn, a.conf.Acl.TopicColumn)
+	authSql := fmt.Sprintf("select %s, %s from %s where %s=?",
+		a.config.Auth.PasswordColumn, a.config.Auth.AllowColumn, a.config.Auth.Table, a.config.Auth.UserColumn)
+	aclSql := fmt.Sprintf("select %s, %s from %s where %s=?",
+		a.config.Acl.TopicColumn, a.config.Acl.AccessColumn, a.config.Acl.Table, a.config.Acl.UserColumn)
 	a.authStmt, _ = sqlxDB.Preparex(authSql)
 	a.aclStmt, _ = sqlxDB.Preparex(aclSql)
 	a.db = sqlxDB
 	return nil
 }
 
-// Close closes the redis instance.
-func (a *Auth) Close() {
+// Stop closes the postgresql connection.
+func (a *Auth) Stop() error {
+	a.Log.Info().Msg("disconnecting from postgresql")
 	a.authStmt.Close()
 	a.aclStmt.Close()
-	a.db.Close()
+	return a.db.Close()
 }
 
-// Authenticate returns true if a username and password are acceptable. Allow always
-// returns true.
-func (a *Auth) Authenticate(user, password []byte) bool {
-	var username string
-	err := a.authStmt.QueryRowx(string(user), string(password)).Scan(&username)
-	if err != nil {
+// OnConnectAuthenticate returns true if the connecting client has rules which provide access
+// in the auth ledger.
+func (a *Auth) OnConnectAuthenticate(cl *mqtt.Client, pk packets.Packet) bool {
+	if a.config.AuthMode == byte(auth.AuthAnonymous) {
+		return true
+	}
+
+	// check blacklist
+	if n, ok := a.config.CheckBLAuth(cl, pk); n >= 0 { // It's on the blacklist
+		return ok
+	}
+
+	// normal verification
+	var key string
+	if a.config.AuthMode == byte(auth.AuthUsername) {
+		key = string(cl.Properties.Username)
+	} else if a.config.AuthMode == byte(auth.AuthClientID) {
+		key = cl.ID
+	} else {
 		return false
 	}
-	if username != "" {
+
+	var password string
+	var allow int
+	err := a.authStmt.QueryRowx(key).Scan(&password, &allow)
+	if err != nil || allow == 0 {
+		return false
+	}
+
+	if password == string(pk.Connect.Password) {
 		return true
 	} else {
 		return false
 	}
 }
 
-// ACL returns true if a user has access permissions to read or write on a topic.
-// Allow always returns true.
-func (a *Auth) ACL(user []byte, topic string, write bool) bool {
-	var access string
-	err := a.aclStmt.QueryRowx(string(user), topic).Scan(&access)
-	if err != nil {
-		return false
+// OnACLCheck returns true if the connecting client has matching read or write access to subscribe
+// or publish to a given topic.
+func (a *Auth) OnACLCheck(cl *mqtt.Client, topic string, write bool) bool {
+	if a.config.AclMode == byte(auth.AuthAnonymous) {
+		return true
 	}
-	if access == a.conf.Acl.PubSub {
-		return true
-	} else if access == a.conf.Acl.Publish && write { //publish
-		return true
-	} else if access == a.conf.Acl.Subscribe && !write { //subscribe
-		return true
+
+	// check blacklist
+	if n, ok := a.config.CheckBLAcl(cl, topic, write); n >= 0 { // It's on the blacklist
+		return ok
+	}
+
+	// normal verification
+	var key string
+	if a.config.AclMode == byte(auth.AuthUsername) {
+		key = string(cl.Properties.Username)
+	} else if a.config.AclMode == byte(auth.AuthClientID) {
+		key = cl.ID
 	} else {
 		return false
 	}
-	return true
+
+	rows, err := a.aclStmt.Query(key)
+	if err != nil {
+		return false
+	}
+
+	fam := make(map[string]auth.Access)
+	for rows.Next() {
+		var filter string
+		var access byte
+		if err := rows.Scan(&filter, &access); err != nil {
+			continue
+		}
+
+		if !plugin.MatchTopic(filter, topic) {
+			continue
+		}
+
+		fam[filter] = auth.Access(access)
+	}
+
+	return pa.CheckAcl(fam, write)
 }

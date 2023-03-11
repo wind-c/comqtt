@@ -3,7 +3,11 @@ package http
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/wind-c/comqtt/mqtt"
+	"github.com/wind-c/comqtt/mqtt/hooks/auth"
+	"github.com/wind-c/comqtt/mqtt/packets"
 	"github.com/wind-c/comqtt/plugin"
+	pa "github.com/wind-c/comqtt/plugin/auth"
 	"io"
 	"net/http"
 	"net/url"
@@ -15,46 +19,73 @@ const (
 	TypeForm = "application/x-www-form-urlencoded"
 )
 
-type config struct {
-	TlsEnable    bool   `json:"tls-enable" yaml:"tls-enable"`
-	TlsCert      string `json:"tls-cert" yaml:"tls-cert"`
-	TlsKey       string `json:"tls-key" yaml:"tls-key"`
-	Method       string `json:"method" yaml:"method"`
-	ContentType  string `json:"content-type" yaml:"content-type"`
-	AuthUrl      string `json:"auth-url" yaml:"auth-url"`
-	AuthSuccess  string `json:"auth-success" yaml:"auth-success"`
-	AclUrl       string `json:"acl-url" yaml:"acl-url"`
-	AclPublish   string `json:"acl-publish" yaml:"acl-publish"`
-	AclSubscribe string `json:"acl-subscribe" yaml:"acl-subscribe"`
-	AclPubSub    string `json:"acl-pubsub" yaml:"acl-pubsub"`
+type Options struct {
+	pa.Blacklist
+	AuthMode    byte   `json:"auth-mode" yaml:"auth-mode"`
+	AclMode     byte   `json:"acl-mode" yaml:"acl-mode"`
+	TlsEnable   bool   `json:"tls-enable" yaml:"tls-enable"`
+	TlsCert     string `json:"tls-cert" yaml:"tls-cert"`
+	TlsKey      string `json:"tls-key" yaml:"tls-key"`
+	Method      string `json:"method" yaml:"method"`
+	ContentType string `json:"content-type" yaml:"content-type"`
+	AuthUrl     string `json:"auth-url" yaml:"auth-url"`
+	AclUrl      string `json:"acl-url" yaml:"acl-url"`
 }
 
 // Auth is an auth controller which allows access to all connections and topics.
 type Auth struct {
-	conf config
+	mqtt.HookBase
+	config *Options
 }
 
-func New(confFile string) (*Auth, error) {
-	conf := config{}
-	err := plugin.LoadYaml(confFile, &conf)
-	if err != nil {
-		return nil, err
+// ID returns the ID of the hook.
+func (a *Auth) ID() string {
+	return "auth-http"
+}
+
+// Provides indicates which hook methods this hook provides.
+func (a *Auth) Provides(b byte) bool {
+	return bytes.Contains([]byte{
+		mqtt.OnConnectAuthenticate,
+		mqtt.OnACLCheck,
+	}, []byte{b})
+}
+
+func (a *Auth) Init(config any) error {
+	if _, ok := config.(*Options); config == nil || (!ok && config != nil) {
+		return mqtt.ErrInvalidConfigType
 	}
-	return &Auth{
-		conf: conf,
-	}, nil
-}
 
-func (a *Auth) Open() error {
+	a.config = config.(*Options)
+	a.Log.Info().
+		Str("auth-url", a.config.AuthUrl).
+		Str("acl-url", a.config.AclUrl)
+
 	return nil
 }
 
-func (a *Auth) Close() {
-}
+// OnConnectAuthenticate returns true if the connecting client has rules which provide access
+// in the auth ledger.
+func (a *Auth) OnConnectAuthenticate(cl *mqtt.Client, pk packets.Packet) bool {
+	if a.config.AuthMode == byte(auth.AuthAnonymous) {
+		return true
+	}
 
-// Authenticate returns true if a username and password are acceptable. Allow always
-// returns true.
-func (a *Auth) Authenticate(user, password []byte) bool {
+	// check blacklist
+	if n, ok := a.config.CheckBLAuth(cl, pk); n >= 0 { // It's on the blacklist
+		return ok
+	}
+
+	// normal verification
+	var key string
+	if a.config.AuthMode == byte(auth.AuthUsername) {
+		key = string(cl.Properties.Username)
+	} else if a.config.AuthMode == byte(auth.AuthClientID) {
+		key = cl.ID
+	} else {
+		return false
+	}
+
 	var err error
 	var resp *http.Response
 	defer func() {
@@ -63,28 +94,28 @@ func (a *Auth) Authenticate(user, password []byte) bool {
 		}
 	}()
 
-	if a.conf.Method == "get" {
+	if a.config.Method == "get" {
 		var builder strings.Builder
-		builder.WriteString(a.conf.AuthUrl)
+		builder.WriteString(a.config.AuthUrl)
 		builder.WriteString("?")
 		builder.WriteString("user=")
-		builder.Write(user)
+		builder.WriteString(key)
 		builder.WriteString("&")
 		builder.WriteString("password=")
-		builder.Write(password)
+		builder.Write(pk.Connect.Password)
 		resp, err = http.Get(builder.String())
 	} else {
-		if a.conf.ContentType == TypeJson {
+		if a.config.ContentType == TypeJson {
 			payload := make(map[string]string, 2)
-			payload["user"] = string(user)
-			payload["password"] = string(password)
+			payload["user"] = key
+			payload["password"] = string(pk.Connect.Password)
 			bytesData, _ := json.Marshal(payload)
-			resp, err = http.Post(a.conf.AuthUrl, TypeJson, bytes.NewBuffer(bytesData))
+			resp, err = http.Post(a.config.AuthUrl, TypeJson, bytes.NewBuffer(bytesData))
 		} else {
 			payload := url.Values{}
-			payload.Add("user", string(user))
-			payload.Add("password", string(password))
-			resp, err = http.Post(a.conf.AuthUrl, TypeForm, strings.NewReader(payload.Encode()))
+			payload.Add("user", key)
+			payload.Add("password", string(pk.Connect.Password))
+			resp, err = http.Post(a.config.AuthUrl, TypeForm, strings.NewReader(payload.Encode()))
 		}
 	}
 
@@ -95,16 +126,35 @@ func (a *Auth) Authenticate(user, password []byte) bool {
 	if err != nil {
 		return false
 	}
-	if string(body) == a.conf.AuthSuccess {
+	if string(body) == "1" {
 		return true
 	} else {
 		return false
 	}
 }
 
-// ACL returns true if a user has access permissions to read or write on a topic.
-// Allow always returns true.
-func (a *Auth) ACL(user []byte, topic string, write bool) bool {
+// OnACLCheck returns true if the connecting client has matching read or write access to subscribe
+// or publish to a given topic.
+func (a *Auth) OnACLCheck(cl *mqtt.Client, topic string, write bool) bool {
+	if a.config.AclMode == byte(auth.AuthAnonymous) {
+		return true
+	}
+
+	// check blacklist
+	if n, ok := a.config.CheckBLAcl(cl, topic, write); n >= 0 { // It's on the blacklist
+		return ok
+	}
+
+	// normal verification
+	var key string
+	if a.config.AclMode == byte(auth.AuthUsername) {
+		key = string(cl.Properties.Username)
+	} else if a.config.AclMode == byte(auth.AuthClientID) {
+		key = cl.ID
+	} else {
+		return false
+	}
+
 	var err error
 	var resp *http.Response
 	defer func() {
@@ -113,28 +163,28 @@ func (a *Auth) ACL(user []byte, topic string, write bool) bool {
 		}
 	}()
 
-	if a.conf.Method == "get" {
+	if a.config.Method == "get" {
 		var builder strings.Builder
-		builder.WriteString(a.conf.AclUrl)
+		builder.WriteString(a.config.AclUrl)
 		builder.WriteString("?")
 		builder.WriteString("user=")
-		builder.Write(user)
-		builder.WriteString("&")
-		builder.WriteString("topic=")
-		builder.WriteString(topic)
+		builder.WriteString(key)
+		//builder.WriteString("&")
+		//builder.WriteString("topic=")
+		//builder.WriteString(topic)
 		resp, err = http.Get(builder.String())
 	} else {
-		if a.conf.ContentType == TypeJson {
+		if a.config.ContentType == TypeJson {
 			payload := make(map[string]string, 2)
-			payload["user"] = string(user)
-			payload["topic"] = topic
+			payload["user"] = key
+			//payload["topic"] = topic
 			bytesData, _ := json.Marshal(payload)
-			resp, err = http.Post(a.conf.AclUrl, TypeJson, bytes.NewBuffer(bytesData))
+			resp, err = http.Post(a.config.AclUrl, TypeJson, bytes.NewBuffer(bytesData))
 		} else {
 			payload := url.Values{}
-			payload.Add("user", string(user))
-			payload.Add("topic", topic)
-			resp, err = http.Post(a.conf.AclUrl, TypeForm, strings.NewReader(payload.Encode()))
+			payload.Add("user", key)
+			//payload.Add("topic", topic)
+			resp, err = http.Post(a.config.AclUrl, TypeForm, strings.NewReader(payload.Encode()))
 		}
 	}
 
@@ -145,13 +195,19 @@ func (a *Auth) ACL(user []byte, topic string, write bool) bool {
 	if err != nil {
 		return false
 	}
-	if string(body) == a.conf.AclPubSub {
-		return true
-	} else if string(body) == a.conf.AclPublish && write {
-		return true
-	} else if string(body) == a.conf.AclSubscribe && !write { //subscribe
-		return true
-	} else {
+
+	fam1 := map[string]int{}
+	if err := json.Unmarshal(body, &fam1); err != nil {
 		return false
 	}
+
+	fam2 := make(map[string]auth.Access)
+	for filter, access := range fam1 {
+		if !plugin.MatchTopic(filter, topic) {
+			continue
+		}
+		fam2[filter] = auth.Access(access)
+	}
+
+	return pa.CheckAcl(fam2, write)
 }

@@ -1,0 +1,13 @@
+
+kafka-options:
+  brokers: [127.0.0.1:9092, 127.0.0.2:9092]
+  topic: comqtt
+  balancer: 0  # 0 LeastBytes、1 RoundRobin、2 Hash、3 CRC32Balancer
+  async: true
+  required-acks: 0  # 0 None、1 Leader、-1 All
+  compression: 1  # 0 Node、1 Gzip、2 Snappy、3 Lz4、4 Zstd
+  write-timeout: 10   # defaults to 10 seconds
+
+rules:
+  topics: []  # The specified publish topics can be forwarded,wildcard(#、+) is supported, empty indicate unrestricted
+  filters: []  # The specified subscribe/unsubscribe filters can be forwarded, wildcard(#、+) is supported, empty indicate unrestricted

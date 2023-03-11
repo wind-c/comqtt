@@ -1,54 +1,114 @@
 package mysql
 
 import (
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
+	"github.com/wind-c/comqtt/mqtt"
+	"github.com/wind-c/comqtt/mqtt/hooks/auth"
+	"github.com/wind-c/comqtt/mqtt/packets"
+	"github.com/wind-c/comqtt/plugin"
+	"os"
 	"testing"
 )
 
 const path = "./conf.yml"
 
+var (
+	logger = zerolog.New(os.Stderr).With().Timestamp().Logger().Level(zerolog.Disabled)
+
+	client = &mqtt.Client{
+		ID: "test",
+		Net: mqtt.ClientConnection{
+			Remote:   "test.addr",
+			Listener: "listener",
+		},
+		Properties: mqtt.ClientProperties{
+			Username: []byte("zhangsan"),
+			Clean:    false,
+		},
+	}
+
+	pkf = packets.Packet{Filters: packets.Subscriptions{{Filter: "a/b/c"}}}
+
+	pkc = packets.Packet{Connect: packets.ConnectParams{Password: []byte("321654")}}
+)
+
 func teardown(a *Auth, t *testing.T) {
-	a.Close()
+	if a.db != nil {
+		a.Stop()
+	}
 }
 
-func TestNew(t *testing.T) {
-	a, _ := New(path)
-	require.NotNil(t, a)
-}
+func newAuth(t *testing.T) *Auth {
+	a := new(Auth)
+	a.SetOpts(&logger, nil)
 
-func TestOpen(t *testing.T) {
-	a, _ := New(path)
-	defer teardown(a, t)
-	err := a.Open()
+	err := a.Init(&Options{
+		AuthMode: byte(auth.AuthUsername),
+		AclMode:  byte(auth.AuthUsername),
+		Dsn: DsnInfo{
+			Host:          "localhost",
+			Port:          3306,
+			Schema:        "comqtt",
+			Charset:       "utf8",
+			LoginName:     "root",
+			LoginPassword: "12345678",
+		},
+		Auth: AuthTable{
+			Table:          "auth",
+			UserColumn:     "username",
+			PasswordColumn: "password",
+			AllowColumn:    "allow",
+		},
+		Acl: AclTable{
+			Table:        "acl",
+			UserColumn:   "username",
+			TopicColumn:  "topic",
+			AccessColumn: "access",
+		},
+	})
 	require.NoError(t, err)
-	require.NotNil(t, a.db)
+
+	return a
 }
 
-func TestAuthenticate(t *testing.T) {
-	a, _ := New(path)
-	defer teardown(a, t)
-	err := a.Open()
+func TestInitFromConfFile(t *testing.T) {
+	a := new(Auth)
+	a.SetOpts(&logger, nil)
+	opts := Options{}
+	err := plugin.LoadYaml(path, &opts)
 	require.NoError(t, err)
-	user := "zhangsan"
-	password := "321654"
-	result := a.Authenticate([]byte(user), []byte(password))
+
+	err = a.Init(&opts)
+	require.NoError(t, err)
+}
+
+func TestInitBadConfig(t *testing.T) {
+	a := new(Auth)
+	a.SetOpts(&logger, nil)
+
+	err := a.Init(map[string]any{})
+	require.Error(t, err)
+}
+
+func TestOnConnectAuthenticate(t *testing.T) {
+	a := newAuth(t)
+	defer teardown(a, t)
+	result := a.OnConnectAuthenticate(client, pkc)
 	require.Equal(t, true, result)
 }
 
-func TestACL(t *testing.T) {
-	a, _ := New(path)
+func TestOnACLCheck(t *testing.T) {
+	a := newAuth(t)
 	defer teardown(a, t)
-	err := a.Open()
-	require.NoError(t, err)
-	user := "zhangsan"
 	topic := "topictest/1"
 	topic2 := "topictest/2"
-	result := a.ACL([]byte(user), topic, true) //publish
+	result := a.OnACLCheck(client, topic, true) //publish
 	require.Equal(t, true, result)
-	result = a.ACL([]byte(user), topic, false) //subscribe
+	result = a.OnACLCheck(client, topic, false) //subscribe
 	require.Equal(t, false, result)
-	result = a.ACL([]byte(user), topic2, true)
+	result = a.OnACLCheck(client, topic2, true)
 	require.Equal(t, false, result)
-	result = a.ACL([]byte(user), topic2, false)
+	result = a.OnACLCheck(client, topic2, false)
 	require.Equal(t, false, result)
 }
