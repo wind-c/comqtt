@@ -8,12 +8,12 @@
 
 </p>
 
-# CoMQTT 
+# Comqtt 
 ### A lightweight, high-performance MQTT server in Go (v3.0｜v3.1.1｜v5.0)
 
-CoMQTT is an embeddable high-performance MQTT broker server written in Go, and supporting distributed cluster, and compliant with the MQTT v3.0 and v3.1.1 and v5.0 specification for the development of IoT and smarthome projects. The server can be used either as a standalone binary or embedded as a library in your own projects. CoMQTT message throughput is comparable with everyone's favourites such as Mosquitto, Mosca, and VerneMQ.
+Comqtt is an embeddable high-performance MQTT broker server written in Go, and supporting distributed cluster, and compliant with the MQTT v3.0 and v3.1.1 and v5.0 specification for the development of IoT and smarthome projects. The server can be used either as a standalone binary or embedded as a library in your own projects. Comqtt message throughput is comparable with everyone's favourites such as Mosquitto, Mosca, and VerneMQ.
 
-:+1: CoMQTT code is cleaner, easier to read, customize, and extend than other Mqtt Broker code! :heart_eyes:
+:+1: Comqtt code is cleaner, easier to read, customize, and extend than other Mqtt Broker code! :heart_eyes:
 
 :+1: If you like or useful to you, please give a STAR, let more know and participate in maintenance together! :muscle:
 
@@ -23,303 +23,359 @@ CoMQTT is an embeddable high-performance MQTT broker server written in Go, and s
 #### What is MQTT?
 MQTT stands for MQ Telemetry Transport. It is a publish/subscribe, extremely simple and lightweight messaging protocol, designed for constrained devices and low-bandwidth, high-latency or unreliable networks. [Learn more](https://mqtt.org/faq)
 
-#### CoMQTT Features
-- Paho MQTT 3.0 / 3.1.1 / 5.0 compatible. 
-- Full MQTT Feature-set (QoS, Retained, $SYS).
-- Trie-based Subscription model.
-- Ring Buffer packet codec.
+#### Comqtt Features
+- Full MQTTv5 Feature Compliance, compatibility for MQTT v3.1.1 and v3.0.0.
 - TCP, Websocket, (including SSL/TLS) and Dashboard listeners.
-- Interfaces for Client Authentication and Topic access control. Auth&ACL based on Redis/HTTP/Mysql is already supported.
-- Bolt persistence and storage interfaces (see examples folder).
-- Directly Publishing from embedding service (`s.Publish(topic, message, retain)`).
-- Basic Event Hooks (`OnMessage`, `onSubscribe`, `onUnsubscribe`, `OnConnect`, `OnDisconnect`, `onProcessMessage`, `OnError`, `OnStorage`).
-- ARM32 Compatible.
-- [Distributed Cluster](cmd/cluster/README.md).
+- File-based server, auth, storage and bridge configuration, [Click to see config examples](cmd/config).
+- Auth and ACL Plugin is supported Redis, HTTP, Mysql and PostgreSql.
+- Packets are bridged to kafka according to the configured rule.
+- Single-machine mode supports local storage BBolt, Badger and Redis.
+- Hook design pattern makes it easy to develop plugins for Auth, Bridge, and Storage.
+- Cluster support is based on Gossip and Raft, [Click to Cluster README](cmd/cluster/README.md).
 
 #### Roadmap
-- Auth plugin
-- Rule engine
-- Bridge
-- CoAP
+- Dashboard.
+- Rule engine.
+- Bridge(Other Mqtt Broker、RocketMQ、RabbitMQ).
+- Enhanced Metrics support.
+- CoAP.
 
-#### Using the Broker
-CoMQTT can be used as a standalone broker. Simply checkout this repository and run the `main.go` entrypoint in the `cmd` folder which will expose tcp (:1883), websocket (:1882), and dashboard (:8080) listeners. A docker image is coming soon.
+## Quick Start
+### Running the Broker with Go
+Comqtt can be used as a standalone broker. Simply checkout this repository and run the [cmd/single/main.go](cmd/single/main.go) entrypoint in the [cmd](cmd) folder which will expose tcp (:1883), websocket (:1882), and dashboard (:8080) listeners.
+
+### Build
+```
+cd cmd/single
+go build -o comqtt cmd/single/main.go
 
 ```
-cd cmd
-go build -o commqtt && ./comqtt
+### Start
 ```
+./comqtt
+or
+./comqtt --conf=./config/single.yml
+```
+*If you want to obtain the bridge and multiple authentication capabilities, you need to use the configuration file to start.[Click to config example](cmd/config/single.yml).*
 
-#### Using Docker
-
-A simple Dockerfile is provided for running the `cmd/single/main.go` Websocket, TCP, and Stats server:
+### Using Docker
+A simple Dockerfile is provided for running the [cmd/single/main.go](cmd/single/main.go) Websocket, TCP, and Stats server:
 
 ```sh
-docker build -t comqtt:latest .
+docker build -t comatt:latest .
 docker run -p 1883:1883 -p 1882:1882 -p 8080:8080 comqtt:latest
 ```
 
-#### Quick Start
-
+## Developing with Comqtt
+### Importing as a package
+Importing Comqtt as a package requires just a few lines of code to get started.
 ``` go
 import (
-  log
-  mqtt "github.com/wind-c/comqtt/server"
-  "github.com/wind-c/comqtt/server/listeners"
+  "log"
+
+  "github.com/wind-c/comqtt/mqtt"
+  "github.com/wind-c/comqtt/mqtt/hooks/auth"
+  "github.com/wind-c/comqtt/mqtt/listeners"
 )
 
 func main() {
-    // Create the new MQTT Server.
-    server := mqtt.NewServer(nil)
-	
-    // Create a TCP listener on a standard port.
-    tcp := listeners.NewTCP("t1", ":1883")
-	
-    // Add the listener to the server with default options (nil).
-    err := server.AddListener(tcp, nil)
-    if err != nil {
-        log.Fatal(err)
-    }
-	
-    // Start the broker. Serve() is blocking - see examples folder 
-    // for usage ideas.
-    err = server.Serve()
-    if err != nil {
-        log.Fatal(err)
-    }
+  // Create the new MQTT Server.
+  server := mqtt.New(nil)
+  
+  // Allow all connections.
+  _ = server.AddHook(new(auth.AllowHook), nil)
+  
+  // Create a TCP listener on a standard port.
+  tcp := listeners.NewTCP("t1", ":1883", nil)
+  err := server.AddListener(tcp)
+  if err != nil {
+    log.Fatal(err)
+  }
+  
+  err = server.Serve()
+  if err != nil {
+    log.Fatal(err)
+  }
 }
 ```
 
-Examples of running the broker with various configurations can be found in the `examples` folder. 
+Examples of running the broker with various configurations can be found in the [mqtt/examples](mqtt/examples) folder.
 
 #### Network Listeners
 The server comes with a variety of pre-packaged network listeners which allow the broker to accept connections on different protocols. The current listeners are:
-- `listeners.NewTCP(id, address string)` - A TCP Listener, taking a unique ID and a network address to bind.
-- `listeners.NewWebsocket(id, address string)` A Websocket Listener
-- `listeners.NewHTTPStats()` An HTTP $SYS info dashboard
 
-##### Configuring Network Listeners
-When a listener is added to the server using `server.AddListener`, a `*listeners.Config` may be passed as the second argument.
+| Listener | Usage |
+| --- | --- |
+| listeners.NewTCP | A TCP listener |
+| listeners.NewUnixSock | A Unix Socket listener |
+| listeners.NewNet | A net.Listener listener |
+| listeners.NewWebsocket | A Websocket listener |
+| listeners.NewHTTPStats | An HTTP $SYS info dashboard |
 
-##### Authentication and ACL
-Authentication and ACL may be configured on a per-listener basis by providing an Auth Controller to the listener configuration. Custom Auth Controllers should satisfy the `auth.Controller` interface found in `listeners/auth`. Two default controllers are provided, `auth.Allow`, which allows all traffic, and `auth.Disallow`, which denies all traffic. 
+> Use the `listeners.Listener` interface to develop new listeners. If you do, please let us know!
+
+A `*listeners.Config` may be passed to configure TLS.
+
+Examples of usage can be found in the [mqtt/examples](mqtt/examples) folder or [cmd/single/main.go](cmd/single/main.go).
+
+### Server Options and Capabilities
+A number of configurable options are available which can be used to alter the behaviour or restrict access to certain features in the server.
 
 ```go
-err := server.AddListener(tcp, &listeners.Config{
-	Auth: new(auth.Allow),
-})
-```
-
-> If no auth controller is provided in the listener configuration, the server will default to _Disallowing_ all traffic to prevent unintentional security issues.
-
-##### SSL
-SSL may be configured on both the TCP and Websocket listeners by providing a public-private PEM key pair to the listener configuration as `[]byte` slices.
-```go
-err := server.AddListener(tcp, &listeners.Config{
-    Auth: new(auth.Allow),
-    TLS: &listeners.TLS{
-        Certificate: publicCertificate, 
-        PrivateKey:  privateKey,
+server := mqtt.New(&mqtt.Options{
+  Capabilities: mqtt.Capabilities{
+    MaximumSessionExpiryInterval: 3600,
+    Compatibilities: mqtt.Compatibilities{
+      ObscureNotAuthorized: true,
     },
+  },
+  SysTopicResendInterval: 10,
 })
 ```
-> Note the mandatory inclusion of the Auth Controller!
 
-#### Event Hooks
-Some basic Event Hooks have been added, allowing you to call your own functions when certain events occur. The execution of the functions are blocking - if necessary, please handle goroutines within the embedding service.
+Review the mqtt.Options, mqtt.Capabilities, and mqtt.Compatibilities structs for a comprehensive list of options.
 
-Working examples can be found in the `examples/events` folder. Please open an issue if there is a particular event hook you are interested in!
 
-##### OnConnect
-`server.Events.OnConnect` is called when a client successfully connects to the broker. The method receives the connect packet and the id and connection type for the client who connected.
+## Event Hooks
+A universal event hooks system allows developers to hook into various parts of the server and client life cycle to add and modify functionality of the broker. These universal hooks are used to provide everything from authentication, persistent storage, to debugging tools.
 
-```go
-import "github.com/wind-c/comqtt/server/events"
+Hooks are stackable - you can add multiple hooks to a server, and they will be run in the order they were added. Some hooks modify values, and these modified values will be passed to the subsequent hooks before being returned to the runtime code.
 
-server.Events.OnMessage = func(cl events.Client, pk events.Packet) (pkx events.Packet, err error) {
-    fmt.Printf("<< OnConnect client connected %s: %+v\n", cl.ID, pk)
-}
-```
+| Type | Import | Info |
+| -- | -- |  -- |
+| Access Control | [mqtt/hooks/auth . AllowHook](mqtt/hooks/auth/allow_all.go) | Allow access to all connecting clients and read/write to  all topics. |
+| Access Control | [mqtt/hooks/auth . Auth](mqtt/hooks/auth/auth.go) | Rule-based access control ledger.  |
+| Persistence | [mqtt/hooks/storage/bolt](mqtt/hooks/storage/bolt/bolt.go)  | Persistent storage using [BoltDB](https://dbdb.io/db/boltdb) (deprecated). |
+| Persistence | [mqtt/hooks/storage/badger](mqtt/hooks/storage/badger/badger.go) | Persistent storage using [BadgerDB](https://github.com/dgraph-io/badger). |
+| Persistence | [mqtt/hooks/storage/redis](mqtt/hooks/storage/redis/redis.go)  | Persistent storage using [Redis](https://redis.io). |
+| Debugging | [mqtt/hooks/debug](mqtt/hooks/debug/debug.go) | Additional debugging output to visualise packet flow. |
 
-##### OnDisconnect
-`server.Events.OnDisconnect` is called when a client disconnects to the broker. If the client disconnected abnormally, the reason is indicated in the `err` error parameter.
+Many of the internal server functions are now exposed to developers, so you can make your own Hooks by using the above as examples. If you do, please [Open an issue](https://github.com/wind-c/comqtt/issues) and let everyone know!
 
-```go
-server.Events.OnDisconnect = func(cl events.Client, err error) {
-    fmt.Printf("<< OnDisconnect client disconnected %s: %v\n", cl.ID, err)
-}
-```
-
-##### OnSubscribe
-`server.Events.OnSubscribe` is called when a client subscribes to a new topic filter.
+### Access Control
+#### Allow Hook
+By default, Comqtt uses a DENY-ALL access control rule. To allow connections, this must overwritten using an Access Control hook. The simplest of these hooks is the `auth.AllowAll` hook, which provides ALLOW-ALL rules to all connections, subscriptions, and publishing. It's also the simplest hook to use:
 
 ```go
-server.Events.OnSubscribe = func(filter string, cl events.Client, qos byte) {
-    fmt.Printf("<< OnSubscribe client subscribed %s: %s %v\n", cl.ID, filter, qos)
-}
+server := mqtt.New(nil)
+_ = server.AddHook(new(auth.AllowHook), nil)
 ```
 
-##### OnUnsubscribe
-`server.Events.OnUnsubscribe` is called when a client unsubscribes from a topic filter.
+> Don't do this if you are exposing your server to the internet or untrusted networks - it should really be used for development, testing, and debugging only.
+
+#### Auth Ledger
+The Auth Ledger hook provides a sophisticated mechanism for defining access rules in a struct format. Auth ledger rules come in two forms: Auth rules (connection), and ACL rules (publish subscribe).
+
+Auth rules have 4 optional criteria and an assertion flag:
+| Criteria | Usage |
+| -- | -- |
+| Client | client id of the connecting client |
+| Username | username of the connecting client |
+| Password | password of the connecting client |
+| Remote | the remote address or ip of the client |
+| Allow | true (allow this user) or false (deny this user) |
+
+ACL rules have 3 optional criteria and an filter match:
+| Criteria | Usage |
+| -- | -- |
+| Client | client id of the connecting client |
+| Username | username of the connecting client |
+| Remote | the remote address or ip of the client |
+| Filters | an array of filters to match |
+
+Rules are processed in index order (0,1,2,3), returning on the first matching rule. See [mqtt/hooks/auth/ledger.go](mqtt/hooks/auth/ledger.go) to review the structs.
 
 ```go
-server.Events.OnUnsubscribe = func(filter string, cl events.Client) {
-    fmt.Printf("<< OnUnsubscribe client unsubscribed %s: %s\n", cl.ID, filter)
-}
+server := mqtt.New(nil)
+err := server.AddHook(new(auth.Hook), &auth.Options{
+    Ledger: &auth.Ledger{
+    Auth: auth.AuthRules{ // Auth disallows all by default
+      {Username: "peach", Password: "password1", Allow: true},
+      {Username: "melon", Password: "password2", Allow: true},
+      {Remote: "127.0.0.1:*", Allow: true},
+      {Remote: "localhost:*", Allow: true},
+    },
+    ACL: auth.ACLRules{ // ACL allows all by default
+      {Remote: "127.0.0.1:*"}, // local superuser allow all
+      {
+        // user melon can read and write to their own topic
+        Username: "melon", Filters: auth.Filters{
+          "melon/#":   auth.ReadWrite,
+          "updates/#": auth.WriteOnly, // can write to updates, but can't read updates from others
+        },
+      },
+      {
+        // Otherwise, no clients have publishing permissions
+        Filters: auth.Filters{
+          "#":         auth.ReadOnly,
+          "updates/#": auth.Deny,
+        },
+      },
+    },
+  }
+})
 ```
 
-##### OnMessage
-`server.Events.OnMessage` is called when a Publish packet (message) is received. The method receives the published message and information about the client who published it. 
-
-> This hook is only triggered when a message is received by clients. It is not triggered when using the direct `server.Publish` method.
-
-
-##### OnProcessMessage
-`server.Events.OnProcessMessage` is called before a publish packet (message) is processed. Specifically, the method callback is triggered after topic and ACL validation has occurred, but before the headers and payload are processed. You can use this if you want to programmatically change the data of the packet, such as setting it to retain, or altering the QoS flag. 
-
-If an error is returned, the packet will not be modified. and the existing packet will be used. If this is an unwanted outcome, the `mqtt.ErrRejectPacket` error can be returned from the callback, and the packet will be dropped/ignored, any further processing is abandoned.
-
-> This hook is only triggered when a message is received by clients. It is not triggered when using the direct `server.Publish` method.
-
+The ledger can also be stored as JSON or YAML and loaded using the Data field:
 ```go
-import "github.com/wind-c/comqtt/server/events"
-
-server.Events.OnMessage = func(cl events.Client, pk events.Packet) (pkx events.Packet, err error) {
-    if string(pk.Payload) == "hello" {
-        pkx = pk
-        pkx.Payload = []byte("hello world")
-        return pkx, nil
-    } 
-    
-    return pk, nil
-}
+err = server.AddHook(new(auth.Hook), &auth.Options{
+    Data: data, // build ledger from byte slice: yaml or json
+})
 ```
+See [examples/auth/encoded/main.go](mqtt/examples/auth/encoded/main.go) for more information.
 
-The OnMessage hook can also be used to selectively only deliver messages to one or more clients based on their id, using the `AllowClients []string` field on the packet structure.  
-
-
-
-##### OnError
-`server.Events.OnError` is called when an error is encountered on the server, particularly within the use of a client connection status.
-
-##### OnStorage
-`server.Events.OnStorage` is like `onError`, but receives the output of persistent storage methods.
-
-
-#### Server Options
-A few options can be passed to the `mqtt.NewServer(opts *Options)` function in order to override the default broker configuration. Currently these options are:
-
-
-- BufferSize (default 1024 * 256 bytes) - The default value is sufficient for most messaging sizes, but if you are sending many kilobytes of data (such as images), you should increase this to a value of (n*s) where is the typical size of your message and n is the number of messages you may have backlogged for a client at any given time.
-- BufferBlockSize (default 1024 * 8) - The minimum size in which R/W data will be allocated. If you are expecting only tiny or large payloads, you can alter this accordingly.
-
-Any options which is not set or is `0` will use default values.
-
+### Persistent Storage
+#### Redis
+A basic Redis storage hook is available which provides persistence for the broker. It can be added to the server in the same fashion as any other hook, with several options. It uses github.com/go-redis/redis/v8 under the hook, and is completely configurable through the Options value.
 ```go
-opts := &mqtt.Options{
-    BufferSize:      512 * 1024,
-    BufferBlockSize: 16 * 1024,
-}
-
-s := mqtt.NewServer(opts)
-```
-
-> See `examples/tcp/main.go` for an example implementation.
-
-#### Direct Publishing
-When the broker is being embedded in a larger codebase, it can be useful to be able to publish messages directly to clients without having to implement a loopback TCP connection with an MQTT client. The `Publish` method allows you to inject publish messages directly into a queue to be delivered to any clients with matching topic filters. The `Retain` flag is supported.
-
-```go 
-// func (s *Server) Publish(topic string, payload []byte, retain bool) error
-err := s.Publish("a/b/c", []byte("hello"), false)
+err := server.AddHook(new(redis.Hook), &redis.Options{
+  Options: &rv8.Options{
+    Addr:     "localhost:6379", // default redis address
+    Password: "",               // your password
+    DB:       0,                // your redis db
+  },
+})
 if err != nil {
-    log.Fatal(err)
+  log.Fatal(err)
 }
 ```
+For more information on how the redis hook works, or how to use it, see the [mqtt/examples/persistence/redis/main.go](mqtt/examples/persistence/redis/main.go) or [hooks/storage/redis](hooks/storage/redis) code.
 
-A working example can be found in the `examples/events` folder.
-
-#### Data Persistence
-CoMQTT provides a `persistence.Store` interface for developing and attaching persistent stores to the broker. The default persistence mechanism packaged with the broker is backed by [Bolt](https://github.com/etcd-io/bbolt) and can be enabled by assigning a `*bolt.Store` to the server.
+#### Badger DB
+There's also a BadgerDB storage hook if you prefer file based storage. It can be added and configured in much the same way as the other hooks (with somewhat less options).
 ```go
-// import "github.com/wind-c/comqtt/server/persistence/bolt"
-err = server.AddStore(bolt.New("comqtt.db", nil))
+err := server.AddHook(new(badger.Hook), &badger.Options{
+  Path: badgerPath,
+})
 if err != nil {
-    log.Fatal(err)
+  log.Fatal(err)
 }
 ```
-> Persistence is on-demand (not flushed) and will potentially reduce throughput when compared to the standard in-memory store. Only use it if you need to maintain state through restarts.
+For more information on how the badger hook works, or how to use it, see the [mqtt/examples/persistence/badger/main.go](mqtt/examples/persistence/badger/main.go) or [hooks/storage/badger](hooks/storage/badger) code.
+
+There is also a BoltDB hook which has been deprecated in favour of Badger, but if you need it, check [mqtt/examples/persistence/bolt/main.go](mqtt/examples/persistence/bolt/main.go).
+
+
+
+## Developing with Event Hooks
+Many hooks are available for interacting with the broker and client lifecycle.
+The function signatures for all the hooks and `mqtt.Hook` interface can be found in [mqtt/hooks.go](mqtt/hooks.go).
+
+> The most flexible event hooks are OnPacketRead, OnPacketEncode, and OnPacketSent - these hooks be used to control and modify all incoming and outgoing packets.
+
+| Function | Usage |
+| -------------------------- | -- |
+| OnStarted | Called when the server has successfully started.|
+| OnStopped | Called when the server has successfully stopped. |
+| OnConnectAuthenticate | Called when a user attempts to authenticate with the server. An implementation of this method MUST be used to allow or deny access to the server (see hooks/auth/allow_all or basic). It can be used in custom hooks to check connecting users against an existing user database. Returns true if allowed. |
+| OnACLCheck | Called when a user attempts to publish or subscribe to a topic filter. As above. |
+| OnSysInfoTick | Called when the $SYS topic values are published out. |
+| OnConnect | Called when a new client connects |
+| OnSessionEstablished | Called when a new client successfully establishes a session (after OnConnect) |
+| OnDisconnect | Called when a client is disconnected for any reason. |
+| OnAuthPacket | Called when an auth packet is received. It is intended to allow developers to create their own mqtt v5 Auth Packet handling mechanisms. Allows packet modification. |
+| OnPacketRead | Called when a packet is received from a client. Allows packet modification. |
+| OnPacketEncode | Called immediately before a packet is encoded to be sent to a client. Allows packet modification. |
+| OnPacketSent | Called when a packet has been sent to a client. |
+| OnPacketProcessed | Called when a packet has been received and successfully handled by the broker. |
+| OnSubscribe | Called when a client subscribes to one or more filters. Allows packet modification. |
+| OnSubscribed | Called when a client successfully subscribes to one or more filters. |
+| OnSelectSubscribers | Called when subscribers have been collected for a topic, but before shared subscription subscribers have been selected. Allows receipient modification.|
+| OnUnsubscribe | Called when a client unsubscribes from one or more filters. Allows packet modification. |
+| OnUnsubscribed | Called when a client successfully unsubscribes from one or more filters. |
+| OnPublish | Called when a client publishes a message. Allows packet modification. |
+| OnPublished | Called when a client has published a message to subscribers. |
+| OnPublishDropped | Called when a message to a client is dropped before delivery, such as if the client is taking too long to respond. |
+| OnRetainMessage | Called then a published message is retained. |
+| OnQosPublish | Called when a publish packet with Qos >= 1 is issued to a subscriber. |
+| OnQosComplete | Called when the Qos flow for a message has been completed. |
+| OnQosDropped | Called when an inflight message expires before completion. |
+| OnWill | Called when a client disconnects and intends to issue a will message. Allows packet modification. |
+| OnWillSent | Called when an LWT message has been issued from a disconnecting client. |
+| OnClientExpired | Called when a client session has expired and should be deleted. |
+| OnRetainedExpired | Called when a retained message has expired and should be deleted. |
+| StoredClients |  Returns clients, eg. from a persistent store. |
+| StoredSubscriptions |  Returns client subscriptions, eg. from a persistent store. |
+| StoredInflightMessages | Returns inflight messages, eg. from a persistent store.  |
+| StoredRetainedMessages | Returns retained messages, eg. from a persistent store. |
+| StoredSysInfo | Returns stored system info values, eg. from a persistent store. |
+
+If you are building a persistent storage hook, see the existing persistent hooks for inspiration and patterns. If you are building an auth hook, you will need `OnACLCheck` and `OnConnectAuthenticate`.
+
+
+### Direct Publish
+To publish basic message to a topic from within the embedding application, you can use the `server.Publish(topic string, payload []byte, retain bool, qos byte) error` method.
+
+```go
+err := server.Publish("direct/publish", []byte("packet scheduled message"), false, 0)
+```
+> The Qos byte in this case is only used to set the upper qos limit available for subscribers, as per MQTT v5 spec.
+
+### Packet Injection
+If you want more control, or want to set specific MQTT v5 properties and other values you can create your own publish packets from a client of your choice. This method allows you to inject MQTT packets (no just publish) directly into the runtime as though they had been received by a specific client. Most of the time you'll want to use the special client flag `inline=true`, as it has unique privileges: it bypasses all ACL and topic validation checks, meaning it can even publish to $SYS topics.
+
+Packet injection can be used for any MQTT packet, including ping requests, subscriptions, etc. And because the Clients structs and methods are now exported, you can even inject packets on behalf of a connected client (if you have a very custom requirements).
+
+```go
+cl := server.NewClient(nil, "local", "inline", true)
+server.InjectPacket(cl, packets.Packet{
+  FixedHeader: packets.FixedHeader{
+    Type: packets.Publish,
+  },
+  TopicName: "direct/publish",
+  Payload: []byte("scheduled message"),
+})
+```
+
+> MQTT packets still need to be correctly formed, so refer our [the test packets catalogue](mqtt/packets/tpackets.go) and [MQTTv5 Specification](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html) for inspiration.
+
+See the [hooks example](mqtt/examples/hooks/main.go) to see this feature in action.
+
+### Testing
+#### Unit Tests
+Comqtt tests over a thousand scenarios with thoughtfully hand written unit tests to ensure each function does exactly what we expect. You can run the tests using go:
+```
+go run --cover ./...
+```
 
 #### Paho Interoperability Test
-You can check the broker against the [Paho Interoperability Test](https://github.com/eclipse/paho.mqtt.testing/tree/master/interoperability) by starting the broker using `examples/paho/main.go`, and then running the test with `python3 client_test.py` from the _interoperability_ folder.
+You can check the broker against the [Paho Interoperability Test](https://github.com/eclipse/paho.mqtt.testing/tree/master/interoperability) by starting the broker using `examples/paho/main.go`, and then running the mqtt v5 and v3 tests with `python3 client_test5.py` from the _interoperability_ folder.
+
+> Note that there are currently a number of outstanding issues regarding false negatives in the paho suite, and as such, certain compatibility modes are enabled in the `paho/main.go` example.
 
 
-#### Performance (messages/second)
-Performance benchmarks were tested using [MQTT-Stresser](https://github.com/inovex/mqtt-stresser) on a  13-inch, Early 2015 Macbook Pro (2.7 GHz Intel Core i5). Taking into account bursts of high and low throughput, the median scores are the most useful. Higher is better. SEND = Publish throughput, RECV = Subscribe throughput.
+## Performance Benchmarks
+Comqtt performance is comparable with popular brokers such as Mosquitto, EMQX, and others.
 
-> As usual, any performance benchmarks should be taken with a pinch of salt, but are shown to demonstrate typical throughput compared to the other leading MQTT brokers.
+Performance benchmarks were tested using [MQTT-Stresser](https://github.com/inovex/mqtt-stresser) on a Apple Macbook Air M2, using `cmd/main.go` default settings. Taking into account bursts of high and low throughput, the median scores are the most useful. Higher is better.
 
-**Single Client, 10,000 messages**
-_With only 1 client, there is no variation in throughput so the benchmark is reports the same number for high, low, and median._
+> The values presented in the benchmark are not representative of true messages per second throughput. They rely on an unusual calculation by mqtt-stresser, but are usable as they are consistent across all brokers.
+> Benchmarks are provided as a general performance expectation guideline only.
 
-![1 Client, 10,000 Messages](assets/benchmarkchart_1_10000.png "1 Client, 10,000 Messages")
-
-`mqtt-stresser -broker tcp://localhost:1883 -num-clients=1 -num-messages=10000`
-
-|              | Comqtt | Mosquitto   | EMQX     | VerneMQ   | Mosca   |  
-| :----------- |-------:| ----------: | -------: | --------: | --------:
-| SEND Max    |  36505 |   30597  | 27202  | 32782  | 30125   |
-| SEND Min    |  36505 |  30597  | 27202   |  32782  | 30125  |
-| SEND Median  |  36505 | 30597   | 27202   |32782    | 30125  |
-| RECV Max    | 152221 |  59130  | 7879   | 17551   | 9145   |
-| RECV Min    | 152221 | 59130   | 7879   |  17551    |  9145    |
-| RECV Median    | 152221 |  59130  | 7879   |  17551   |  9145   |
-
-**10 Clients, 1,000 Messages**
-
-![10 Clients, 1,000 Messages](assets/benchmarkchart_10_1000.png "10 Clients, 1,000 Messages")
-
-`mqtt-stresser -broker tcp://localhost:1883 -num-clients=10 -num-messages=1000`
-
-|              | Comqtt     | Mosquitto   | EMQX     | VerneMQ   | Mosca   |  
-| :----------- | --------: | ----------: | -------: | --------: | --------:
-| SEND Max    |  37193 | 	15775 |	17455 |	34138 |	36575  |
-| SEND Min    |   6529 |	6446 |	7714 |	8583 |	7383      |
-| SEND Median  |  15127 |	7813 | 	10305 |	9887 |	8169     |
-| RECV Max    |  33535	 | 3710	| 3022 |	4534 |	9411    |
-| RECV Min    |   7484	| 2661	| 1689 |	2021 |	2275     |
-| RECV Median    |   11427 |  3142 | 1831 |	2468 |	4692      |
-
-**10 Clients, 10,000 Messages**
-
-![10 Clients, 10000 Messages](assets/benchmarkchart_10_10000.png "10 Clients, 10000 Messages")
+`mqtt-stresser -broker tcp://localhost:1883 -num-clients=2 -num-messages=10000`
+| Broker            | publish fastest | median | slowest | receive fastest | median | slowest |
+| --                | --             | --   | --   | --             | --   | --   |
+| Comqtt v2.0.0      | 127,216 | 125,748 | 124,279 | 319,250 | 309,327 | 299,405 |
+| Mosquitto v2.0.15 | 155,920 | 155,919 | 155,918 | 185,485 | 185,097 | 184,709 |
+| EMQX v5.0.11      | 156,945 | 156,257 | 155,568 | 17,918 | 17,783 | 17,649 |
 
 `mqtt-stresser -broker tcp://localhost:1883 -num-clients=10 -num-messages=10000`
+| Broker            | publish fastest | median | slowest | receive fastest | median | slowest |
+| --                | --             | --   | --   | --             | --   | --   |
+| Comqtt v2.0.0      | 45,615 | 30,129 | 21,138 | 232,717 | 86,323 | 50,402 |
+| Mosquitto v2.0.15 | 42,729 | 38,633 | 29,879 | 23,241 | 19,714 | 18,806 |
+| EMQX v5.0.11      | 21,553 | 17,418 | 14,356 | 4,257 | 3,980 | 3,756 |
 
-|              | Comqtt     | Mosquitto   | EMQX     | VerneMQ   | Mosca   |  
-| :----------- | --------: | ----------: | -------: | --------: | --------:
-| SEND Max    |   13153 |	13270 |	12229 |	13025 |	38446  |
-| SEND Min    |  8728	| 8513	| 8193 | 	6483 |	3889    |
-| SEND Median  |   9045	| 9532	| 9252 |	8031 |	9210    |
-| RECV Max    |  20774	| 5052	| 2093 |	2071 | 	43008    |
-| RECV Min    |   10718	 |3995	| 1531	| 1673	| 18764   |
-| RECV Median    |  16339 |	4607 |	1620 | 	1907	| 33524  |
+Million Message Challenge (hit the server with 1 million messages immediately):
 
-**500 Clients, 100 Messages**
+`mqtt-stresser -broker tcp://localhost:1883 -num-clients=100 -num-messages=10000`
+| Broker            | publish fastest | median | slowest | receive fastest | median | slowest |
+| --                | --             | --   | --   | --             | --   | --   |
+| Comqtt v2.0.0      | 51,044 | 4,682 | 2,345 | 72,634 | 7,645 | 2,464 |
+| Mosquitto v2.0.15 | 3,826 | 3,395 | 3,032 | 1,200 | 1,150 | 1,118 |
+| EMQX v5.0.11      | 4,086 | 2,432 | 2,274 | 434 | 333 | 311 |
 
-![500 Clients, 100 Messages](assets/benchmarkchart_500_100.png "500 Clients, 100 Messages")
-
-`mqtt-stresser -broker tcp://localhost:1883 -num-clients=500 -num-messages=100`
-
-|              | Comqtt     | Mosquitto   | EMQX     | VerneMQ   | Mosca   |  
-| :----------- | --------: | ----------: | -------: | --------: | --------:
-| SEND Max    |  70688	| 72686	| 71392 |	75336 |	73192   |
-| SEND Min    |   1021	| 2577 |	1603 |	8417 |	2344  |
-| SEND Median  |  49871	| 33076 |	33637 |	35200 |	31312   |
-| RECV Max    |  116163 |	4215 |	3427 |	5484 |	10100 |
-| RECV Min    |   1044	| 156 | 	56 | 	83	| 169   |
-| RECV Median    |     24398 | 208 |	94 |	413 |	474     |
-
+> Not sure what's going on with EMQX here, perhaps the docker out-of-the-box settings are not optimal, so take it with a pinch of salt as we know for a fact it's a solid piece of software.
 
 ## Contributions
 Contributions and feedback are both welcomed and encouraged! Open an [issue](https://github.com/wind-c/comqtt/issues) to report a bug, ask a question, or make a feature request.
