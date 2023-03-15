@@ -61,7 +61,7 @@ or
 A simple Dockerfile is provided for running the [cmd/single/main.go](cmd/single/main.go) Websocket, TCP, and Stats server:
 
 ```sh
-docker build -t comatt:latest .
+docker build -t comqtt:latest .
 docker run -p 1883:1883 -p 1882:1882 -p 8080:8080 comqtt:latest
 ```
 
