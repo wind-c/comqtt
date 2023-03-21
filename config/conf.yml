@@ -34,8 +34,8 @@ mqtt:
     server-cert:   #Server certificate file path
     server-key:   #server rsa private key file path
   options:
-    fan-pool-size: 32 #It is the number of individual workers and queues to initialize.
-    fan-pool-queue-size: 1024  #It is the size of the queue per worker.
+    client-write-buffer-size: 2048 #It is the number of individual workers and queues to initialize.
+    client-read-buffer-size: 2048  #It is the size of the queue per worker.
     sys-topic-resend-interval: 1 #It specifies the interval between $SYS topic updates in seconds.
     capabilities:
       compatibilities:

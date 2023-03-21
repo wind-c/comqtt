@@ -162,7 +162,6 @@ func main() {
 	logger.Warn().Msg("caught signal, stopping...")
 	agent.Stop()
 	server.Close()
-	logger.Info().Msg("comqtt server finished")
 	colog.Close()
 }
 

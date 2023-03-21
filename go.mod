@@ -6,7 +6,6 @@ require (
 	github.com/alicebob/miniredis/v2 v2.23.0
 	github.com/asdine/storm v2.1.2+incompatible
 	github.com/asdine/storm/v3 v3.2.1
-	github.com/cespare/xxhash/v2 v2.2.0
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/golang/protobuf v1.5.2
@@ -47,6 +46,7 @@ require (
 	github.com/armon/go-metrics v0.3.9 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/boltdb/bolt v1.3.1 // indirect
+	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/coreos/go-semver v0.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgraph-io/badger v1.6.0 // indirect

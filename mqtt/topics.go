@@ -301,6 +301,9 @@ func NewTopicsIndex() *TopicsIndex {
 // Subscribe adds a new subscription for a client to a topic filter, returning
 // true if the subscription was new.
 func (x *TopicsIndex) Subscribe(client string, subscription packets.Subscription) (bool, int) {
+	x.root.Lock()
+	defer x.root.Unlock()
+
 	var existed bool
 	var count int // number of subscribers for the same filter
 	prefix, _ := isolateParticle(subscription.Filter, 0)
@@ -323,9 +326,11 @@ func (x *TopicsIndex) Subscribe(client string, subscription packets.Subscription
 // Unsubscribe removes a subscription filter for a client, returning true if the
 // subscription existed.
 func (x *TopicsIndex) Unsubscribe(filter, client string) (bool, int) {
+	x.root.Lock()
+	defer x.root.Unlock()
+
 	var d int
 	var count int
-
 	if strings.HasPrefix(filter, SharePrefix) {
 		d = 2
 	}
@@ -353,6 +358,9 @@ func (x *TopicsIndex) Unsubscribe(filter, client string) (bool, int) {
 // 1 if a retained message was added, and -1 if the retained message was removed.
 // 0 is returned if sequential empty payloads are received.
 func (x *TopicsIndex) RetainMessage(pk packets.Packet) int64 {
+	x.root.Lock()
+	defer x.root.Unlock()
+
 	n := x.set(pk.TopicName, 0)
 	n.Lock()
 	defer n.Unlock()
