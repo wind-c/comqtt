@@ -1481,6 +1481,7 @@ func (s *Server) loadRetained(v []storage.Message) {
 	}
 }
 
+// msgToPacket converts storage.Message to packets.Packet
 func msgToPacket(msg *storage.Message) packets.Packet {
 	return packets.Packet{
 		FixedHeader: msg.FixedHeader,

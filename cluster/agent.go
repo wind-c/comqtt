@@ -7,7 +7,6 @@ package cluster
 import (
 	"bytes"
 	"context"
-	"errors"
 	"github.com/panjf2000/ants/v2"
 	"github.com/wind-c/comqtt/cluster/discovery"
 	"github.com/wind-c/comqtt/cluster/discovery/mlist"
@@ -376,7 +375,8 @@ func (a *Agent) processRelayMsg(msg *message.Message) {
 	case packets.Connect:
 		//If a client is connected to another node, the client's data cached on the node needs to be cleared
 		if existing, ok := a.mqttServer.Clients.Get(msg.ClientID); ok {
-			existing.Stop(errors.New("connection from other node"))
+			// connection notify from other node
+			existing.Stop(packets.ErrSessionTakenOver)
 			// clean local session and subscriptions
 			a.mqttServer.UnsubscribeClient(existing)
 			a.mqttServer.Clients.Delete(msg.ClientID)
