@@ -7,6 +7,7 @@ package cluster
 import (
 	"bytes"
 	"errors"
+
 	msg "github.com/wind-c/comqtt/cluster/message"
 	"github.com/wind-c/comqtt/mqtt"
 	"github.com/wind-c/comqtt/mqtt/packets"
@@ -30,6 +31,7 @@ func (h *MqttEventHook) Provides(b byte) bool {
 		mqtt.OnSubscribed,
 		mqtt.OnUnsubscribed,
 		mqtt.OnPublished,
+		mqtt.OnWillSent,
 	}, []byte{b})
 }
 
@@ -57,6 +59,14 @@ func (h *MqttEventHook) OnSessionEstablished(cl *mqtt.Client, pk packets.Packet)
 
 // OnPublished is called when a client has published a message to subscribers.
 func (h *MqttEventHook) OnPublished(cl *mqtt.Client, pk packets.Packet) {
+	if pk.Connect.ClientIdentifier == "" {
+		pk.Connect.ClientIdentifier = cl.ID
+	}
+	h.agent.OutPool.Invoke(&pk)
+}
+
+// OnWillSent is called when an LWT message has been issued from a disconnecting client.
+func (h *MqttEventHook) OnWillSent(cl *mqtt.Client, pk packets.Packet) {
 	if pk.Connect.ClientIdentifier == "" {
 		pk.Connect.ClientIdentifier = cl.ID
 	}
