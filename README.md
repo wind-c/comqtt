@@ -19,6 +19,8 @@ Comqtt is an embeddable high-performance MQTT broker server written in Go, and s
 
 > #### 📦 💬 See Github Discussions for discussions about releases
 > Ongoing discussion about current and future releases can be found at https://github.com/wind-c/comqtt/discussions
+> 
+> Developers in China can join wechat group discussions at https://github.com/wind-c/comqtt/discussions/32
 
 #### What is MQTT?
 MQTT stands for MQ Telemetry Transport. It is a publish/subscribe, extremely simple and lightweight messaging protocol, designed for constrained devices and low-bandwidth, high-latency or unreliable networks. [Learn more](https://mqtt.org/faq)
