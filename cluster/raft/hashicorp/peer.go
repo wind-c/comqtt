@@ -334,6 +334,10 @@ func (p *Peer) GenPeersFile(file string) error {
 		return err
 	}
 
+	if len(entries) == 0 {
+		return nil
+	}
+
 	f, err := os.OpenFile(file, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0644)
 	if err != nil {
 		return err
