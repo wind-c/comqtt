@@ -393,10 +393,12 @@ func (a *Agent) readFixedHeader(b []byte, fh *packets.FixedHeader) error {
 	if err != nil {
 		return err
 	}
+
 	fh.Remaining, _, err = packets.DecodeLength(bytes.NewReader(b[1:]))
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 

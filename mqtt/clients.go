@@ -376,6 +376,10 @@ func (cl *Client) Stop(err error) {
 			cl.State.stopCause.Store(err)
 		}
 
+		if cl.State.outbound != nil {
+			close(cl.State.outbound)
+		}
+
 		atomic.StoreUint32(&cl.State.done, 1)
 		atomic.StoreInt64(&cl.State.disconnected, time.Now().Unix())
 	})
