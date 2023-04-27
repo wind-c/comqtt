@@ -367,8 +367,11 @@ func (a *Agent) processRelayMsg(msg *message.Message) {
 		pk := packets.Packet{FixedHeader: packets.FixedHeader{Type: packets.Publish}}
 		pk.ProtocolVersion = msg.ProtocolVersion
 		pk.Origin = msg.ClientID
-		pk.FixedHeader.Decode(msg.Payload[0])                     // Unpack fixedheader.
-		if err := pk.PublishDecode(msg.Payload[2:]); err == nil { // Unpack skips fixedheader
+		if err := a.readFixedHeader(msg.Payload, &pk.FixedHeader); err != nil {
+			return
+		}
+		offset := len(msg.Payload) - pk.FixedHeader.Remaining          // Unpack fixedheader.
+		if err := pk.PublishDecode(msg.Payload[offset:]); err == nil { // Unpack skips fixedheader
 			a.mqttServer.PublishToSubscribers(pk)
 			OnPublishPacketLog(DirectionInbound, msg.NodeID, msg.ClientID, pk.TopicName, pk.PacketID)
 		}
@@ -383,6 +386,18 @@ func (a *Agent) processRelayMsg(msg *message.Message) {
 		}
 		OnConnectPacketLog(DirectionInbound, msg.NodeID, msg.ClientID)
 	}
+}
+
+func (a *Agent) readFixedHeader(b []byte, fh *packets.FixedHeader) error {
+	err := fh.Decode(b[0])
+	if err != nil {
+		return err
+	}
+	fh.Remaining, _, err = packets.DecodeLength(bytes.NewReader(b[1:]))
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // ProcessInboundMsg process messages from other nodes in the cluster
