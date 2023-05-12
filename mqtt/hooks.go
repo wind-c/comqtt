@@ -10,9 +10,9 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/wind-c/comqtt/mqtt/hooks/storage"
-	"github.com/wind-c/comqtt/mqtt/packets"
-	"github.com/wind-c/comqtt/mqtt/system"
+	"github.com/wind-c/comqtt/v2/mqtt/hooks/storage"
+	"github.com/wind-c/comqtt/v2/mqtt/packets"
+	"github.com/wind-c/comqtt/v2/mqtt/system"
 
 	"github.com/rs/zerolog"
 )
@@ -44,6 +44,7 @@ const (
 	OnQosPublish
 	OnQosComplete
 	OnQosDropped
+	OnPacketIDExhausted
 	OnWill
 	OnWillSent
 	OnClientExpired
@@ -97,6 +98,7 @@ type Hook interface {
 	OnQosPublish(cl *Client, pk packets.Packet, sent int64, resends int)
 	OnQosComplete(cl *Client, pk packets.Packet)
 	OnQosDropped(cl *Client, pk packets.Packet)
+	OnPacketIDExhausted(cl *Client, pk packets.Packet)
 	OnWill(cl *Client, will Will) (Will, error)
 	OnWillSent(cl *Client, pk packets.Packet)
 	OnClientExpired(cl *Client)
@@ -451,6 +453,16 @@ func (h *Hooks) OnQosDropped(cl *Client, pk packets.Packet) {
 	for _, hook := range h.GetAll() {
 		if hook.Provides(OnQosDropped) {
 			hook.OnQosDropped(cl, pk)
+		}
+	}
+}
+
+// OnPacketIDExhausted is called when the client runs out of unused packet ids to
+// assign to a packet.
+func (h *Hooks) OnPacketIDExhausted(cl *Client, pk packets.Packet) {
+	for _, hook := range h.GetAll() {
+		if hook.Provides(OnPacketIDExhausted) {
+			hook.OnPacketIDExhausted(cl, pk)
 		}
 	}
 }
@@ -837,6 +849,9 @@ func (h *HookBase) OnQosComplete(cl *Client, pk packets.Packet) {}
 
 // OnQosDropped is called the Qos flow for a message expires.
 func (h *HookBase) OnQosDropped(cl *Client, pk packets.Packet) {}
+
+// OnPacketIDExhausted is called when the client runs out of unused packet ids to assign to a packet.
+func (h *HookBase) OnPacketIDExhausted(cl *Client, pk packets.Packet) {}
 
 // OnWill is called when a client disconnects and publishes an LWT message.
 func (h *HookBase) OnWill(cl *Client, will Will) (Will, error) {

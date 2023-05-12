@@ -7,9 +7,9 @@ package etcd
 import (
 	"bytes"
 	"encoding/gob"
-	"github.com/wind-c/comqtt/cluster/log/zero"
-	"github.com/wind-c/comqtt/cluster/message"
-	"github.com/wind-c/comqtt/mqtt/packets"
+	"github.com/wind-c/comqtt/v2/cluster/log/zero"
+	"github.com/wind-c/comqtt/v2/cluster/message"
+	"github.com/wind-c/comqtt/v2/mqtt/packets"
 	"sync"
 
 	"go.etcd.io/etcd/raft/v3/raftpb"

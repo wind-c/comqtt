@@ -13,10 +13,10 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/timshannon/badgerhold"
-	"github.com/wind-c/comqtt/mqtt"
-	"github.com/wind-c/comqtt/mqtt/hooks/storage"
-	"github.com/wind-c/comqtt/mqtt/packets"
-	"github.com/wind-c/comqtt/mqtt/system"
+	"github.com/wind-c/comqtt/v2/mqtt"
+	"github.com/wind-c/comqtt/v2/mqtt/hooks/storage"
+	"github.com/wind-c/comqtt/v2/mqtt/packets"
+	"github.com/wind-c/comqtt/v2/mqtt/system"
 )
 
 var (

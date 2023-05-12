@@ -4,7 +4,7 @@
 
 package raft
 
-import "github.com/wind-c/comqtt/cluster/message"
+import "github.com/wind-c/comqtt/v2/cluster/message"
 
 type IPeer interface {
 	Join(nodeID, addr string) error

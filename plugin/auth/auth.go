@@ -1,9 +1,9 @@
 package auth
 
 import (
-	"github.com/wind-c/comqtt/mqtt"
-	"github.com/wind-c/comqtt/mqtt/hooks/auth"
-	"github.com/wind-c/comqtt/mqtt/packets"
+	"github.com/wind-c/comqtt/v2/mqtt"
+	"github.com/wind-c/comqtt/v2/mqtt/hooks/auth"
+	"github.com/wind-c/comqtt/v2/mqtt/packets"
 )
 
 func CheckAcl(tam map[string]auth.Access, write bool) bool {

@@ -9,7 +9,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/wind-c/comqtt/mqtt/packets"
+	"github.com/wind-c/comqtt/v2/mqtt/packets"
 )
 
 var (

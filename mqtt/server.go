@@ -17,17 +17,17 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/wind-c/comqtt/mqtt/hooks/storage"
-	"github.com/wind-c/comqtt/mqtt/listeners"
-	"github.com/wind-c/comqtt/mqtt/packets"
-	"github.com/wind-c/comqtt/mqtt/system"
+	"github.com/wind-c/comqtt/v2/mqtt/hooks/storage"
+	"github.com/wind-c/comqtt/v2/mqtt/listeners"
+	"github.com/wind-c/comqtt/v2/mqtt/packets"
+	"github.com/wind-c/comqtt/v2/mqtt/system"
 
 	"github.com/rs/zerolog"
 )
 
 const (
-	Version                       = "2.2.6" // the current server version.
-	defaultSysTopicInterval int64 = 1       // the interval between $SYS topic publishes
+	Version                       = "2.2.10" // the current server version.
+	defaultSysTopicInterval int64 = 1        // the interval between $SYS topic publishes
 )
 
 var (
@@ -43,7 +43,6 @@ var (
 		WildcardSubAvailable:         1,              // wildcard subscriptions are available
 		SubIDAvailable:               1,              // subscription identifiers are available
 		SharedSubAvailable:           1,              // shared subscriptions are available
-		ServerKeepAlive:              10,             // default keepalive for clients
 		MinimumProtocolVersion:       3,              // minimum supported mqtt version (3.0.0)
 		MaximumClientWritesPending:   1024 * 8,       // maximum number of pending message writes for a client
 	}
@@ -61,7 +60,6 @@ type Capabilities struct {
 	maximumPacketID              uint32 // unexported, used for testing only
 	ReceiveMaximum               uint16 `yaml:"receive-maximum"`
 	TopicAliasMaximum            uint16 `yaml:"topic-alias-maximum"`
-	ServerKeepAlive              uint16 `yaml:"server-keep-alive"`
 	SharedSubAvailable           byte   `yaml:"shared-sub-available"`
 	MinimumProtocolVersion       byte   `yaml:"minimum-protocol-version"`
 	Compatibilities              Compatibilities
@@ -331,6 +329,7 @@ func (s *Server) attachClient(cl *Client, listener string) error {
 	}
 
 	s.hooks.OnConnect(cl, pk)
+	cl.refreshDeadline(cl.State.Keepalive)
 
 	if !s.hooks.OnConnectAuthenticate(cl, pk) { // [MQTT-3.1.4-2]
 		err := s.sendConnack(cl, packets.ErrBadUsernameOrPassword, false)
@@ -372,7 +371,7 @@ func (s *Server) attachClient(cl *Client, listener string) error {
 	}
 
 	s.Log.Debug().Str("client", cl.ID).Err(err).Str("remote", cl.Net.Remote).Str("listener", listener).Msg("client disconnected")
-	expire := (cl.Properties.ProtocolVersion == 5 && cl.Properties.Props.SessionExpiryIntervalFlag && cl.Properties.Props.SessionExpiryInterval == 0) || (cl.Properties.ProtocolVersion < 5 && cl.Properties.Clean)
+	expire := (cl.Properties.ProtocolVersion == 5 && cl.Properties.Props.SessionExpiryInterval == 0) || (cl.Properties.ProtocolVersion < 5 && cl.Properties.Clean)
 	s.hooks.OnDisconnect(cl, err, expire)
 
 	if expire && atomic.LoadUint32(&cl.State.isTakenOver) == 0 {
@@ -531,9 +530,12 @@ func (s *Server) loadClientHistory(cid string) bool {
 // sendConnack returns a Connack packet to a client.
 func (s *Server) sendConnack(cl *Client, reason packets.Code, present bool) error {
 	properties := packets.Properties{
-		ServerKeepAlive:     s.Options.Capabilities.ServerKeepAlive, // [MQTT-3.1.2-21]
-		ServerKeepAliveFlag: true,
-		ReceiveMaximum:      s.Options.Capabilities.ReceiveMaximum, // 3.2.2.3.3 Receive Maximum
+		ReceiveMaximum: s.Options.Capabilities.ReceiveMaximum, // 3.2.2.3.3 Receive Maximum
+	}
+
+	if cl.State.ServerKeepalive { // You can set this dynamically using the OnConnect hook.
+		properties.ServerKeepAlive = cl.State.Keepalive // [MQTT-3.1.2-21]
+		properties.ServerKeepAliveFlag = true
 	}
 
 	if reason.Code >= packets.ErrUnspecifiedError.Code {
@@ -701,7 +703,7 @@ func (s *Server) InjectPacket(cl *Client, pk packets.Packet) error {
 	return nil
 }
 
-// processPublish processes a publish packet.
+// processPublish processes a Publish packet.
 func (s *Server) processPublish(cl *Client, pk packets.Packet) error {
 	if !cl.Net.Inline && !IsValidFilter(pk.TopicName, true) {
 		return nil
@@ -859,6 +861,7 @@ func (s *Server) publishToClient(cl *Client, sub packets.Subscription, pk packet
 	if out.FixedHeader.Qos > 0 {
 		i, err := cl.NextPacketID() // [MQTT-4.3.2-1] [MQTT-4.3.3-1]
 		if err != nil {
+			s.hooks.OnPacketIDExhausted(cl, pk)
 			s.Log.Warn().Err(err).Str("client", cl.ID).Str("listener", cl.Net.Listener).Msg("packet ids exhausted")
 			return out, packets.ErrQuotaExceeded
 		}
@@ -879,7 +882,7 @@ func (s *Server) publishToClient(cl *Client, sub packets.Subscription, pk packet
 		}
 	}
 
-	if cl.Net.Conn == nil || atomic.LoadUint32(&cl.State.done) == 1 {
+	if cl.Net.Conn == nil || cl.Closed() {
 		return out, packets.CodeDisconnect
 	}
 
@@ -906,18 +909,7 @@ func (s *Server) publishRetainedToClient(cl *Client, sub packets.Subscription, e
 		return
 	}
 
-	pks := s.Topics.Messages(sub.Filter) // [MQTT-3.8.4-4]
-	// local no，query from remote storage
-	if len(pks) == 0 {
-		msg, err := s.hooks.StoredRetainedMessageByTopic(sub.Filter)
-		if err != nil || len(msg.Payload) == 0 {
-			return
-		}
-		pks = append(pks, msgToPacket(&msg))
-	}
-
-	// send to client
-	for _, pkv := range pks {
+	for _, pkv := range s.Topics.Messages(sub.Filter) { // [MQTT-3.8.4-4]
 		_, err := s.publishToClient(cl, sub, pkv)
 		if err != nil {
 			s.Log.Debug().Err(err).Str("client", cl.ID).Str("listener", cl.Net.Listener).Interface("packet", pkv).Msg("failed to publish retained message")
@@ -1468,7 +1460,7 @@ func (s *Server) loadClients(v []storage.Client) {
 func (s *Server) loadInflight(v []storage.Message) {
 	for _, msg := range v {
 		if client, ok := s.Clients.Get(msg.Origin); ok {
-			client.State.Inflight.Set(msgToPacket(&msg))
+			client.State.Inflight.Set(msg.ToPacket())
 		}
 	}
 }
@@ -1476,30 +1468,7 @@ func (s *Server) loadInflight(v []storage.Message) {
 // loadRetained restores retained messages from the datastore.
 func (s *Server) loadRetained(v []storage.Message) {
 	for _, msg := range v {
-		s.Topics.RetainMessage(msgToPacket(&msg))
-	}
-}
-
-// msgToPacket converts storage.Message to packets.Packet
-func msgToPacket(msg *storage.Message) packets.Packet {
-	return packets.Packet{
-		FixedHeader: msg.FixedHeader,
-		PacketID:    msg.PacketID,
-		TopicName:   msg.TopicName,
-		Payload:     msg.Payload,
-		Origin:      msg.Origin,
-		Created:     msg.Created,
-		Properties: packets.Properties{
-			PayloadFormat:          msg.Properties.PayloadFormat,
-			PayloadFormatFlag:      msg.Properties.PayloadFormatFlag,
-			MessageExpiryInterval:  msg.Properties.MessageExpiryInterval,
-			ContentType:            msg.Properties.ContentType,
-			ResponseTopic:          msg.Properties.ResponseTopic,
-			CorrelationData:        msg.Properties.CorrelationData,
-			SubscriptionIdentifier: msg.Properties.SubscriptionIdentifier,
-			TopicAlias:             msg.Properties.TopicAlias,
-			User:                   msg.Properties.User,
-		},
+		s.Topics.RetainMessage(msg.ToPacket())
 	}
 }
 

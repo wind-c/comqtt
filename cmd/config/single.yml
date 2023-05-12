@@ -30,7 +30,6 @@ mqtt:
       maximum-packet-size: 0 #Maximum packet size, 0 unlimited
       receive-maximum: 1024 #Maximum number of concurrent qos messages per client
       topic-alias-maximum: 65535 #Maximum topic alias value
-      server-keep-alive: 10 #Default keepalive for clients
       maximum-qos: 2 #Maxmimum qos value available to clients
       retain-available: 1 #Retain messages is available
       wildcard-sub-available: 1 #Wildcard subscriptions are available

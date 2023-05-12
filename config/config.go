@@ -8,7 +8,7 @@ import (
 	tls2 "crypto/tls"
 	"crypto/x509"
 	"errors"
-	comqtt "github.com/wind-c/comqtt/mqtt"
+	comqtt "github.com/wind-c/comqtt/v2/mqtt"
 	"gopkg.in/yaml.v3"
 	"os"
 )

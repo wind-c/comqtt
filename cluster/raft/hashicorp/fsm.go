@@ -7,8 +7,8 @@ package hashicorp
 import (
 	"bytes"
 	"encoding/gob"
-	"github.com/wind-c/comqtt/cluster/message"
-	"github.com/wind-c/comqtt/mqtt/packets"
+	"github.com/wind-c/comqtt/v2/cluster/message"
+	"github.com/wind-c/comqtt/v2/mqtt/packets"
 	"io"
 	"sync"
 

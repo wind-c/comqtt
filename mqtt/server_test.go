@@ -15,10 +15,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wind-c/comqtt/mqtt/hooks/storage"
-	"github.com/wind-c/comqtt/mqtt/listeners"
-	"github.com/wind-c/comqtt/mqtt/packets"
-	"github.com/wind-c/comqtt/mqtt/system"
+	"github.com/wind-c/comqtt/v2/mqtt/hooks/storage"
+	"github.com/wind-c/comqtt/v2/mqtt/listeners"
+	"github.com/wind-c/comqtt/v2/mqtt/packets"
+	"github.com/wind-c/comqtt/v2/mqtt/system"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -127,7 +127,7 @@ func TestServerNewClient(t *testing.T) {
 	require.NotNil(t, cl.State.Inflight.internal)
 	require.NotNil(t, cl.State.Subscriptions)
 	require.NotNil(t, cl.State.TopicAliases)
-	require.Equal(t, defaultKeepalive, cl.State.keepalive)
+	require.Equal(t, defaultKeepalive, cl.State.Keepalive)
 	require.Equal(t, defaultClientProtocolVersion, cl.Properties.ProtocolVersion)
 	require.NotNil(t, cl.Net.Conn)
 	require.NotNil(t, cl.Net.bconn)
@@ -821,7 +821,6 @@ func TestServerSendConnack(t *testing.T) {
 	s := newServer()
 	cl, r, w := newTestClient()
 	cl.Properties.ProtocolVersion = 5
-	s.Options.Capabilities.ServerKeepAlive = 20
 	s.Options.Capabilities.MaximumQos = 1
 	cl.Properties.Props = packets.Properties{
 		AssignedClientID: "mochi",
@@ -841,7 +840,6 @@ func TestServerSendConnackFailureReason(t *testing.T) {
 	s := newServer()
 	cl, r, w := newTestClient()
 	cl.Properties.ProtocolVersion = 5
-	s.Options.Capabilities.ServerKeepAlive = 20
 	go func() {
 		err := s.sendConnack(cl, packets.ErrUnspecifiedError, true)
 		require.NoError(t, err)
@@ -851,6 +849,23 @@ func TestServerSendConnackFailureReason(t *testing.T) {
 	buf, err := io.ReadAll(r)
 	require.NoError(t, err)
 	require.Equal(t, packets.TPacketData[packets.Connack].Get(packets.TConnackInvalidMinMqtt5).RawBytes, buf)
+}
+
+func TestServerSendConnackWithServerKeepalive(t *testing.T) {
+	s := newServer()
+	cl, r, w := newTestClient()
+	cl.Properties.ProtocolVersion = 5
+	cl.State.Keepalive = 10
+	cl.State.ServerKeepalive = true
+	go func() {
+		err := s.sendConnack(cl, packets.CodeSuccess, true)
+		require.NoError(t, err)
+		w.Close()
+	}()
+
+	buf, err := io.ReadAll(r)
+	require.NoError(t, err)
+	require.Equal(t, packets.TPacketData[packets.Connack].Get(packets.TConnackServerKeepalive).RawBytes, buf)
 }
 
 func TestServerValidateConnect(t *testing.T) {
@@ -2490,7 +2505,7 @@ func TestServerProcessPacketDisconnect(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, 0, s.loop.willDelayed.Len())
-	require.Equal(t, uint32(1), atomic.LoadUint32(&cl.State.done))
+	require.True(t, cl.Closed())
 	require.Equal(t, time.Now().Unix(), atomic.LoadInt64(&cl.State.disconnected))
 }
 
@@ -2822,7 +2837,7 @@ func TestServerClearExpiredClients(t *testing.T) {
 	cl0, _, _ := newTestClient()
 	cl0.ID = "c0"
 	cl0.State.disconnected = n - 10
-	cl0.State.done = 1
+	cl0.State.cancelOpen()
 	cl0.Properties.ProtocolVersion = 5
 	cl0.Properties.Props.SessionExpiryInterval = 12
 	cl0.Properties.Props.SessionExpiryIntervalFlag = true
@@ -2832,7 +2847,7 @@ func TestServerClearExpiredClients(t *testing.T) {
 	cl1, _, _ := newTestClient()
 	cl1.ID = "c1"
 	cl1.State.disconnected = n - 10
-	cl1.State.done = 1
+	cl1.State.cancelOpen()
 	cl1.Properties.ProtocolVersion = 5
 	cl1.Properties.Props.SessionExpiryInterval = 8
 	cl1.Properties.Props.SessionExpiryIntervalFlag = true
@@ -2842,7 +2857,7 @@ func TestServerClearExpiredClients(t *testing.T) {
 	cl2, _, _ := newTestClient()
 	cl2.ID = "c2"
 	cl2.State.disconnected = n - 10
-	cl2.State.done = 1
+	cl2.State.cancelOpen()
 	cl2.Properties.ProtocolVersion = 5
 	cl2.Properties.Props.SessionExpiryInterval = 0
 	cl2.Properties.Props.SessionExpiryIntervalFlag = true

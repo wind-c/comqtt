@@ -1,10 +1,10 @@
 
 <p align="center">
   
-[![Build Status](https://travis-ci.com/wind-c/comqtt.svg?token=59nqixhtefy2iQRwsPcu&branch=master)](https://travis-ci.com/wind-c/comqtt)
+[![Build Status](https://travis-ci.com/wind-c/comqtt.svg?token=59nqixhtefy2iQRwsPcu&branch=master)](https://travis-ci.com/wind-c/comqtt/v2)
 [![contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/wind-c/comqtt/issues)
-[![codecov](https://codecov.io/gh/wind-c/comqtt/branch/master/graph/badge.svg?token=6vBUgYVaVB)](https://codecov.io/gh/wind-c/comqtt)
-[![GoDoc](https://godoc.org/github.com/wind-c/comqtt?status.svg)](https://pkg.go.dev/github.com/wind-c/comqtt)
+[![codecov](https://codecov.io/gh/wind-c/comqtt/branch/master/graph/badge.svg?token=6vBUgYVaVB)](https://codecov.io/gh/wind-c/comqtt/v2)
+[![GoDoc](https://godoc.org/github.com/wind-c/comqtt?status.svg)](https://pkg.go.dev/github.com/wind-c/comqtt/v2)
 
 </p>
 
@@ -74,9 +74,9 @@ Importing Comqtt as a package requires just a few lines of code to get started.
 import (
   "log"
 
-  "github.com/wind-c/comqtt/mqtt"
-  "github.com/wind-c/comqtt/mqtt/hooks/auth"
-  "github.com/wind-c/comqtt/mqtt/listeners"
+  "github.com/wind-c/comqtt/v2/mqtt"
+  "github.com/wind-c/comqtt/v2/mqtt/hooks/auth"
+  "github.com/wind-c/comqtt/v2/mqtt/listeners"
 )
 
 func main() {

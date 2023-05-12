@@ -6,7 +6,7 @@ package hashicorp
 
 import (
 	"github.com/hashicorp/raft"
-	"github.com/wind-c/comqtt/cluster/log/zero"
+	"github.com/wind-c/comqtt/v2/cluster/log/zero"
 	"net"
 	"time"
 )

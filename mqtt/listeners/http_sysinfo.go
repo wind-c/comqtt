@@ -13,7 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/wind-c/comqtt/mqtt/system"
+	"github.com/wind-c/comqtt/v2/mqtt/system"
 
 	"github.com/rs/zerolog"
 )

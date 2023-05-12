@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/wind-c/comqtt/mqtt/packets"
-	"github.com/wind-c/comqtt/mqtt/system"
+	"github.com/wind-c/comqtt/v2/mqtt/packets"
+	"github.com/wind-c/comqtt/v2/mqtt/system"
 )
 
 var (
@@ -193,4 +193,36 @@ func TestSysInfoUnmarshalBinaryEmpty(t *testing.T) {
 	err := d.UnmarshalBinary([]byte{})
 	require.NoError(t, err)
 	require.Equal(t, SystemInfo{}, d)
+}
+
+func TestMessageToPacket(t *testing.T) {
+	d := messageStruct
+	pk := d.ToPacket()
+
+	require.Equal(t, packets.Packet{
+		Payload: []byte("payload"),
+		FixedHeader: packets.FixedHeader{
+			Remaining: d.FixedHeader.Remaining,
+			Type:      d.FixedHeader.Type,
+			Qos:       d.FixedHeader.Qos,
+			Dup:       d.FixedHeader.Dup,
+			Retain:    d.FixedHeader.Retain,
+		},
+		Origin:    d.Origin,
+		TopicName: d.TopicName,
+		Properties: packets.Properties{
+			PayloadFormat:          d.Properties.PayloadFormat,
+			PayloadFormatFlag:      d.Properties.PayloadFormatFlag,
+			MessageExpiryInterval:  d.Properties.MessageExpiryInterval,
+			ContentType:            d.Properties.ContentType,
+			ResponseTopic:          d.Properties.ResponseTopic,
+			CorrelationData:        d.Properties.CorrelationData,
+			SubscriptionIdentifier: d.Properties.SubscriptionIdentifier,
+			TopicAlias:             d.Properties.TopicAlias,
+			User:                   d.Properties.User,
+		},
+		PacketID: 100,
+		Created:  d.Created,
+	}, pk)
+
 }

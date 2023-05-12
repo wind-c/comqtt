@@ -8,20 +8,20 @@ import (
 	"flag"
 	rv8 "github.com/go-redis/redis/v8"
 	"github.com/rs/zerolog"
-	colog "github.com/wind-c/comqtt/cluster/log/zero"
-	"github.com/wind-c/comqtt/config"
-	"github.com/wind-c/comqtt/mqtt"
-	"github.com/wind-c/comqtt/mqtt/hooks/auth"
-	"github.com/wind-c/comqtt/mqtt/hooks/storage/badger"
-	"github.com/wind-c/comqtt/mqtt/hooks/storage/bolt"
-	"github.com/wind-c/comqtt/mqtt/hooks/storage/redis"
-	"github.com/wind-c/comqtt/mqtt/listeners"
-	"github.com/wind-c/comqtt/plugin"
-	hauth "github.com/wind-c/comqtt/plugin/auth/http"
-	mauth "github.com/wind-c/comqtt/plugin/auth/mysql"
-	pauth "github.com/wind-c/comqtt/plugin/auth/postgresql"
-	rauth "github.com/wind-c/comqtt/plugin/auth/redis"
-	cokafka "github.com/wind-c/comqtt/plugin/bridge/kafka"
+	colog "github.com/wind-c/comqtt/v2/cluster/log/zero"
+	"github.com/wind-c/comqtt/v2/config"
+	"github.com/wind-c/comqtt/v2/mqtt"
+	"github.com/wind-c/comqtt/v2/mqtt/hooks/auth"
+	"github.com/wind-c/comqtt/v2/mqtt/hooks/storage/badger"
+	"github.com/wind-c/comqtt/v2/mqtt/hooks/storage/bolt"
+	"github.com/wind-c/comqtt/v2/mqtt/hooks/storage/redis"
+	"github.com/wind-c/comqtt/v2/mqtt/listeners"
+	"github.com/wind-c/comqtt/v2/plugin"
+	hauth "github.com/wind-c/comqtt/v2/plugin/auth/http"
+	mauth "github.com/wind-c/comqtt/v2/plugin/auth/mysql"
+	pauth "github.com/wind-c/comqtt/v2/plugin/auth/postgresql"
+	rauth "github.com/wind-c/comqtt/v2/plugin/auth/redis"
+	cokafka "github.com/wind-c/comqtt/v2/plugin/bridge/kafka"
 	"go.etcd.io/bbolt"
 	"log"
 	"os"
@@ -113,7 +113,7 @@ func main() {
 			log.Fatal(err)
 		}
 	}()
-	
+
 	if cfg.Log.Format == 1 {
 		log.Println("comqtt server started")
 	}

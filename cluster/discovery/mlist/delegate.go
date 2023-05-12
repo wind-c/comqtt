@@ -7,8 +7,8 @@ package mlist
 import (
 	"encoding/json"
 	"github.com/hashicorp/memberlist"
-	"github.com/wind-c/comqtt/cluster/log/zero"
-	mqtt "github.com/wind-c/comqtt/mqtt"
+	"github.com/wind-c/comqtt/v2/cluster/log/zero"
+	mqtt "github.com/wind-c/comqtt/v2/mqtt"
 	"sync"
 	"time"
 )

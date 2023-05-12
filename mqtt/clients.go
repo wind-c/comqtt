@@ -7,6 +7,7 @@ package mqtt
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -16,7 +17,7 @@ import (
 
 	"github.com/rs/xid"
 
-	"github.com/wind-c/comqtt/mqtt/packets"
+	"github.com/wind-c/comqtt/v2/mqtt/packets"
 )
 
 const (
@@ -94,7 +95,7 @@ func (cl *Clients) GetByListener(id string) []*Client {
 	defer cl.RUnlock()
 	clients := make([]*Client, 0, cl.Len())
 	for _, client := range cl.internal {
-		if client.Net.Listener == id && atomic.LoadUint32(&client.State.done) == 0 {
+		if client.Net.Listener == id && !client.Closed() {
 			clients = append(clients, client)
 		}
 	}
@@ -143,29 +144,34 @@ type Will struct {
 
 // State tracks the state of the client.
 type ClientState struct {
-	TopicAliases  TopicAliases         // a map of topic aliases
-	stopCause     atomic.Value         // reason for stopping
-	Inflight      *Inflight            // a map of in-flight qos messages
-	Subscriptions *Subscriptions       // a map of the subscription filters a client maintains
-	disconnected  int64                // the time the client disconnected in unix time, for calculating expiry
-	outbound      chan *packets.Packet // queue for pending outbound packets
-	endOnce       sync.Once            // only end once
-	isTakenOver   uint32               // used to identify orphaned clients
-	packetID      uint32               // the current highest packetID
-	done          uint32               // atomic counter which indicates that the client has closed
-	outboundQty   int32                // number of messages currently in the outbound queue
-	keepalive     uint16               // the number of seconds the connection can wait
+	TopicAliases    TopicAliases         // a map of topic aliases
+	stopCause       atomic.Value         // reason for stopping
+	Inflight        *Inflight            // a map of in-flight qos messages
+	Subscriptions   *Subscriptions       // a map of the subscription filters a client maintains
+	disconnected    int64                // the time the client disconnected in unix time, for calculating expiry
+	outbound        chan *packets.Packet // queue for pending outbound packets
+	endOnce         sync.Once            // only end once
+	isTakenOver     uint32               // used to identify orphaned clients
+	packetID        uint32               // the current highest packetID
+	open            context.Context      // indicate that the client is open for packet exchange
+	cancelOpen      context.CancelFunc   // cancel function for open context
+	outboundQty     int32                // number of messages currently in the outbound queue
+	Keepalive       uint16               // the number of seconds the connection can wait
+	ServerKeepalive bool                 // keepalive was set by the server
 }
 
 // newClient returns a new instance of Client. This is almost exclusively used by Server
 // for creating new clients, but it lives here because it's not dependent.
 func newClient(c net.Conn, o *ops) *Client {
+	ctx, cancel := context.WithCancel(context.Background())
 	cl := &Client{
 		State: ClientState{
 			Inflight:      NewInflights(),
 			Subscriptions: NewSubscriptions(),
 			TopicAliases:  NewTopicAliases(o.options.Capabilities.TopicAliasMaximum),
-			keepalive:     defaultKeepalive,
+			open:          ctx,
+			cancelOpen:    cancel,
+			Keepalive:     defaultKeepalive,
 			outbound:      make(chan *packets.Packet, o.options.Capabilities.MaximumClientWritesPending),
 		},
 		Properties: ClientProperties{
@@ -185,18 +191,21 @@ func newClient(c net.Conn, o *ops) *Client {
 		}
 	}
 
-	cl.refreshDeadline(cl.State.keepalive)
-
 	return cl
 }
 
 // WriteLoop ranges over pending outbound messages and writes them to the client connection.
 func (cl *Client) WriteLoop() {
-	for pk := range cl.State.outbound {
-		if err := cl.WritePacket(*pk); err != nil {
-			cl.ops.log.Debug().Err(err).Str("client", cl.ID).Interface("packet", pk).Msg("failed publishing packet")
+	for {
+		select {
+		case pk := <-cl.State.outbound:
+			if err := cl.WritePacket(*pk); err != nil {
+				cl.ops.log.Debug().Err(err).Str("client", cl.ID).Interface("packet", pk).Msg("failed publishing packet")
+			}
+			atomic.AddInt32(&cl.State.outboundQty, -1)
+		case <-cl.State.open.Done():
+			return
 		}
-		atomic.AddInt32(&cl.State.outboundQty, -1)
 	}
 }
 
@@ -209,20 +218,15 @@ func (cl *Client) ParseConnect(lid string, pk packets.Packet) {
 	cl.Properties.Clean = pk.Connect.Clean
 	cl.Properties.Props = pk.Properties.Copy(false)
 
+	cl.State.Keepalive = pk.Connect.Keepalive                                              // [MQTT-3.2.2-22]
 	cl.State.Inflight.ResetReceiveQuota(int32(cl.ops.options.Capabilities.ReceiveMaximum)) // server receive max per client
 	cl.State.Inflight.ResetSendQuota(int32(cl.Properties.Props.ReceiveMaximum))            // client receive max
-
 	cl.State.TopicAliases.Outbound = NewOutboundTopicAliases(cl.Properties.Props.TopicAliasMaximum)
 
 	cl.ID = pk.Connect.ClientIdentifier
 	if cl.ID == "" {
 		cl.ID = xid.New().String() // [MQTT-3.1.3-6] [MQTT-3.1.3-7]
 		cl.Properties.Props.AssignedClientID = cl.ID
-	}
-
-	cl.State.keepalive = cl.ops.options.Capabilities.ServerKeepAlive
-	if pk.Connect.Keepalive > 0 {
-		cl.State.keepalive = pk.Connect.Keepalive // [MQTT-3.2.2-22]
 	}
 
 	if pk.Connect.WillFlag {
@@ -242,8 +246,6 @@ func (cl *Client) ParseConnect(lid string, pk packets.Packet) {
 			cl.Properties.Will.Flag = 1 // atomic for checking
 		}
 	}
-
-	cl.refreshDeadline(cl.State.keepalive)
 }
 
 // refreshDeadline refreshes the read/write deadline for the net.Conn connection.
@@ -338,11 +340,11 @@ func (cl *Client) Read(packetHandler ReadFn) error {
 	var err error
 
 	for {
-		if atomic.LoadUint32(&cl.State.done) == 1 {
+		if cl.Closed() {
 			return nil
 		}
 
-		cl.refreshDeadline(cl.State.keepalive)
+		cl.refreshDeadline(cl.State.Keepalive)
 		fh := new(packets.FixedHeader)
 		err = cl.ReadFixedHeader(fh)
 		if err != nil {
@@ -363,11 +365,8 @@ func (cl *Client) Read(packetHandler ReadFn) error {
 
 // Stop instructs the client to shut down all processing goroutines and disconnect.
 func (cl *Client) Stop(err error) {
-	if atomic.LoadUint32(&cl.State.done) == 1 {
-		return
-	}
-
 	cl.State.endOnce.Do(func() {
+
 		if cl.Net.Conn != nil {
 			_ = cl.Net.Conn.Close() // omit close error
 		}
@@ -376,11 +375,10 @@ func (cl *Client) Stop(err error) {
 			cl.State.stopCause.Store(err)
 		}
 
-		if cl.State.outbound != nil {
-			close(cl.State.outbound)
+		if cl.State.cancelOpen != nil {
+			cl.State.cancelOpen()
 		}
 
-		atomic.StoreUint32(&cl.State.done, 1)
 		atomic.StoreInt64(&cl.State.disconnected, time.Now().Unix())
 	})
 }
@@ -395,7 +393,7 @@ func (cl *Client) StopCause() error {
 
 // Closed returns true if client connection is closed.
 func (cl *Client) Closed() bool {
-	return atomic.LoadUint32(&cl.State.done) == 1
+	return cl.State.open == nil || cl.State.open.Err() != nil
 }
 
 // ReadFixedHeader reads in the values of the next packet's fixed header.
@@ -491,14 +489,6 @@ func (cl *Client) ReadPacket(fh *packets.FixedHeader) (pk packets.Packet, err er
 
 // WritePacket encodes and writes a packet to the client.
 func (cl *Client) WritePacket(pk packets.Packet) error {
-	if atomic.LoadUint32(&cl.State.done) == 1 {
-		return ErrConnectionClosed
-	}
-
-	if cl.Net.Conn == nil {
-		return nil
-	}
-
 	if pk.Expiry > 0 {
 		pk.Properties.MessageExpiryInterval = uint32(pk.Expiry - time.Now().Unix()) // [MQTT-3.3.2-6]
 	}
@@ -560,6 +550,17 @@ func (cl *Client) WritePacket(pk packets.Packet) error {
 
 	if pk.Mods.MaxSize > 0 && uint32(buf.Len()) > pk.Mods.MaxSize {
 		return packets.ErrPacketTooLarge // [MQTT-3.1.2-24] [MQTT-3.1.2-25]
+	}
+
+	cl.Lock()
+	defer cl.Unlock()
+
+	if cl.Closed() {
+		return ErrConnectionClosed
+	}
+
+	if cl.Net.Conn == nil {
+		return nil
 	}
 
 	nb := net.Buffers{buf.Bytes()}

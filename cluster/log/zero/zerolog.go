@@ -6,7 +6,7 @@ package zero
 
 import (
 	"github.com/rs/zerolog"
-	"github.com/wind-c/comqtt/config"
+	"github.com/wind-c/comqtt/v2/config"
 	"gopkg.in/natefinch/lumberjack.v2"
 	"io"
 	"os"

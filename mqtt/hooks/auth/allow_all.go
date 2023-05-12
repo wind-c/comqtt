@@ -7,8 +7,8 @@ package auth
 import (
 	"bytes"
 
-	"github.com/wind-c/comqtt/mqtt"
-	"github.com/wind-c/comqtt/mqtt/packets"
+	"github.com/wind-c/comqtt/v2/mqtt"
+	"github.com/wind-c/comqtt/v2/mqtt/packets"
 )
 
 // AllowHook is an authentication hook which allows connection access

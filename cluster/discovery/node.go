@@ -6,7 +6,7 @@ package discovery
 
 import (
 	"encoding/json"
-	"github.com/wind-c/comqtt/mqtt"
+	"github.com/wind-c/comqtt/v2/mqtt"
 	"net"
 	"os"
 	"strconv"

@@ -10,9 +10,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/segmentio/kafka-go"
-	"github.com/wind-c/comqtt/mqtt"
-	"github.com/wind-c/comqtt/mqtt/packets"
-	"github.com/wind-c/comqtt/plugin"
+	"github.com/wind-c/comqtt/v2/mqtt"
+	"github.com/wind-c/comqtt/v2/mqtt/packets"
+	"github.com/wind-c/comqtt/v2/plugin"
 	"strings"
 	"time"
 )
@@ -48,7 +48,7 @@ type Message struct {
 	Remote          string   `json:"remote,omitempty"`          // the remote address of the client
 	Listener        string   `json:"listener,omitempty"`        // the listener the client connected on
 	Topics          []string `json:"topics,omitempty"`          // publish topic or subscribe/unsubscribe filters
-	reasonCodes     []byte   `json:"reasonCodes,omitempty"`          // subscribe/unsubscribe filters success(0) or failure(>0x80) code
+	reasonCodes     []byte   `json:"reasonCodes,omitempty"`     // subscribe/unsubscribe filters success(0) or failure(>0x80) code
 	Payload         []byte   `json:"payload,omitempty"`         // publish payload
 	ProtocolVersion byte     `json:"protocolVersion,omitempty"` // mqtt protocol version of the client
 	Clean           bool     `json:"clean,omitempty"`           // if the client requested a clean start/session

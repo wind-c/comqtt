@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wind-c/comqtt/mqtt/hooks/storage"
-	"github.com/wind-c/comqtt/mqtt/packets"
-	"github.com/wind-c/comqtt/mqtt/system"
+	"github.com/wind-c/comqtt/v2/mqtt/hooks/storage"
+	"github.com/wind-c/comqtt/v2/mqtt/packets"
+	"github.com/wind-c/comqtt/v2/mqtt/system"
 
 	"github.com/stretchr/testify/require"
 )
@@ -241,6 +241,7 @@ func TestHooksNonReturns(t *testing.T) {
 			h.OnQosPublish(cl, packets.Packet{}, time.Now().Unix(), 0)
 			h.OnQosComplete(cl, packets.Packet{})
 			h.OnQosDropped(cl, packets.Packet{})
+			h.OnPacketIDExhausted(cl, packets.Packet{})
 			h.OnWillSent(cl, packets.Packet{})
 			h.OnClientExpired(cl)
 			h.OnRetainedExpired("a/b/c")

@@ -6,10 +6,10 @@ package mlist
 
 import (
 	"github.com/hashicorp/memberlist"
-	mb "github.com/wind-c/comqtt/cluster/discovery"
-	"github.com/wind-c/comqtt/cluster/log/zero"
-	"github.com/wind-c/comqtt/config"
-	"github.com/wind-c/comqtt/mqtt"
+	mb "github.com/wind-c/comqtt/v2/cluster/discovery"
+	"github.com/wind-c/comqtt/v2/cluster/log/zero"
+	"github.com/wind-c/comqtt/v2/config"
+	"github.com/wind-c/comqtt/v2/mqtt"
 	"net"
 	"time"
 )
