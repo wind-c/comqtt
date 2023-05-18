@@ -216,6 +216,9 @@ func (s *Storage) OnSubscribed(cl *mqtt.Client, pk packets.Packet, reasonCodes [
 
 	var in *storage.Subscription
 	for i := 0; i < len(pk.Filters); i++ {
+		if reasonCodes[i] == 0x80 {
+			continue
+		}
 		in = &storage.Subscription{
 			Qos:               reasonCodes[i],
 			Identifier:        pk.Filters[i].Identifier,
