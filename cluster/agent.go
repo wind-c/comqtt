@@ -411,10 +411,10 @@ func (a *Agent) processInboundMsg() {
 		case bs := <-a.inboundMsgCh:
 			var msg message.Message
 			if err := msg.MsgpackLoad(bs); err == nil {
-				a.processRelayMsg(&msg)
+				go a.processRelayMsg(&msg)
 			}
 		case msg := <-a.grpcMsgCh:
-			a.processRelayMsg(msg)
+			go a.processRelayMsg(msg)
 		}
 	}
 }
@@ -442,7 +442,7 @@ func (a *Agent) processOutboundPacket(pk *packets.Packet) {
 			for _, node := range ns {
 				if node != a.GetLocalName() && !utils.Contains(oldNodes, node) {
 					if a.Config.GrpcEnable {
-						a.grpcClientManager.RelayPublishPacket(node, &msg)
+						go a.grpcClientManager.RelayPublishPacket(node, &msg)
 					} else {
 						bs := msg.MsgpackBytes()
 						a.membership.SendToNode(node, bs)
@@ -458,7 +458,7 @@ func (a *Agent) processOutboundPacket(pk *packets.Packet) {
 			msg.ClientID = pk.Connect.ClientIdentifier
 		}
 		if a.Config.GrpcEnable {
-			a.grpcClientManager.ConnectNotifyToOthers(&msg)
+			go a.grpcClientManager.ConnectNotifyToOthers(&msg)
 		} else {
 			a.membership.SendToOthers(msg.MsgpackBytes())
 		}

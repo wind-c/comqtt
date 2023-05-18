@@ -24,7 +24,8 @@ import (
 )
 
 const (
-	ReqTimeout = 500 * time.Millisecond
+	ReqTimeout            = 500 * time.Millisecond
+	DefaultClientPoolSize = 32
 )
 
 var kaep = keepalive.EnforcementPolicy{
@@ -182,7 +183,7 @@ func genApplyCmd(req *crpc.ApplyRequest) []byte {
 type ClientManager struct {
 	sync.Mutex
 	agent *Agent
-	cs    map[string]*client
+	ps    map[string]*clientPool
 }
 
 type client struct {
@@ -190,17 +191,24 @@ type client struct {
 	crpc.RelaysClient
 }
 
+type clientPool struct {
+	sync.Mutex
+	clients chan *client
+	addr    string
+	size    int
+}
+
 func NewClientManager(a *Agent) *ClientManager {
 	return &ClientManager{
 		agent: a,
-		cs:    make(map[string]*client),
+		ps:    make(map[string]*clientPool),
 	}
 }
 
 func (c *ClientManager) RemoveGrpcClient(nodeId string) {
-	if client, ok := c.cs[nodeId]; ok {
-		delete(c.cs, nodeId)
-		client.conn.Close()
+	if pool, ok := c.ps[nodeId]; ok {
+		delete(c.ps, nodeId)
+		pool.close()
 	}
 }
 
@@ -213,12 +221,10 @@ func (c *ClientManager) getNodeAddr(nodeId string) (string, error) {
 	return getGrpcAddr(m), nil
 }
 
-func (c *ClientManager) getClient(nodeId string) (*client, error) {
-	c.Lock()
-	defer c.Unlock()
-	sc, ok := c.cs[nodeId]
+func (c *ClientManager) getClientPool(nodeId string) (*clientPool, error) {
+	pool, ok := c.ps[nodeId]
 	if ok {
-		return sc, nil
+		return pool, nil
 	}
 
 	addr, err := c.getNodeAddr(nodeId)
@@ -226,32 +232,20 @@ func (c *ClientManager) getClient(nodeId string) (*client, error) {
 		return nil, errors.New("node not found")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*ReqTimeout)
-	defer cancel()
-	//serviceConfig := `{"healthCheckConfig": {"serviceName": "Transit"}, "loadBalancingConfig": [{"round_robin":{}}]}`
-	retryOpts := []grpc_retry.CallOption{
-		grpc_retry.WithBackoff(grpc_retry.BackoffExponential(ReqTimeout)),
-		grpc_retry.WithMax(3),
-	}
-	conn, err := grpc.DialContext(ctx, addr,
-		//grpc.WithDefaultServiceConfig(serviceConfig),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
-		grpc.WithUnaryInterceptor(grpc_retry.UnaryClientInterceptor(retryOpts...)),
-		grpc.WithKeepaliveParams(kacp))
+	pool, err = newConnPool(addr, DefaultClientPoolSize)
 	if err != nil {
-		return nil, fmt.Errorf("dialing failed: %v", err)
+		return nil, err
 	}
-
-	grpcClient := crpc.NewRelaysClient(conn)
-	wrapClient := &client{conn, grpcClient}
-	c.cs[nodeId] = wrapClient
-
-	return wrapClient, nil
+	c.ps[nodeId] = pool
+	return pool, nil
 }
 
 func (c *ClientManager) RelayPublishPacket(nodeId string, msg *message.Message) {
-	client, err := c.getClient(nodeId)
+	pool, err := c.getClientPool(nodeId)
+	if err != nil {
+		zero.Error().Err(err).Msg("get grpc client pool")
+	}
+	client, err := pool.get()
 	if err != nil {
 		zero.Error().Err(err).Msg("get grpc client")
 		return
@@ -268,10 +262,15 @@ func (c *ClientManager) RelayPublishPacket(nodeId string, msg *message.Message) 
 	if _, err := client.PublishPacket(ctx, &req); err != nil {
 		zero.Error().Err(err).Str("to", nodeId).Str("cid", msg.ClientID).Msg("relay publish packet")
 	}
+	pool.put(client)
 }
 
 func (c *ClientManager) ConnectNotifyToNode(nodeId, clientId string) {
-	client, err := c.getClient(nodeId)
+	pool, err := c.getClientPool(nodeId)
+	if err != nil {
+		zero.Error().Err(err).Msg("get grpc client pool")
+	}
+	client, err := pool.get()
 	if err != nil {
 		return
 	}
@@ -286,6 +285,7 @@ func (c *ClientManager) ConnectNotifyToNode(nodeId, clientId string) {
 	if _, err := client.ConnectNotify(ctx, &req); err != nil {
 		zero.Error().Err(err).Str("to", nodeId).Str("cid", clientId).Msg("connection notification")
 	}
+	pool.put(client)
 }
 
 func (c *ClientManager) ConnectNotifyToOthers(msg *message.Message) {
@@ -299,7 +299,11 @@ func (c *ClientManager) ConnectNotifyToOthers(msg *message.Message) {
 }
 
 func (c *ClientManager) RelayRaftApply(nodeId string, msg *message.Message) {
-	client, err := c.getClient(nodeId)
+	pool, err := c.getClientPool(nodeId)
+	if err != nil {
+		zero.Error().Err(err).Msg("get grpc client pool")
+	}
+	client, err := pool.get()
 	if err != nil {
 		zero.Error().Err(err).Msg("get grpc client")
 		return
@@ -315,6 +319,7 @@ func (c *ClientManager) RelayRaftApply(nodeId string, msg *message.Message) {
 	if _, err := client.RaftApply(ctx, &req); err != nil {
 		OnApplyLog(nodeId, msg.NodeID, msg.Type, msg.Payload, "to leader do apply", err)
 	}
+	pool.put(client)
 }
 
 func (c *ClientManager) RaftApplyToOthers(msg *message.Message) {
@@ -328,7 +333,11 @@ func (c *ClientManager) RaftApplyToOthers(msg *message.Message) {
 }
 
 func (c *ClientManager) RelayRaftJoin(nodeId string) {
-	client, err := c.getClient(nodeId)
+	pool, err := c.getClientPool(nodeId)
+	if err != nil {
+		zero.Error().Err(err).Msg("get grpc client pool")
+	}
+	client, err := pool.get()
 	if err != nil {
 		zero.Error().Err(err).Msg("get grpc client")
 		return
@@ -345,6 +354,7 @@ func (c *ClientManager) RelayRaftJoin(nodeId string) {
 		addr := c.agent.Config.BindAddr + ":" + strconv.Itoa(c.agent.Config.RaftPort)
 		OnJoinLog(nodeId, addr, "raft join", err)
 	}
+	pool.put(client)
 }
 
 func (c *ClientManager) RaftJoinToOthers() {
@@ -354,5 +364,81 @@ func (c *ClientManager) RaftJoinToOthers() {
 			continue
 		}
 		c.RelayRaftJoin(m.Name)
+	}
+}
+
+func newConnPool(addr string, size int) (*clientPool, error) {
+	pool := &clientPool{
+		clients: make(chan *client, size),
+		addr:    addr,
+	}
+
+	for i := 0; i < size; i++ {
+		c, err := pool.createClient()
+		if err != nil {
+			pool.close()
+			return nil, err
+		}
+		pool.clients <- c
+	}
+	return pool, nil
+}
+
+func (p *clientPool) createClient() (*client, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*ReqTimeout)
+	defer cancel()
+	//serviceConfig := `{"healthCheckConfig": {"serviceName": "Transit"}, "loadBalancingConfig": [{"round_robin":{}}]}`
+	retryOpts := []grpc_retry.CallOption{
+		grpc_retry.WithBackoff(grpc_retry.BackoffExponential(ReqTimeout)),
+		grpc_retry.WithMax(3),
+	}
+	conn, err := grpc.DialContext(ctx, p.addr,
+		//grpc.WithDefaultServiceConfig(serviceConfig),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
+		grpc.WithUnaryInterceptor(grpc_retry.UnaryClientInterceptor(retryOpts...)),
+		grpc.WithKeepaliveParams(kacp))
+	if err != nil {
+		return nil, fmt.Errorf("dialing failed: %v", err)
+	}
+
+	grpcClient := crpc.NewRelaysClient(conn)
+	wrapClient := &client{conn, grpcClient}
+
+	return wrapClient, nil
+}
+
+func (p *clientPool) get() (*client, error) {
+	select {
+	case c := <-p.clients:
+		return c, nil
+	default:
+		return p.createClient()
+	}
+}
+
+func (p *clientPool) put(c *client) {
+	if c == nil {
+		return
+	}
+
+	p.Lock()
+	defer p.Unlock()
+
+	select {
+	case p.clients <- c:
+	default:
+		_ = c.conn.Close()
+	}
+}
+
+func (p *clientPool) close() {
+	p.Lock()
+	defer p.Unlock()
+
+	close(p.clients)
+
+	for c := range p.clients {
+		_ = c.conn.Close()
 	}
 }
