@@ -12,10 +12,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/wind-c/comqtt/mqtt"
-	"github.com/wind-c/comqtt/mqtt/hooks/auth"
-	"github.com/wind-c/comqtt/mqtt/listeners"
-	"github.com/wind-c/comqtt/mqtt/packets"
+	"github.com/wind-c/comqtt/v2/mqtt"
+	"github.com/wind-c/comqtt/v2/mqtt/hooks/auth"
+	"github.com/wind-c/comqtt/v2/mqtt/listeners"
+	"github.com/wind-c/comqtt/v2/mqtt/packets"
 )
 
 func main() {

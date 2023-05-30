@@ -11,10 +11,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/wind-c/comqtt/mqtt"
-	"github.com/wind-c/comqtt/mqtt/hooks/auth"
-	"github.com/wind-c/comqtt/mqtt/hooks/storage/bolt"
-	"github.com/wind-c/comqtt/mqtt/listeners"
+	"github.com/wind-c/comqtt/v2/mqtt"
+	"github.com/wind-c/comqtt/v2/mqtt/hooks/auth"
+	"github.com/wind-c/comqtt/v2/mqtt/hooks/storage/bolt"
+	"github.com/wind-c/comqtt/v2/mqtt/listeners"
 	"go.etcd.io/bbolt"
 )
 
