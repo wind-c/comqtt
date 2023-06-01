@@ -45,8 +45,8 @@ const (
 	// This is used to reduce disk I/O for the recently committed entries.
 	raftLogCacheSize = 512
 
-	leaderWaitDelay  = 100 * time.Millisecond
-	appliedWaitDelay = 100 * time.Millisecond
+	leaderWaitDelay  = 300 * time.Millisecond
+	appliedWaitDelay = 500 * time.Millisecond
 )
 
 type Peer struct {

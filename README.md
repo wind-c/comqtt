@@ -130,6 +130,8 @@ server := mqtt.New(&mqtt.Options{
       ObscureNotAuthorized: true,
     },
   },
+  ClientNetWriteBufferSize: 4096,
+  ClientNetReadBufferSize: 4096,
   SysTopicResendInterval: 10,
 })
 ```

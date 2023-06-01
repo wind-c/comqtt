@@ -24,7 +24,6 @@ import (
 	"net"
 	"path"
 	"path/filepath"
-	"runtime"
 	"strconv"
 )
 
@@ -46,8 +45,8 @@ type Agent struct {
 	mqttServer        *mqtt.Server
 	grpcService       *RpcService
 	grpcClientManager *ClientManager
-	raftPool          *ants.PoolWithFunc
-	OutPool           *ants.PoolWithFunc
+	raftPool          *ants.Pool
+	OutPool           *ants.Pool
 	inPool            *ants.Pool
 	subTree           *topics.Index
 	raftPeer          raft.IPeer
@@ -126,9 +125,6 @@ func (a *Agent) Start() (err error) {
 	// init goroutine pool
 	a.initPool()
 
-	// notification of a new raft peer
-	//a.notifyNewRaftPeer()
-
 	// process node event
 	go a.processNodeEvent()
 
@@ -136,40 +132,39 @@ func (a *Agent) Start() (err error) {
 }
 
 func (a *Agent) initPool() error {
-	gps := runtime.GOMAXPROCS(0)
+	var err error
+
 	// create raft app goroutine pool and raft msg
-	rp, err := ants.NewPoolWithFunc(gps/2, func(i interface{}) {
-		if v, ok := i.(*message.Message); ok {
-			a.raftPropose(v)
-		}
-	})
-	if err != nil {
+	if a.raftPool, err = ants.NewPool(0, ants.WithNonblocking(true)); err != nil {
 		return err
 	}
-	a.raftPool = rp
 
 	// create outbound goroutine pool and outbound msg
-	op, err := ants.NewPoolWithFunc(gps, func(i interface{}) {
-		if v, ok := i.(*packets.Packet); ok {
-			a.processOutboundPacket(v)
-		}
-	})
-	if err != nil {
+	if a.OutPool, err = ants.NewPool(a.Config.OutboundPoolSize, ants.WithNonblocking(a.Config.InoutPoolNonblocking)); err != nil {
 		return err
 	}
-	a.OutPool = op
 
 	// create inbound goroutine pool and process inbound msg
-	if ip, err := ants.NewPool(gps); err != nil {
+	if a.inPool, err = ants.NewPool(a.Config.InboundPoolSize, ants.WithNonblocking(a.Config.InoutPoolNonblocking)); err != nil {
 		return err
-	} else {
-		a.inPool = ip
-		for i := 0; i < gps; i++ {
-			a.inPool.Submit(a.processInboundMsg)
-		}
 	}
 
+	// start incoming message receiving goroutine
+	go a.processInboundMsg()
+
 	return nil
+}
+
+func (a *Agent) SubmitOutTask(pk *packets.Packet) {
+	a.OutPool.Submit(func() {
+		a.processOutboundPacket(pk)
+	})
+}
+
+func (a *Agent) SubmitRaftTask(msg *message.Message) {
+	a.raftPool.Submit(func() {
+		a.raftPropose(msg)
+	})
 }
 
 func (a *Agent) Stop() {
@@ -409,12 +404,16 @@ func (a *Agent) processInboundMsg() {
 		case <-a.ctx.Done():
 			return
 		case bs := <-a.inboundMsgCh:
-			var msg message.Message
-			if err := msg.MsgpackLoad(bs); err == nil {
-				a.processRelayMsg(&msg)
-			}
+			a.inPool.Submit(func() {
+				var msg message.Message
+				if err := msg.MsgpackLoad(bs); err == nil {
+					a.processRelayMsg(&msg)
+				}
+			})
 		case msg := <-a.grpcMsgCh:
-			a.processRelayMsg(msg)
+			a.inPool.Submit(func() {
+				a.processRelayMsg(msg)
+			})
 		}
 	}
 }

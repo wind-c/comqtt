@@ -11,9 +11,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/wind-c/comqtt/mqtt"
-	"github.com/wind-c/comqtt/mqtt/hooks/auth"
-	"github.com/wind-c/comqtt/mqtt/listeners"
+	"github.com/wind-c/comqtt/v2/mqtt"
+	"github.com/wind-c/comqtt/v2/mqtt/hooks/auth"
+	"github.com/wind-c/comqtt/v2/mqtt/listeners"
 )
 
 var (
@@ -97,7 +97,7 @@ func main() {
 
 	stats := listeners.NewHTTPStats("stats", ":8080", &listeners.Config{
 		TLSConfig: tlsConfig,
-	}, nil)
+	}, server.Info)
 	err = server.AddListener(stats)
 	if err != nil {
 		log.Fatal(err)

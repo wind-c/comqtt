@@ -6,7 +6,7 @@ package zap
 
 import (
 	"errors"
-	"github.com/wind-c/comqtt/config"
+	"github.com/wind-c/comqtt/v2/config"
 	"go.uber.org/zap"
 	"os"
 	"testing"

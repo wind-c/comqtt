@@ -127,21 +127,24 @@ type redis struct {
 }
 
 type Cluster struct {
-	DiscoveryWay  uint              `yaml:"discovery-way"  json:"discovery-way"`
-	NodeName      string            `yaml:"node-name" json:"node-name"`
-	BindAddr      string            `yaml:"bind-addr" json:"bind-addr"`
-	BindPort      int               `yaml:"bind-port" json:"bind-port"`
-	AdvertiseAddr string            `yaml:"advertise-addr" json:"advertise-addr"`
-	AdvertisePort int               `yaml:"advertise-port" json:"advertise-port"`
-	Members       []string          `yaml:"members" json:"members"`
-	QueueDepth    int               `yaml:"queue-depth" json:"queue-depth"`
-	Tags          map[string]string `yaml:"tags" json:"tags"`
-	RaftImpl      uint              `yaml:"raft-impl" json:"raft-impl"`
-	RaftPort      int               `yaml:"raft-port" json:"raft-port"`
-	RaftDir       string            `yaml:"raft-dir" json:"raft-dir"`
-	RaftBootstrap bool              `yaml:"raft-bootstrap" json:"raft-bootstrap"`
-	GrpcEnable    bool              `yaml:"grpc-enable" json:"grpc-enable"`
-	GrpcPort      int               `yaml:"grpc-port" json:"grpc-port"`
+	DiscoveryWay         uint              `yaml:"discovery-way"  json:"discovery-way"`
+	NodeName             string            `yaml:"node-name" json:"node-name"`
+	BindAddr             string            `yaml:"bind-addr" json:"bind-addr"`
+	BindPort             int               `yaml:"bind-port" json:"bind-port"`
+	AdvertiseAddr        string            `yaml:"advertise-addr" json:"advertise-addr"`
+	AdvertisePort        int               `yaml:"advertise-port" json:"advertise-port"`
+	Members              []string          `yaml:"members" json:"members"`
+	QueueDepth           int               `yaml:"queue-depth" json:"queue-depth"`
+	Tags                 map[string]string `yaml:"tags" json:"tags"`
+	RaftImpl             uint              `yaml:"raft-impl" json:"raft-impl"`
+	RaftPort             int               `yaml:"raft-port" json:"raft-port"`
+	RaftDir              string            `yaml:"raft-dir" json:"raft-dir"`
+	RaftBootstrap        bool              `yaml:"raft-bootstrap" json:"raft-bootstrap"`
+	GrpcEnable           bool              `yaml:"grpc-enable" json:"grpc-enable"`
+	GrpcPort             int               `yaml:"grpc-port" json:"grpc-port"`
+	InboundPoolSize      int               `yaml:"inbound-pool-size" json:"inbound-pool-size"`
+	OutboundPoolSize     int               `yaml:"outbound-pool-size" json:"outbound-pool-size"`
+	InoutPoolNonblocking bool              `yaml:"inout-pool-nonblocking" json:"inout-pool-nonblocking"`
 }
 
 func GenTlsConfig(conf *Config) (*tls2.Config, error) {

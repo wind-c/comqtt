@@ -54,7 +54,7 @@ func (h *MqttEventHook) OnSessionEstablished(cl *mqtt.Client, pk packets.Packet)
 	if cl.InheritWay != mqtt.InheritWayRemote {
 		return
 	}
-	h.agent.OutPool.Invoke(&pk)
+	h.agent.SubmitOutTask(&pk)
 }
 
 // OnPublished is called when a client has published a message to subscribers.
@@ -62,7 +62,7 @@ func (h *MqttEventHook) OnPublished(cl *mqtt.Client, pk packets.Packet) {
 	if pk.Connect.ClientIdentifier == "" {
 		pk.Connect.ClientIdentifier = cl.ID
 	}
-	h.agent.OutPool.Invoke(&pk)
+	h.agent.SubmitOutTask(&pk)
 }
 
 // OnWillSent is called when an LWT message has been issued from a disconnecting client.
@@ -70,7 +70,7 @@ func (h *MqttEventHook) OnWillSent(cl *mqtt.Client, pk packets.Packet) {
 	if pk.Connect.ClientIdentifier == "" {
 		pk.Connect.ClientIdentifier = cl.ID
 	}
-	h.agent.OutPool.Invoke(&pk)
+	h.agent.SubmitOutTask(&pk)
 }
 
 // OnSubscribed is called when a client subscribes to one or more filters.
@@ -87,7 +87,7 @@ func (h *MqttEventHook) OnSubscribed(cl *mqtt.Client, pk packets.Packet, reasonC
 				ProtocolVersion: cl.Properties.ProtocolVersion,
 				Payload:         []byte(v.Filter),
 			}
-			h.agent.raftPool.Invoke(&m)
+			h.agent.SubmitRaftTask(&m)
 		}
 	}
 }
@@ -105,7 +105,7 @@ func (h *MqttEventHook) OnUnsubscribed(cl *mqtt.Client, pk packets.Packet, reaso
 				ProtocolVersion: cl.Properties.ProtocolVersion,
 				Payload:         []byte(v.Filter),
 			}
-			h.agent.raftPool.Invoke(&m)
+			h.agent.SubmitRaftTask(&m)
 		}
 	}
 }

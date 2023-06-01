@@ -23,6 +23,9 @@ cluster:
   raft-bootstrap: true  #Should be `true` for the first node of the cluster. It is required so that it can elect a leader without any other nodes being present.
   grpc-enable: true  #Grpc is used for raft transport and reliable communication between nodes
   grpc-port: 17946  #Grpc communication port between nodes
+  inbound-pool-size: 40960 #The maximum number of goroutine to process incoming messages.
+  outbound-pool-size: 40960 #The maximum number of goroutine to process outgoing messages.
+  inout-pool-nonblocking: false #Pool size is unlimited, when inout-pool-nonblocking is true, inbound-pool-size and outbound-pool-size is inoperative.
 
 mqtt:
   tcp: :1883

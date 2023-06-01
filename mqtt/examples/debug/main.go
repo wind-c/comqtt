@@ -11,10 +11,10 @@ import (
 	"syscall"
 
 	"github.com/rs/zerolog"
-	"github.com/wind-c/comqtt/mqtt"
-	"github.com/wind-c/comqtt/mqtt/hooks/auth"
-	"github.com/wind-c/comqtt/mqtt/hooks/debug"
-	"github.com/wind-c/comqtt/mqtt/listeners"
+	"github.com/wind-c/comqtt/v2/mqtt"
+	"github.com/wind-c/comqtt/v2/mqtt/hooks/auth"
+	"github.com/wind-c/comqtt/v2/mqtt/hooks/debug"
+	"github.com/wind-c/comqtt/v2/mqtt/listeners"
 )
 
 func main() {
