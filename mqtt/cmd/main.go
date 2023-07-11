@@ -7,6 +7,7 @@ package main
 import (
 	"flag"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -14,7 +15,15 @@ import (
 	"github.com/wind-c/comqtt/v2/mqtt"
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/auth"
 	"github.com/wind-c/comqtt/v2/mqtt/listeners"
+
+	_ "net/http/pprof"
 )
+
+func init() {
+	go func() {
+		log.Println(http.ListenAndServe(":6060", nil))
+	}()
+}
 
 func main() {
 	tcpAddr := flag.String("tcp", ":1883", "network address for TCP listener")

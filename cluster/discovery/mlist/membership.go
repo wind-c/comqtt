@@ -184,3 +184,16 @@ func (m *Membership) Stop() {
 	m.list.Shutdown()
 	m.delegate.Stop()
 }
+
+// Join joins an existing Serf cluster. Returns the number of nodes
+// successfully contacted. The returned error will be non-nil only in the
+// case that no nodes could be contacted.
+// The format of an existing node is nodename/ip:port or ip:port
+func (m *Membership) Join(existing []string) (int, error) {
+	return m.list.Join(existing)
+}
+
+// Leave gracefully exits the cluster.
+func (m *Membership) Leave() error {
+	return m.list.Leave(5 * time.Second)
+}

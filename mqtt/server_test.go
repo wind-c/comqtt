@@ -817,6 +817,30 @@ func TestServerEstablishConnectionBadPacket(t *testing.T) {
 	r.Close()
 }
 
+func TestServerEstablishConnectionOnConnectError(t *testing.T) {
+	s := newServer()
+	hook := new(modifiedHookBase)
+	hook.fail = true
+	err := s.AddHook(hook, nil)
+	require.NoError(t, err)
+
+	r, w := net.Pipe()
+	o := make(chan error)
+	go func() {
+		o <- s.EstablishConnection("tcp", r)
+	}()
+
+	go func() {
+		w.Write(packets.TPacketData[packets.Connect].Get(packets.TConnectClean).RawBytes)
+	}()
+
+	err = <-o
+	require.Error(t, err)
+	require.ErrorIs(t, err, errTestHook)
+
+	r.Close()
+}
+
 func TestServerSendConnack(t *testing.T) {
 	s := newServer()
 	cl, r, w := newTestClient()
@@ -826,7 +850,7 @@ func TestServerSendConnack(t *testing.T) {
 		AssignedClientID: "mochi",
 	}
 	go func() {
-		err := s.sendConnack(cl, packets.CodeSuccess, true)
+		err := s.SendConnack(cl, packets.CodeSuccess, true, nil)
 		require.NoError(t, err)
 		w.Close()
 	}()
@@ -841,7 +865,7 @@ func TestServerSendConnackFailureReason(t *testing.T) {
 	cl, r, w := newTestClient()
 	cl.Properties.ProtocolVersion = 5
 	go func() {
-		err := s.sendConnack(cl, packets.ErrUnspecifiedError, true)
+		err := s.SendConnack(cl, packets.ErrUnspecifiedError, true, nil)
 		require.NoError(t, err)
 		w.Close()
 	}()
@@ -858,7 +882,7 @@ func TestServerSendConnackWithServerKeepalive(t *testing.T) {
 	cl.State.Keepalive = 10
 	cl.State.ServerKeepalive = true
 	go func() {
-		err := s.sendConnack(cl, packets.CodeSuccess, true)
+		err := s.SendConnack(cl, packets.CodeSuccess, true, nil)
 		require.NoError(t, err)
 		w.Close()
 	}()
@@ -937,7 +961,7 @@ func TestServerSendConnackAdjustedExpiryInterval(t *testing.T) {
 	cl.Properties.Props.SessionExpiryInterval = uint32(300)
 	s.Options.Capabilities.MaximumSessionExpiryInterval = 120
 	go func() {
-		err := s.sendConnack(cl, packets.CodeSuccess, false)
+		err := s.SendConnack(cl, packets.CodeSuccess, false, nil)
 		require.NoError(t, err)
 		w.Close()
 	}()
@@ -2598,6 +2622,46 @@ func TestServerSendLWT(t *testing.T) {
 	}()
 
 	require.Equal(t, packets.TPacketData[packets.Publish].Get(packets.TPublishBasic).RawBytes, <-receiverBuf)
+}
+
+func TestServerSendLWTRetain(t *testing.T) {
+	s := newServer()
+	s.Serve()
+	defer s.Close()
+
+	sender, _, w1 := newTestClient()
+	sender.ID = "sender"
+	sender.Properties.Will = Will{
+		Flag:      1,
+		TopicName: "a/b/c",
+		Payload:   []byte("hello mochi"),
+		Retain:    true,
+	}
+	s.Clients.Add(sender)
+
+	receiver, r2, w2 := newTestClient()
+	receiver.ID = "receiver"
+	s.Clients.Add(receiver)
+	s.Topics.Subscribe(receiver.ID, packets.Subscription{Filter: "a/b/c", Qos: 0})
+
+	require.Equal(t, int64(0), atomic.LoadInt64(&s.Info.PacketsReceived))
+	require.Equal(t, 0, len(s.Topics.Messages("a/b/c")))
+
+	receiverBuf := make(chan []byte)
+	go func() {
+		buf, err := io.ReadAll(r2)
+		require.NoError(t, err)
+		receiverBuf <- buf
+	}()
+
+	go func() {
+		s.sendLWT(sender)
+		time.Sleep(time.Millisecond * 10)
+		w1.Close()
+		w2.Close()
+	}()
+
+	require.Equal(t, packets.TPacketData[packets.Publish].Get(packets.TPublishRetain).RawBytes, <-receiverBuf)
 }
 
 func TestServerSendLWTDelayed(t *testing.T) {

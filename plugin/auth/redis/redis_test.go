@@ -27,7 +27,7 @@ var (
 		},
 	}
 
-	pkf = packets.Packet{Filters: packets.Subscriptions{{Filter: "a/b/c"}}}
+	//pkf = packets.Packet{Filters: packets.Subscriptions{{Filter: "a/b/c"}}}
 
 	pkc = packets.Packet{Connect: packets.ConnectParams{Password: []byte("123456")}}
 )
@@ -124,7 +124,7 @@ func TestOnACLCheck(t *testing.T) {
 	result = a.OnACLCheck(client, topic2, false)
 	require.Equal(t, false, result)
 
-	err = a.db.HSet(context.Background(), a.getAclKey(user), topic2, byte(auth.ReadWrite)).Err()
+	a.db.HSet(context.Background(), a.getAclKey(user), topic2, byte(auth.ReadWrite)).Err()
 	result = a.OnACLCheck(client, topic2, true) //publish
 	require.Equal(t, true, result)
 	result = a.OnACLCheck(client, topic2, false) //subscribe

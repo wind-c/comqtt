@@ -298,7 +298,7 @@ func (p *Peer) Leave(nodeId string) error {
 		if server.ID == raft.ServerID(nodeId) {
 			f := p.raft.RemoveServer(server.ID, 0, 0)
 			if err := f.Error(); err != nil {
-				return errors.New(fmt.Sprintf("failed to remove server %s", nodeId))
+				return fmt.Errorf("failed to remove server %s", nodeId)
 			}
 			return nil
 		}

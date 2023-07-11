@@ -330,18 +330,19 @@ func (x *TopicsIndex) Unsubscribe(filter, client string) (bool, int) {
 	defer x.root.Unlock()
 
 	var d int
-	var count int
-	if strings.HasPrefix(filter, SharePrefix) {
+	prefix, _ := isolateParticle(filter, 0)
+	shareSub := strings.EqualFold(prefix, SharePrefix)
+	if shareSub {
 		d = 2
 	}
 
+	var count int
 	particle := x.seek(filter, d)
 	if particle == nil {
 		return false, count
 	}
 
-	prefix, _ := isolateParticle(filter, 0)
-	if strings.EqualFold(prefix, SharePrefix) {
+	if shareSub {
 		group, _ := isolateParticle(filter, 1)
 		particle.shared.Delete(group, client)
 		count = particle.shared.Len()
@@ -506,18 +507,25 @@ func (x *TopicsIndex) scanSubscribers(topic string, d int, n *particle, subs *Su
 	}
 
 	key, hasNext := isolateParticle(topic, d)
-	for _, partKey := range []string{key, "+", "#"} {
+	for _, partKey := range []string{key, "+"} {
 		if particle := n.particles.get(partKey); particle != nil { // [MQTT-3.3.2-3]
-			x.gatherSubscriptions(topic, particle, subs)
-			x.gatherSharedSubscriptions(particle, subs)
-			if wild := particle.particles.get("#"); wild != nil && partKey != "#" && partKey != "+" {
-				x.gatherSubscriptions(topic, wild, subs) // also match any subs where filter/# is filter as per 4.7.1.2
-			}
-
 			if hasNext {
 				x.scanSubscribers(topic, d+1, particle, subs)
+			} else {
+				x.gatherSubscriptions(topic, particle, subs)
+				x.gatherSharedSubscriptions(particle, subs)
+
+				if wild := particle.particles.get("#"); wild != nil && partKey != "+" {
+					x.gatherSubscriptions(topic, wild, subs) // also match any subs where filter/# is filter as per 4.7.1.2
+					x.gatherSharedSubscriptions(wild, subs)
+				}
 			}
 		}
+	}
+
+	if particle := n.particles.get("#"); particle != nil {
+		x.gatherSubscriptions(topic, particle, subs)
+		x.gatherSharedSubscriptions(particle, subs)
 	}
 
 	return subs
@@ -631,12 +639,12 @@ func IsValidFilter(filter string, forPublish bool) bool {
 
 // particle is a child node on the tree.
 type particle struct {
-	key           string               // the key of the particle
 	parent        *particle            // a pointer to the parent of the particle
-	particles     particles            // a map of child particles
 	subscriptions *Subscriptions       // a map of subscriptions made by clients to this ending address
 	shared        *SharedSubscriptions // a map of shared subscriptions keyed on group name
+	key           string               // the key of the particle
 	retainPath    string               // path of a retained message
+	particles     particles            // a map of child particles
 	sync.Mutex                         // mutex for when making changes to the particle
 }
 

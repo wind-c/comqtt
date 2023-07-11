@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	ReqTimeout = 500 * time.Millisecond
+	ReqTimeout = 1 * time.Second
 )
 
 var kaep = keepalive.EnforcementPolicy{
@@ -83,16 +83,6 @@ func (s *RpcService) StopRpcServer() {
 }
 
 func (s *RpcService) PublishPacket(ctx context.Context, req *crpc.PublishRequest) (*crpc.Response, error) {
-	//pk := packets.Packet{FixedHeader: packets.FixedHeader{Type: packets.Publish}}
-	//pk.ProtocolVersion = uint8(req.ProtocolVersion)
-	//pk.Origin = req.ClientId
-	//pk.FixedHeader.Decode(req.Payload[0])                     // Unpack fixedheader.
-	//if err := pk.PublishDecode(req.Payload[2:]); err != nil { // Unpack skips fixedheader.
-	//	return &crpc.Response{Ok: false}, err
-	//}
-	//s.agent.mqttServer.PublishToSubscribers(pk)
-	//OnPublishPacketLog(DirectionInbound, req.NodeId, req.ClientId, pk.TopicName, pk.PacketID)
-
 	msg := message.Message{
 		Type:            packets.Publish,
 		NodeID:          req.NodeId,
@@ -106,14 +96,6 @@ func (s *RpcService) PublishPacket(ctx context.Context, req *crpc.PublishRequest
 }
 
 func (s *RpcService) ConnectNotify(ctx context.Context, req *crpc.ConnectRequest) (*crpc.Response, error) {
-	//if existing, ok := s.agent.mqttServer.Clients.Get(req.ClientId); ok {
-	//	existing.Stop(errors.New("connection from other node"))
-	//	// clean local session and subscriptions
-	//	s.agent.mqttServer.UnsubscribeClient(existing)
-	//	s.agent.mqttServer.Clients.Delete(req.ClientId)
-	//}
-	//OnConnectPacketLog(DirectionInbound, req.NodeId, req.ClientId)
-
 	msg := message.Message{
 		Type:     packets.Connect,
 		NodeID:   req.NodeId,
@@ -125,20 +107,6 @@ func (s *RpcService) ConnectNotify(ctx context.Context, req *crpc.ConnectRequest
 }
 
 func (s *RpcService) RaftApply(ctx context.Context, req *crpc.ApplyRequest) (*crpc.Response, error) {
-	//prompt := "raft apply"
-	//if !s.agent.raftPeer.IsLeader() {
-	//	err := errors.New("a non-leader cannot apply")
-	//	OnApplyLog("unknown", req.NodeId, uint8(req.Action), req.Filter, prompt, err)
-	//	return &crpc.Response{Ok: false}, err
-	//}
-	//result := true
-	//cmd := genApplyCmd(req)
-	//err := s.agent.raftPeer.Propose(cmd, raft.DefaultRaftTimeout)
-	//if err != nil {
-	//	result = false
-	//}
-	//OnApplyLog(s.agent.GetLocalName(), req.NodeId, uint8(req.Action), req.Filter, prompt, err)
-
 	msg := message.Message{
 		Type:    uint8(req.Action),
 		NodeID:  req.NodeId,
@@ -150,15 +118,6 @@ func (s *RpcService) RaftApply(ctx context.Context, req *crpc.ApplyRequest) (*cr
 }
 
 func (s *RpcService) RaftJoin(ctx context.Context, req *crpc.JoinRequest) (*crpc.Response, error) {
-	//prompt := "raft join"
-	//addr := net.JoinHostPort(req.Addr, strconv.Itoa(int(req.Port)))
-	//result := true
-	//err := s.agent.RaftJoin(req.NodeId, addr)
-	//if err != nil {
-	//	result = false
-	//}
-	//OnJoinLog(req.NodeId, addr, prompt, err)
-
 	addr := net.JoinHostPort(req.Addr, strconv.Itoa(int(req.Port)))
 	msg := message.Message{
 		Type:    message.RaftJoin,
@@ -180,9 +139,9 @@ func genApplyCmd(req *crpc.ApplyRequest) []byte {
 }
 
 type ClientManager struct {
-	sync.Mutex
 	agent *Agent
 	cs    map[string]*client
+	sync.Mutex
 }
 
 type client struct {

@@ -105,13 +105,14 @@ Examples of running the broker with various configurations can be found in the [
 #### Network Listeners
 The server comes with a variety of pre-packaged network listeners which allow the broker to accept connections on different protocols. The current listeners are:
 
-| Listener | Usage |
-| --- | --- |
-| listeners.NewTCP | A TCP listener |
-| listeners.NewUnixSock | A Unix Socket listener |
-| listeners.NewNet | A net.Listener listener |
-| listeners.NewWebsocket | A Websocket listener |
-| listeners.NewHTTPStats | An HTTP $SYS info dashboard |
+| Listener                     | Usage                                                                                        |
+|------------------------------|----------------------------------------------------------------------------------------------|
+| listeners.NewTCP             | A TCP listener                                                                               |
+| listeners.NewUnixSock        | A Unix Socket listener                                                                       |
+| listeners.NewNet             | A net.Listener listener                                                                      |
+| listeners.NewWebsocket       | A Websocket listener                                                                         |
+| listeners.NewHTTPStats       | An HTTP $SYS info dashboard                                                                  |
+| listeners.NewHTTPHealthCheck | An HTTP healthcheck listener to provide health check responses for e.g. cloud infrastructure |
 
 > Use the `listeners.Listener` interface to develop new listeners. If you do, please let us know!
 
@@ -130,8 +131,8 @@ server := mqtt.New(&mqtt.Options{
       ObscureNotAuthorized: true,
     },
   },
-  ClientNetWriteBufferSize: 4096,
-  ClientNetReadBufferSize: 4096,
+  ClientNetWriteBufferSize: 1024,
+  ClientNetReadBufferSize: 1024,
   SysTopicResendInterval: 10,
 })
 ```
@@ -167,26 +168,26 @@ _ = server.AddHook(new(auth.AllowHook), nil)
 > Don't do this if you are exposing your server to the internet or untrusted networks - it should really be used for development, testing, and debugging only.
 
 #### Auth Ledger
-The Auth Ledger hook provides a sophisticated mechanism for defining access rules in a struct format. Auth ledger rules come in two forms: Auth rules (connection), and ACL rules (publish subscribe).
+The Auth Ledger hook provides a sophisticated mechanism for defining access rules in a struct format. Auth ledger rules come in two forms: Auth rules (connection), and ACL rules (publish subscribe). 
 
 Auth rules have 4 optional criteria and an assertion flag:
-| Criteria | Usage |
+| Criteria | Usage | 
 | -- | -- |
 | Client | client id of the connecting client |
 | Username | username of the connecting client |
 | Password | password of the connecting client |
 | Remote | the remote address or ip of the client |
-| Allow | true (allow this user) or false (deny this user) |
+| Allow | true (allow this user) or false (deny this user) | 
 
 ACL rules have 3 optional criteria and an filter match:
-| Criteria | Usage |
+| Criteria | Usage | 
 | -- | -- |
 | Client | client id of the connecting client |
 | Username | username of the connecting client |
 | Remote | the remote address or ip of the client |
 | Filters | an array of filters to match |
 
-Rules are processed in index order (0,1,2,3), returning on the first matching rule. See [mqtt/hooks/auth/ledger.go](mqtt/hooks/auth/ledger.go) to review the structs.
+Rules are processed in index order (0,1,2,3), returning on the first matching rule. See [hooks/auth/ledger.go](hooks/auth/ledger.go) to review the structs.
 
 ```go
 server := mqtt.New(nil)
@@ -266,42 +267,45 @@ The function signatures for all the hooks and `mqtt.Hook` interface can be found
 
 > The most flexible event hooks are OnPacketRead, OnPacketEncode, and OnPacketSent - these hooks be used to control and modify all incoming and outgoing packets.
 
-| Function | Usage |
-| -------------------------- | -- |
-| OnStarted | Called when the server has successfully started.|
-| OnStopped | Called when the server has successfully stopped. |
-| OnConnectAuthenticate | Called when a user attempts to authenticate with the server. An implementation of this method MUST be used to allow or deny access to the server (see hooks/auth/allow_all or basic). It can be used in custom hooks to check connecting users against an existing user database. Returns true if allowed. |
-| OnACLCheck | Called when a user attempts to publish or subscribe to a topic filter. As above. |
-| OnSysInfoTick | Called when the $SYS topic values are published out. |
-| OnConnect | Called when a new client connects |
-| OnSessionEstablished | Called when a new client successfully establishes a session (after OnConnect) |
-| OnDisconnect | Called when a client is disconnected for any reason. |
-| OnAuthPacket | Called when an auth packet is received. It is intended to allow developers to create their own mqtt v5 Auth Packet handling mechanisms. Allows packet modification. |
-| OnPacketRead | Called when a packet is received from a client. Allows packet modification. |
-| OnPacketEncode | Called immediately before a packet is encoded to be sent to a client. Allows packet modification. |
-| OnPacketSent | Called when a packet has been sent to a client. |
-| OnPacketProcessed | Called when a packet has been received and successfully handled by the broker. |
-| OnSubscribe | Called when a client subscribes to one or more filters. Allows packet modification. |
-| OnSubscribed | Called when a client successfully subscribes to one or more filters. |
-| OnSelectSubscribers | Called when subscribers have been collected for a topic, but before shared subscription subscribers have been selected. Allows receipient modification.|
-| OnUnsubscribe | Called when a client unsubscribes from one or more filters. Allows packet modification. |
-| OnUnsubscribed | Called when a client successfully unsubscribes from one or more filters. |
-| OnPublish | Called when a client publishes a message. Allows packet modification. |
-| OnPublished | Called when a client has published a message to subscribers. |
-| OnPublishDropped | Called when a message to a client is dropped before delivery, such as if the client is taking too long to respond. |
-| OnRetainMessage | Called then a published message is retained. |
-| OnQosPublish | Called when a publish packet with Qos >= 1 is issued to a subscriber. |
-| OnQosComplete | Called when the Qos flow for a message has been completed. |
-| OnQosDropped | Called when an inflight message expires before completion. |
-| OnWill | Called when a client disconnects and intends to issue a will message. Allows packet modification. |
-| OnWillSent | Called when an LWT message has been issued from a disconnecting client. |
-| OnClientExpired | Called when a client session has expired and should be deleted. |
-| OnRetainedExpired | Called when a retained message has expired and should be deleted. |
-| StoredClients |  Returns clients, eg. from a persistent store. |
-| StoredSubscriptions |  Returns client subscriptions, eg. from a persistent store. |
-| StoredInflightMessages | Returns inflight messages, eg. from a persistent store.  |
-| StoredRetainedMessages | Returns retained messages, eg. from a persistent store. |
-| StoredSysInfo | Returns stored system info values, eg. from a persistent store. |
+| Function               | Usage                                                                                                                                                                                                                                                                                                      | 
+|------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| OnStarted              | Called when the server has successfully started.                                                                                                                                                                                                                                                           |
+| OnStopped              | Called when the server has successfully stopped.                                                                                                                                                                                                                                                           | 
+| OnConnectAuthenticate  | Called when a user attempts to authenticate with the server. An implementation of this method MUST be used to allow or deny access to the server (see hooks/auth/allow_all or basic). It can be used in custom hooks to check connecting users against an existing user database. Returns true if allowed. |
+| OnACLCheck             | Called when a user attempts to publish or subscribe to a topic filter. As above.                                                                                                                                                                                                                           |
+| OnSysInfoTick          | Called when the $SYS topic values are published out.                                                                                                                                                                                                                                                       |
+| OnConnect              | Called when a new client connects, may return an error or packet code to halt the client connection process.                                                                                                                                                                                               | 
+| OnSessionEstablish     | Called immediately after a new client connects and authenticates and immediately before the session is established and CONNACK is sent.
+| OnSessionEstablished   | Called when a new client successfully establishes a session (after OnConnect)                                                                                                                                                                                                                              | 
+| OnDisconnect           | Called when a client is disconnected for any reason.                                                                                                                                                                                                                                                       | 
+| OnAuthPacket           | Called when an auth packet is received. It is intended to allow developers to create their own mqtt v5 Auth Packet handling mechanisms. Allows packet modification.                                                                                                                                        | 
+| OnPacketRead           | Called when a packet is received from a client. Allows packet modification.                                                                                                                                                                                                                                | 
+| OnPacketEncode         | Called immediately before a packet is encoded to be sent to a client. Allows packet modification.                                                                                                                                                                                                          | 
+| OnPacketSent           | Called when a packet has been sent to a client.                                                                                                                                                                                                                                                            | 
+| OnPacketProcessed      | Called when a packet has been received and successfully handled by the broker.                                                                                                                                                                                                                             | 
+| OnSubscribe            | Called when a client subscribes to one or more filters. Allows packet modification.                                                                                                                                                                                                                        | 
+| OnSubscribed           | Called when a client successfully subscribes to one or more filters.                                                                                                                                                                                                                                       | 
+| OnSelectSubscribers    | Called when subscribers have been collected for a topic, but before shared subscription subscribers have been selected. Allows receipient modification.                                                                                                                                                    | 
+| OnUnsubscribe          | Called when a client unsubscribes from one or more filters. Allows packet modification.                                                                                                                                                                                                                    | 
+| OnUnsubscribed         | Called when a client successfully unsubscribes from one or more filters.                                                                                                                                                                                                                                   | 
+| OnPublish              | Called when a client publishes a message. Allows packet modification.                                                                                                                                                                                                                                      | 
+| OnPublished            | Called when a client has published a message to subscribers.                                                                                                                                                                                                                                               | 
+| OnPublishDropped       | Called when a message to a client is dropped before delivery, such as if the client is taking too long to respond.                                                                                                                                                                                         | 
+| OnRetainMessage        | Called then a published message is retained.                                                                                                                                                                                                                                                               | 
+| OnRetainPublished      | Called then a retained message is published to a client.                                                                                                                                                                                                                                                   | 
+| OnQosPublish           | Called when a publish packet with Qos >= 1 is issued to a subscriber.                                                                                                                                                                                                                                      | 
+| OnQosComplete          | Called when the Qos flow for a message has been completed.                                                                                                                                                                                                                                                 | 
+| OnQosDropped           | Called when an inflight message expires before completion.                                                                                                                                                                                                                                                 | 
+| OnPacketIDExhausted    | Called when a client runs out of unused packet ids to assign.                                                                                                                                                                                                                                              | 
+| OnWill                 | Called when a client disconnects and intends to issue a will message. Allows packet modification.                                                                                                                                                                                                          | 
+| OnWillSent             | Called when an LWT message has been issued from a disconnecting client.                                                                                                                                                                                                                                    | 
+| OnClientExpired        | Called when a client session has expired and should be deleted.                                                                                                                                                                                                                                            | 
+| OnRetainedExpired      | Called when a retained message has expired and should be deleted.                                                                                                                                                                                                                                          | 
+| StoredClients          | Returns clients, eg. from a persistent store.                                                                                                                                                                                                                                                              | 
+| StoredSubscriptions    | Returns client subscriptions, eg. from a persistent store.                                                                                                                                                                                                                                                 | 
+| StoredInflightMessages | Returns inflight messages, eg. from a persistent store.                                                                                                                                                                                                                                                    | 
+| StoredRetainedMessages | Returns retained messages, eg. from a persistent store.                                                                                                                                                                                                                                                    | 
+| StoredSysInfo          | Returns stored system info values, eg. from a persistent store.                                                                                                                                                                                                                                            | 
 
 If you are building a persistent storage hook, see the existing persistent hooks for inspiration and patterns. If you are building an auth hook, you will need `OnACLCheck` and `OnConnectAuthenticate`.
 
@@ -315,7 +319,7 @@ err := server.Publish("direct/publish", []byte("packet scheduled message"), fals
 > The Qos byte in this case is only used to set the upper qos limit available for subscribers, as per MQTT v5 spec.
 
 ### Packet Injection
-If you want more control, or want to set specific MQTT v5 properties and other values you can create your own publish packets from a client of your choice. This method allows you to inject MQTT packets (no just publish) directly into the runtime as though they had been received by a specific client. Most of the time you'll want to use the special client flag `inline=true`, as it has unique privileges: it bypasses all ACL and topic validation checks, meaning it can even publish to $SYS topics.
+If you want more control, or want to set specific MQTT v5 properties and other values you can create your own publish packets from a client of your choice. This method allows you to inject MQTT packets (no just publish) directly into the runtime as though they had been received by a specific client. Most of the time you'll want to use the special client flag `inline=true`, as it has unique privileges: it bypasses all ACL and topic validation checks, meaning it can even publish to $SYS topics. 
 
 Packet injection can be used for any MQTT packet, including ping requests, subscriptions, etc. And because the Clients structs and methods are now exported, you can even inject packets on behalf of a connected client (if you have a very custom requirements).
 
@@ -353,14 +357,15 @@ Comqtt performance is comparable with popular brokers such as Mosquitto, EMQX, a
 Performance benchmarks were tested using [MQTT-Stresser](https://github.com/inovex/mqtt-stresser) on a Apple Macbook Air M2, using `cmd/main.go` default settings. Taking into account bursts of high and low throughput, the median scores are the most useful. Higher is better.
 
 > The values presented in the benchmark are not representative of true messages per second throughput. They rely on an unusual calculation by mqtt-stresser, but are usable as they are consistent across all brokers.
-> Benchmarks are provided as a general performance expectation guideline only.
+> Benchmarks are provided as a general performance expectation guideline only. Comparisons are performed using out-of-the-box default configurations.
 
 `mqtt-stresser -broker tcp://localhost:1883 -num-clients=2 -num-messages=10000`
-| Broker            | publish fastest | median | slowest | receive fastest | median | slowest |
+| Broker            | publish fastest | median | slowest | receive fastest | median | slowest | 
 | --                | --             | --   | --   | --             | --   | --   |
-| Comqtt v2.0.0      | 127,216 | 125,748 | 124,279 | 319,250 | 309,327 | 299,405 |
-| Mosquitto v2.0.15 | 155,920 | 155,919 | 155,918 | 185,485 | 185,097 | 184,709 |
-| EMQX v5.0.11      | 156,945 | 156,257 | 155,568 | 17,918 | 17,783 | 17,649 |
+| Comqtt v2.0.0      | 124,772 | 125,456 | 124,614 | 314,461 | 313,186 | 311,910 |
+| [Mosquitto v2.0.15](https://github.com/eclipse/mosquitto) | 155,920 | 155,919 | 155,918 | 185,485 | 185,097 | 184,709 |
+| [EMQX v5.0.11](https://github.com/emqx/emqx)      | 156,945 | 156,257 | 155,568 | 17,918 | 17,783 | 17,649 |
+| [Rumqtt v0.21.0](https://github.com/bytebeamio/rumqtt) | 112,208 | 108,480 | 104,753 | 135,784 | 126,446 | 117,108 |
 
 `mqtt-stresser -broker tcp://localhost:1883 -num-clients=10 -num-messages=10000`
 | Broker            | publish fastest | median | slowest | receive fastest | median | slowest |
@@ -368,6 +373,7 @@ Performance benchmarks were tested using [MQTT-Stresser](https://github.com/inov
 | Comqtt v2.0.0      | 45,615 | 30,129 | 21,138 | 232,717 | 86,323 | 50,402 |
 | Mosquitto v2.0.15 | 42,729 | 38,633 | 29,879 | 23,241 | 19,714 | 18,806 |
 | EMQX v5.0.11      | 21,553 | 17,418 | 14,356 | 4,257 | 3,980 | 3,756 |
+| Rumqtt v0.21.0    | 42,213 | 23,153 | 20,814 | 49,465 | 36,626 | 19,283 |
 
 Million Message Challenge (hit the server with 1 million messages immediately):
 
@@ -377,6 +383,7 @@ Million Message Challenge (hit the server with 1 million messages immediately):
 | Comqtt v2.0.0      | 51,044 | 4,682 | 2,345 | 72,634 | 7,645 | 2,464 |
 | Mosquitto v2.0.15 | 3,826 | 3,395 | 3,032 | 1,200 | 1,150 | 1,118 |
 | EMQX v5.0.11      | 4,086 | 2,432 | 2,274 | 434 | 333 | 311 |
+| Rumqtt v0.21.0    | 78,972 | 5,047 | 3,804 | 4,286 | 3,249 | 2,027 |
 
 > Not sure what's going on with EMQX here, perhaps the docker out-of-the-box settings are not optimal, so take it with a pinch of salt as we know for a fact it's a solid piece of software.
 

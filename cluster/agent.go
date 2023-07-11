@@ -501,6 +501,21 @@ func OnConnectPacketLog(direction byte, node, clientId string) {
 	logEvent.Str("cid", clientId).Msg("connection notification")
 }
 
+func (a *Agent) Join(nodeName, addr string) error {
+	var existingNode string
+	if nodeName != "" {
+		existingNode += nodeName
+		existingNode += "/"
+	}
+	existingNode += addr
+	_, err := a.membership.Join([]string{existingNode})
+	return err
+}
+
+func (a *Agent) Leave() error {
+	return a.membership.Leave()
+}
+
 func (a *Agent) AddRaftPeer(id, addr string) {
 	a.raftPeer.Join(id, addr)
 	zero.Info().Str("nid", id).Str("addr", addr).Msg("add peer")

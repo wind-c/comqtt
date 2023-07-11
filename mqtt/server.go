@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	Version                       = "2.2.11" // the current server version.
+	Version                       = "2.2.15" // the current server version.
 	defaultSysTopicInterval int64 = 1        // the interval between $SYS topic publishes
 )
 
@@ -84,12 +84,6 @@ type Options struct {
 	// 	server.Options.Capabilities.MaximumClientWritesPending = 16 * 1024
 	Capabilities *Capabilities
 
-	// ClientNetWriteBufferSize specifies the size of the client *bufio.Writer write buffer.
-	ClientNetWriteBufferSize int `yaml:"client-write-buffer-size"`
-
-	// ClientNetReadBufferSize specifies the size of the client *bufio.Reader read buffer.
-	ClientNetReadBufferSize int `yaml:"client-read-buffer-size"`
-
 	// Logger specifies a custom configured implementation of zerolog to override
 	// the servers default logger configuration. If you wish to change the log level,
 	// of the default logger, you can do so by setting
@@ -97,6 +91,12 @@ type Options struct {
 	// 	l := server.Log.Level(zerolog.DebugLevel)
 	// 	server.Log = &l
 	Logger *zerolog.Logger
+
+	// ClientNetWriteBufferSize specifies the size of the client *bufio.Writer write buffer.
+	ClientNetWriteBufferSize int `yaml:"client-write-buffer-size"`
+
+	// ClientNetReadBufferSize specifies the size of the client *bufio.Reader read buffer.
+	ClientNetReadBufferSize int `yaml:"client-read-buffer-size"`
 
 	// SysTopicResendInterval specifies the interval between $SYS topic updates in seconds.
 	SysTopicResendInterval int64 `yaml:"sys-topic-resend-interval"`
@@ -213,7 +213,7 @@ func (s *Server) NewClient(c net.Conn, listener string, id string, inline bool) 
 
 	if inline { // inline clients bypass acl and some validity checks.
 		cl.Net.Inline = true
-		// By default we don't want to restrict developer publishes,
+		// By default, we don't want to restrict developer publishes,
 		// but if you do, reset this after creating inline client.
 		cl.State.Inflight.ResetReceiveQuota(math.MaxInt32)
 	} else {
@@ -322,17 +322,20 @@ func (s *Server) attachClient(cl *Client, listener string) error {
 	cl.ParseConnect(listener, pk)
 	code := s.validateConnect(cl, pk) // [MQTT-3.1.4-1] [MQTT-3.1.4-2]
 	if code != packets.CodeSuccess {
-		if err := s.sendConnack(cl, code, false); err != nil {
+		if err := s.SendConnack(cl, code, false, nil); err != nil {
 			return fmt.Errorf("invalid connection send ack: %w", err)
 		}
 		return code // [MQTT-3.2.2-7] [MQTT-3.1.4-6]
 	}
 
-	s.hooks.OnConnect(cl, pk)
-	cl.refreshDeadline(cl.State.Keepalive)
+	err = s.hooks.OnConnect(cl, pk)
+	if err != nil {
+		return err
+	}
 
+	cl.refreshDeadline(cl.State.Keepalive)
 	if !s.hooks.OnConnectAuthenticate(cl, pk) { // [MQTT-3.1.4-2]
-		err := s.sendConnack(cl, packets.ErrBadUsernameOrPassword, false)
+		err := s.SendConnack(cl, packets.ErrBadUsernameOrPassword, false, nil)
 		if err != nil {
 			return fmt.Errorf("invalid connection send ack: %w", err)
 		}
@@ -343,10 +346,12 @@ func (s *Server) attachClient(cl *Client, listener string) error {
 	atomic.AddInt64(&s.Info.ClientsConnected, 1)
 	defer atomic.AddInt64(&s.Info.ClientsConnected, -1)
 
+	s.hooks.OnSessionEstablish(cl, pk)
+
 	sessionPresent := s.inheritClientSession(pk, cl)
 	s.Clients.Add(cl) // [MQTT-4.1.0-1]
 
-	err = s.sendConnack(cl, code, sessionPresent) // [MQTT-3.1.4-5] [MQTT-3.2.0-1] [MQTT-3.2.0-2] &[MQTT-3.14.0-1]
+	err = s.SendConnack(cl, code, sessionPresent, nil) // [MQTT-3.1.4-5] [MQTT-3.2.0-1] [MQTT-3.2.0-2] &[MQTT-3.14.0-1]
 	if err != nil {
 		return fmt.Errorf("ack connection packet: %w", err)
 	}
@@ -506,34 +511,16 @@ func (s *Server) inheritClientSession(pk packets.Packet, cl *Client) bool {
 	return false
 }
 
-// loadClientHistory loads history info of client
-func (s *Server) loadClientHistory(cid string) bool {
-	ss, err := s.hooks.StoredSubscriptionsByCid(cid)
-	if err != nil {
-		return false
-	}
-	s.loadSubscriptions(ss)
-
-	fs, err := s.hooks.StoredInflightMessagesByCid(cid)
-	if err != nil {
-		return false
-	}
-	s.loadInflight(fs)
-
-	if len(ss) > 0 || len(fs) > 0 {
-		return true
+// SendConnack returns a Connack packet to a client.
+func (s *Server) SendConnack(cl *Client, reason packets.Code, present bool, properties *packets.Properties) error {
+	if properties == nil {
+		properties = &packets.Properties{
+			ReceiveMaximum: s.Options.Capabilities.ReceiveMaximum,
+		}
 	}
 
-	return false
-}
-
-// sendConnack returns a Connack packet to a client.
-func (s *Server) sendConnack(cl *Client, reason packets.Code, present bool) error {
-	properties := packets.Properties{
-		ReceiveMaximum: s.Options.Capabilities.ReceiveMaximum, // 3.2.2.3.3 Receive Maximum
-	}
-
-	if cl.State.ServerKeepalive { // You can set this dynamically using the OnConnect hook.
+	properties.ReceiveMaximum = s.Options.Capabilities.ReceiveMaximum // 3.2.2.3.3 Receive Maximum
+	if cl.State.ServerKeepalive {                                     // You can set this dynamically using the OnConnect hook.
 		properties.ServerKeepAlive = cl.State.Keepalive // [MQTT-3.1.2-21]
 		properties.ServerKeepAliveFlag = true
 	}
@@ -552,9 +539,8 @@ func (s *Server) sendConnack(cl *Client, reason packets.Code, present bool) erro
 			},
 			SessionPresent: false,       // [MQTT-3.2.2-6]
 			ReasonCode:     reason.Code, // [MQTT-3.2.2-8]
-			Properties:     properties,
+			Properties:     *properties,
 		}
-
 		return cl.WritePacket(ack)
 	}
 
@@ -574,14 +560,36 @@ func (s *Server) sendConnack(cl *Client, reason packets.Code, present bool) erro
 		cl.Properties.Props.SessionExpiryIntervalFlag = true
 	}
 
-	return cl.WritePacket(packets.Packet{
+	ack := packets.Packet{
 		FixedHeader: packets.FixedHeader{
 			Type: packets.Connack,
 		},
 		SessionPresent: present,
 		ReasonCode:     reason.Code, // [MQTT-3.2.2-8]
-		Properties:     properties,
-	})
+		Properties:     *properties,
+	}
+	return cl.WritePacket(ack)
+}
+
+// loadClientHistory loads history info of client
+func (s *Server) loadClientHistory(cid string) bool {
+	ss, err := s.hooks.StoredSubscriptionsByCid(cid)
+	if err != nil {
+		return false
+	}
+	s.loadSubscriptions(ss)
+
+	fs, err := s.hooks.StoredInflightMessagesByCid(cid)
+	if err != nil {
+		return false
+	}
+	s.loadInflight(fs)
+
+	if len(ss) > 0 || len(fs) > 0 {
+		return true
+	}
+
+	return false
 }
 
 // processPacket processes an inbound packet for a client. Since the method is
@@ -913,11 +921,13 @@ func (s *Server) publishRetainedToClient(cl *Client, sub packets.Subscription, e
 		_, err := s.publishToClient(cl, sub, pkv)
 		if err != nil {
 			s.Log.Debug().Err(err).Str("client", cl.ID).Str("listener", cl.Net.Listener).Interface("packet", pkv).Msg("failed to publish retained message")
+			continue
 		}
+		s.hooks.OnRetainPublished(cl, pkv)
 	}
 }
 
-// buildAck builds an standardised ack message for Puback, Pubrec, Pubrel, Pubcomp packets.
+// buildAck builds a standardised ack message for Puback, Pubrec, Pubrel, Pubcomp packets.
 func (s *Server) buildAck(packetID uint16, pkt, qos byte, properties packets.Properties, reason packets.Code) packets.Packet {
 	properties = packets.Properties{} // PRL
 	if reason.Code >= packets.ErrUnspecifiedError.Code {
@@ -1064,7 +1074,7 @@ func (s *Server) processSubscribe(cl *Client, pk packets.Packet) error {
 		}
 	}
 
-	ack := packets.Packet{ //[MQTT-3.8.4-1] [MQTT-3.8.4-5]
+	ack := packets.Packet{ // [MQTT-3.8.4-1] [MQTT-3.8.4-5]
 		FixedHeader: packets.FixedHeader{
 			Type: packets.Suback,
 		},
@@ -1325,6 +1335,10 @@ func (s *Server) sendLWT(cl *Client) {
 		return
 	}
 
+	if pk.FixedHeader.Retain {
+		s.retainMessage(cl, pk)
+	}
+
 	s.PublishToSubscribers(pk)                      // [MQTT-3.1.2-8]
 	atomic.StoreUint32(&cl.Properties.Will.Flag, 0) // [MQTT-3.1.2-10]
 	s.hooks.OnWillSent(cl, pk)
@@ -1520,6 +1534,9 @@ func (s *Server) sendDelayedLWT(dt int64) {
 		if dt > pk.Expiry {
 			s.PublishToSubscribers(pk) // [MQTT-3.1.2-8]
 			if cl, ok := s.Clients.Get(id); ok {
+				if pk.FixedHeader.Retain {
+					s.retainMessage(cl, pk)
+				}
 				cl.Properties.Will = Will{} // [MQTT-3.1.2-10]
 				s.hooks.OnWillSent(cl, pk)
 			}

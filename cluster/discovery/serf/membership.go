@@ -106,10 +106,6 @@ func (m *Membership) EventChan() <-chan *mb.Event {
 	return m.eventCh
 }
 
-func (m *Membership) Leave() error {
-	return m.serf.Leave()
-}
-
 func (m *Membership) NumMembers() int {
 	return m.serf.NumNodes()
 }
@@ -231,10 +227,6 @@ func (m *Membership) isLocal(member serf.Member) bool {
 	return m.serf.LocalMember().Name == member.Name
 }
 
-func (m *Membership) logError(err error, msg string, name string) {
-	zero.Error().Err(err).Str("node", name).Msg(msg)
-}
-
 func (m *Membership) otherNames(excluded string) []string {
 	names := make([]string, 0)
 	for _, node := range m.serf.Members() {
@@ -269,4 +261,17 @@ func (m *Membership) aliveMembers() []serf.Member {
 		}
 	}
 	return alive
+}
+
+// Join joins an existing Serf cluster. Returns the number of nodes
+// successfully contacted. The returned error will be non-nil only in the
+// case that no nodes could be contacted.
+// The format of an existing node is nodename/ip:port or ip:port
+func (m *Membership) Join(existing []string) (int, error) {
+	return m.serf.Join(existing, true)
+}
+
+// Leave gracefully exits the cluster.
+func (m *Membership) Leave() error {
+	return m.serf.Leave()
 }

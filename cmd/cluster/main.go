@@ -7,6 +7,7 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"github.com/go-redis/redis/v8"
 	"github.com/rs/zerolog"
 	cs "github.com/wind-c/comqtt/v2/cluster"
@@ -34,9 +35,14 @@ import (
 	"syscall"
 )
 
-var server *mqtt.Server
 var agent *cs.Agent
 var logger *zerolog.Logger
+
+func init() {
+	go func() {
+		log.Println(http.ListenAndServe(":6060", nil))
+	}()
+}
 
 func main() {
 	var err error
@@ -98,7 +104,7 @@ func main() {
 	//listen system operations
 	sigs := make(chan os.Signal, 1)
 	done := make(chan bool, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGABRT, syscall.SIGKILL)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGABRT)
 	go func() {
 		<-sigs
 		done <- true
@@ -179,22 +185,22 @@ func initAuth(server *mqtt.Server, conf *config.Config) {
 			opts := rauth.Options{}
 			onError(plugin.LoadYaml(conf.Auth.ConfPath, &opts), logMsg)
 			onError(server.AddHook(new(rauth.Auth), &opts), logMsg)
-			opts.SetBlacklist(ledger)
+			opts.SetBlacklist(&ledger)
 		case config.AuthDSMysql:
 			opts := mauth.Options{}
 			onError(plugin.LoadYaml(conf.Auth.ConfPath, &opts), logMsg)
 			onError(server.AddHook(new(mauth.Auth), &opts), logMsg)
-			opts.SetBlacklist(ledger)
+			opts.SetBlacklist(&ledger)
 		case config.AuthDSPostgresql:
 			opts := pauth.Options{}
 			onError(plugin.LoadYaml(conf.Auth.ConfPath, &opts), logMsg)
 			onError(server.AddHook(new(pauth.Auth), &opts), logMsg)
-			opts.SetBlacklist(ledger)
+			opts.SetBlacklist(&ledger)
 		case config.AuthDSHttp:
 			opts := hauth.Options{}
 			onError(plugin.LoadYaml(conf.Auth.ConfPath, &opts), logMsg)
 			onError(server.AddHook(new(hauth.Auth), &opts), logMsg)
-			opts.SetBlacklist(ledger)
+			opts.SetBlacklist(&ledger)
 		}
 	} else {
 		onError(config.ErrAuthWay, logMsg)
@@ -300,7 +306,7 @@ func PeerHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		agent.AddRaftPeer(string(nodeId), string(addr))
+		agent.AddRaftPeer(fmt.Sprint(nodeId), string(addr))
 		w.WriteHeader(http.StatusNoContent)
 	case http.MethodDelete:
 		nodeId, err := strconv.ParseUint(key, 0, 64)
@@ -310,7 +316,7 @@ func PeerHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		agent.RemoveRaftPeer(string(nodeId))
+		agent.RemoveRaftPeer(fmt.Sprint(nodeId))
 		w.WriteHeader(http.StatusNoContent)
 	default:
 		w.Header().Add("Allow", http.MethodPut)

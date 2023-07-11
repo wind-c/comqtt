@@ -104,11 +104,11 @@ func (cl *Clients) GetByListener(id string) []*Client {
 
 // Client contains information about a client known by the broker.
 type Client struct {
-	Properties   ClientProperties // client properties
-	State        ClientState      // the operational state of the client.
-	Net          ClientConnection // network connection state of the clinet
-	ID           string           // the client id.
 	ops          *ops             // ops provides a reference to server ops.
+	State        ClientState      // the operational state of the client.
+	ID           string           // the client id.
+	Net          ClientConnection // network connection state of the clinet
+	Properties   ClientProperties // client properties
 	InheritWay   int              // session inheritance way
 	sync.RWMutex                  // mutex
 }
@@ -124,18 +124,18 @@ type ClientConnection struct {
 
 // ClientProperties contains the properties which define the client behaviour.
 type ClientProperties struct {
-	Props           packets.Properties
-	Will            Will
 	Username        []byte
+	Will            Will
+	Props           packets.Properties
 	ProtocolVersion byte
 	Clean           bool
 }
 
 // Will contains the last will and testament details for a client connection.
 type Will struct {
+	TopicName         string                 // -
 	Payload           []byte                 // -
 	User              []packets.UserProperty // -
-	TopicName         string                 // -
 	Flag              uint32                 // 0,1
 	WillDelayInterval uint32                 // -
 	Qos               byte                   // -
@@ -146,15 +146,15 @@ type Will struct {
 type ClientState struct {
 	TopicAliases    TopicAliases         // a map of topic aliases
 	stopCause       atomic.Value         // reason for stopping
-	Inflight        *Inflight            // a map of in-flight qos messages
+	open            context.Context      // indicate that the client is open for packet exchange
 	Subscriptions   *Subscriptions       // a map of the subscription filters a client maintains
-	disconnected    int64                // the time the client disconnected in unix time, for calculating expiry
 	outbound        chan *packets.Packet // queue for pending outbound packets
+	Inflight        *Inflight            // a map of in-flight qos messages
+	cancelOpen      context.CancelFunc   // cancel function for open context
+	disconnected    int64                // the time the client disconnected in unix time, for calculating expiry
 	endOnce         sync.Once            // only end once
 	isTakenOver     uint32               // used to identify orphaned clients
 	packetID        uint32               // the current highest packetID
-	open            context.Context      // indicate that the client is open for packet exchange
-	cancelOpen      context.CancelFunc   // cancel function for open context
 	outboundQty     int32                // number of messages currently in the outbound queue
 	Keepalive       uint16               // the number of seconds the connection can wait
 	ServerKeepalive bool                 // keepalive was set by the server
@@ -185,7 +185,7 @@ func newClient(c net.Conn, o *ops) *Client {
 			Conn: c,
 			bconn: bufio.NewReadWriter(
 				bufio.NewReaderSize(c, o.options.ClientNetReadBufferSize),
-				bufio.NewWriterSize(c, o.options.ClientNetReadBufferSize),
+				bufio.NewWriterSize(c, o.options.ClientNetWriteBufferSize),
 			),
 			Remote: c.RemoteAddr().String(),
 		}

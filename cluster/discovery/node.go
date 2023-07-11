@@ -37,6 +37,8 @@ type Node interface {
 	SendToNode(nodeName string, msg []byte) error
 	SendToOthers(msg []byte)
 	Stat() map[string]int64
+	Join(existing []string) (int, error)
+	Leave() error
 }
 
 type Event struct {

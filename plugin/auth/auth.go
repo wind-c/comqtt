@@ -43,10 +43,10 @@ func CheckAcl(tam map[string]auth.Access, write bool) bool {
 }
 
 type Blacklist struct {
-	rules auth.Ledger
+	rules *auth.Ledger
 }
 
-func (b *Blacklist) SetBlacklist(bl auth.Ledger) {
+func (b *Blacklist) SetBlacklist(bl *auth.Ledger) {
 	b.rules = bl
 }
 

@@ -50,6 +50,14 @@ func (h *modifiedHookBase) Stop() error {
 	return nil
 }
 
+func (h *modifiedHookBase) OnConnect(cl *Client, pk packets.Packet) error {
+	if h.fail {
+		return errTestHook
+	}
+
+	return nil
+}
+
 func (h *modifiedHookBase) OnConnectAuthenticate(cl *Client, pk packets.Packet) bool {
 	return true
 }
@@ -228,7 +236,7 @@ func TestHooksNonReturns(t *testing.T) {
 			h.OnStarted()
 			h.OnStopped()
 			h.OnSysInfoTick(new(system.Info))
-			h.OnConnect(cl, packets.Packet{})
+			h.OnSessionEstablish(cl, packets.Packet{})
 			h.OnSessionEstablished(cl, packets.Packet{})
 			h.OnDisconnect(cl, nil, false)
 			h.OnPacketSent(cl, packets.Packet{}, []byte{})
@@ -238,6 +246,7 @@ func TestHooksNonReturns(t *testing.T) {
 			h.OnPublished(cl, packets.Packet{})
 			h.OnPublishDropped(cl, packets.Packet{})
 			h.OnRetainMessage(cl, packets.Packet{}, 0)
+			h.OnRetainPublished(cl, packets.Packet{})
 			h.OnQosPublish(cl, packets.Packet{}, time.Now().Unix(), 0)
 			h.OnQosComplete(cl, packets.Packet{})
 			h.OnQosDropped(cl, packets.Packet{})
@@ -391,6 +400,22 @@ func TestHooksOnAuthPacket(t *testing.T) {
 	pk, err = h.OnAuthPacket(new(Client), packets.Packet{PacketID: 10})
 	require.Error(t, err)
 	require.Equal(t, uint16(10), pk.PacketID)
+}
+
+func TestHooksOnConnect(t *testing.T) {
+	h := new(Hooks)
+	h.Log = &logger
+
+	hook := new(modifiedHookBase)
+	err := h.Add(hook, nil)
+	require.NoError(t, err)
+
+	err = h.OnConnect(new(Client), packets.Packet{PacketID: 10})
+	require.NoError(t, err)
+
+	hook.fail = true
+	err = h.OnConnect(new(Client), packets.Packet{PacketID: 10})
+	require.Error(t, err)
 }
 
 func TestHooksOnPacketEncode(t *testing.T) {
@@ -565,10 +590,17 @@ func TestHookBaseOnConnectAuthenticate(t *testing.T) {
 	v := h.OnConnectAuthenticate(new(Client), packets.Packet{})
 	require.False(t, v)
 }
+
 func TestHookBaseOnACLCheck(t *testing.T) {
 	h := new(HookBase)
 	v := h.OnACLCheck(new(Client), "topic", true)
 	require.False(t, v)
+}
+
+func TestHookBaseOnConnect(t *testing.T) {
+	h := new(HookBase)
+	err := h.OnConnect(new(Client), packets.Packet{})
+	require.NoError(t, err)
 }
 
 func TestHookBaseOnPublish(t *testing.T) {

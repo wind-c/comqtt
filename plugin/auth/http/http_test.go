@@ -29,7 +29,7 @@ var (
 		},
 	}
 
-	pkf = packets.Packet{Filters: packets.Subscriptions{{Filter: "a/b/c"}}}
+	//pkf = packets.Packet{Filters: packets.Subscriptions{{Filter: "a/b/c"}}}
 
 	pkc = packets.Packet{Connect: packets.ConnectParams{Password: []byte("321654")}}
 )

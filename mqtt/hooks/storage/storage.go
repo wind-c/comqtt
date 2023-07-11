@@ -55,9 +55,9 @@ type ClientProperties struct {
 
 // ClientWill contains a will message for a client, and limited mqtt v5 properties.
 type ClientWill struct {
+	TopicName         string                 `json:"topicName,omitempty"`
 	Payload           []byte                 `json:"payload,omitempty"`
 	User              []packets.UserProperty `json:"user,omitempty"`
-	TopicName         string                 `json:"topicName,omitempty"`
 	Flag              uint32                 `json:"flag,omitempty"`
 	WillDelayInterval uint32                 `json:"willDelayInterval,omitempty"`
 	Qos               byte                   `json:"qos,omitempty"`
