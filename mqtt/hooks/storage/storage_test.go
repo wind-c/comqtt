@@ -159,7 +159,7 @@ func TestMessageUnmarshalBinaryEmpty(t *testing.T) {
 func TestSubscriptionMarshalBinary(t *testing.T) {
 	data, err := subscriptionStruct.MarshalBinary()
 	require.NoError(t, err)
-	require.Equal(t, subscriptionJSON, data)
+	require.JSONEq(t, string(subscriptionJSON), string(data))
 }
 
 func TestSubscriptionUnmarshalBinary(t *testing.T) {
