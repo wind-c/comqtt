@@ -7,7 +7,6 @@ package config
 import (
 	"fmt"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 	"testing"
 )
 
@@ -81,9 +80,6 @@ func TestLoadConfigFromFile(t *testing.T) {
 func TestParse(t *testing.T) {
 	cfg, err := parse(buf)
 	require.NoError(t, err)
-
-	buf2, err := yaml.Marshal(cfg)
-	fmt.Println(string(buf2))
 	require.Equal(t, ":1883", cfg.Mqtt.TCP)
 	require.Equal(t, 7946, cfg.Cluster.BindPort)
 	require.Equal(t, "127.0.0.1:6379", cfg.Redis.Options.Addr)
