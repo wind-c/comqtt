@@ -7,6 +7,7 @@ package config
 import (
 	"fmt"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 	"testing"
 )
 
@@ -19,7 +20,7 @@ cluster:
   advertise-addr: 0.0.0.0
   advertise-port: 7946
   members:   #seeds member list, format such as 192.168.0.103:7946,192.168.0.104:7946
-  queuedepth: 10240 #size of Memberlist's internal channel which handles UDP messages.
+  queue-depth: 10240 #size of Memberlist's internal channel which handles UDP messages.
 
 mqtt:
   tcp: :1883
@@ -38,7 +39,8 @@ mqtt:
       receive-maximum: 1024
 
 redis:
-  addr: 127.0.0.1:6739
+  options:
+    addr: 127.0.0.1:6379
   password:
   db: 0
 
@@ -79,6 +81,9 @@ func TestLoadConfigFromFile(t *testing.T) {
 func TestParse(t *testing.T) {
 	cfg, err := parse(buf)
 	require.NoError(t, err)
+
+	buf2, err := yaml.Marshal(cfg)
+	fmt.Println(string(buf2))
 	require.Equal(t, ":1883", cfg.Mqtt.TCP)
 	require.Equal(t, 7946, cfg.Cluster.BindPort)
 	require.Equal(t, "127.0.0.1:6379", cfg.Redis.Options.Addr)
