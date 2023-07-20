@@ -118,7 +118,8 @@ var (
 func TestClientMarshalBinary(t *testing.T) {
 	data, err := clientStruct.MarshalBinary()
 	require.NoError(t, err)
-	require.Equal(t, clientJSON, data)
+	require.JSONEq(t, string(clientJSON), string(data))
+
 }
 
 func TestClientUnmarshalBinary(t *testing.T) {
