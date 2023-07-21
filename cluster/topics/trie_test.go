@@ -5,6 +5,7 @@
 package topics
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -266,12 +267,11 @@ func TestSubscribersFind(t *testing.T) {
 		},
 	}
 
-	for _, check := range tt {
+	for i, check := range tt {
 		index := New()
 		index.Subscribe(check.filter)
-		bb := index.Scan(check.topic, make([]string, 0))
-		//spew.Dump(clients)
-		require.Equal(t, true, bb)
+		res := index.Scan(check.topic, make([]string, 0))
+		require.Equal(t, check.len, len(res), fmt.Sprintf("case %d did not meet expectations - '%+v'", i, check))
 	}
 
 }

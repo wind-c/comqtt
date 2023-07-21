@@ -19,7 +19,7 @@ cluster:
   advertise-addr: 0.0.0.0
   advertise-port: 7946
   members:   #seeds member list, format such as 192.168.0.103:7946,192.168.0.104:7946
-  queuedepth: 10240 #size of Memberlist's internal channel which handles UDP messages.
+  queue-depth: 10240 #size of Memberlist's internal channel which handles UDP messages.
 
 mqtt:
   tcp: :1883
@@ -38,7 +38,8 @@ mqtt:
       receive-maximum: 1024
 
 redis:
-  addr: 127.0.0.1:6739
+  options:
+    addr: 127.0.0.1:6379
   password:
   db: 0
 
