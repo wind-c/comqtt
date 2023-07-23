@@ -348,7 +348,7 @@ func (h *Hook) OnSysInfoTick(sys *system.Info) {
 	in := &storage.SystemInfo{
 		ID:   sysInfoKey(),
 		T:    storage.SysInfoKey,
-		Info: *sys,
+		Info: *sys.Clone(),
 	}
 
 	err := h.db.Upsert(in.ID, in)

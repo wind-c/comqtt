@@ -25,6 +25,9 @@ Comqtt is an embeddable high-performance MQTT broker server written in Go, and s
 #### What is MQTT?
 MQTT stands for MQ Telemetry Transport. It is a publish/subscribe, extremely simple and lightweight messaging protocol, designed for constrained devices and low-bandwidth, high-latency or unreliable networks. [Learn more](https://mqtt.org/faq)
 
+#### When is this repo updated?
+Unless it's a critical issue, new releases typically go out over the weekend. At some point in the future this repo may be converted to an organisation, or collaborators added if the project continues to grow.
+
 #### Comqtt Features
 - Full MQTTv5 Feature Compliance, compatibility for MQTT v3.1.1 and v3.0.0.
 - TCP, Websocket, (including SSL/TLS) and Dashboard listeners.
