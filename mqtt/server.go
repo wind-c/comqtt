@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	Version                       = "2.2.15" // the current server version.
+	Version                       = "2.2.16" // the current server version.
 	defaultSysTopicInterval int64 = 1        // the interval between $SYS topic publishes
 )
 
@@ -71,10 +71,11 @@ type Capabilities struct {
 
 // Compatibilities provides flags for using compatibility modes.
 type Compatibilities struct {
-	ObscureNotAuthorized     bool `yaml:"obscure-not-authorized"`    // return unspecified errors instead of not authorized
-	PassiveClientDisconnect  bool `yaml:"passive-client-disconnect"` // don't disconnect the client forcefully after sending disconnect packet (paho)
-	AlwaysReturnResponseInfo bool `yaml:"always-return-response"`    // always return response info (useful for testing)
-	RestoreSysInfoOnRestart  bool `yaml:"restore-sys-info-restart"`  // restore system info from store as if server never stopped
+	ObscureNotAuthorized       bool `yaml:"obscure-not-authorized"`    // return unspecified errors instead of not authorized
+	PassiveClientDisconnect    bool `yaml:"passive-client-disconnect"` // don't disconnect the client forcefully after sending disconnect packet (paho)
+	AlwaysReturnResponseInfo   bool `yaml:"always-return-response"`    // always return response info (useful for testing)
+	RestoreSysInfoOnRestart    bool `yaml:"restore-sys-info-restart"`  // restore system info from store as if server never stopped
+	NoInheritedPropertiesOnAck bool // don't allow inherited user properties on ack (paho - spec violation)
 }
 
 // Options contains configurable options for the server.
@@ -795,8 +796,12 @@ func (s *Server) processPublish(cl *Client, pk packets.Packet) error {
 }
 
 // retainMessage adds a message to a topic, and if a persistent store is provided,
-// adds the message to the store so it can be reloaded if necessary.
+// adds the message to the store to be reloaded if necessary.
 func (s *Server) retainMessage(cl *Client, pk packets.Packet) {
+	if s.Options.Capabilities.RetainAvailable == 0 {
+		return
+	}
+
 	out := pk.Copy(false)
 	r := s.Topics.RetainMessage(out)
 	s.hooks.OnRetainMessage(cl, pk, r)
@@ -839,7 +844,7 @@ func (s *Server) publishToClient(cl *Client, sub packets.Subscription, pk packet
 	}
 
 	out := pk.Copy(false)
-	if cl.Properties.ProtocolVersion == 5 && !sub.RetainAsPublished { // ![MQTT-3.3.1-13]
+	if !sub.FwdRetainedFlag && ((cl.Properties.ProtocolVersion == 5 && !sub.RetainAsPublished) || cl.Properties.ProtocolVersion < 5) { // ![MQTT-3.3.1-13] [v3 MQTT-3.3.1-9]
 		out.FixedHeader.Retain = false // [MQTT-3.3.1-12]
 	}
 
@@ -849,6 +854,10 @@ func (s *Server) publishToClient(cl *Client, sub packets.Subscription, pk packet
 			out.Properties.SubscriptionIdentifier = append(out.Properties.SubscriptionIdentifier, id) // [MQTT-3.3.4-4] ![MQTT-3.3.4-5]
 		}
 		sort.Ints(out.Properties.SubscriptionIdentifier)
+	}
+
+	if out.FixedHeader.Qos > sub.Qos {
+		out.FixedHeader.Qos = sub.Qos
 	}
 
 	if out.FixedHeader.Qos > s.Options.Capabilities.MaximumQos {
@@ -917,6 +926,7 @@ func (s *Server) publishRetainedToClient(cl *Client, sub packets.Subscription, e
 		return
 	}
 
+	sub.FwdRetainedFlag = true
 	for _, pkv := range s.Topics.Messages(sub.Filter) { // [MQTT-3.8.4-4]
 		_, err := s.publishToClient(cl, sub, pkv)
 		if err != nil {
@@ -1286,7 +1296,7 @@ func (s *Server) publishSysTopics() {
 	s.hooks.OnSysInfoTick(s.Info)
 }
 
-// Close attempts to gracefully shutdown the server, all listeners, clients, and stores.
+// Close attempts to gracefully shut down the server, all listeners, clients, and stores.
 func (s *Server) Close() error {
 	close(s.done)
 	s.Listeners.CloseAll(s.closeListenerClients)
