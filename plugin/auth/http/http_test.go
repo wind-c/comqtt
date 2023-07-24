@@ -1,6 +1,7 @@
 package http
 
 import (
+	"encoding/json"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/wind-c/comqtt/v2/mqtt"
@@ -151,35 +152,43 @@ func TestAclWithGet(t *testing.T) {
 	a := newAuth(t)
 	a.config.Method = "get"
 	user := "zhangsan"
-	topic := "topictest/1"
+	topic1 := "topictest/1"
 	topic2 := "topictest/2"
+	topic3 := "topictest/3"
 
 	defer gock.Off() // Flush pending mocks after test execution
+
+	// make a body that will be injected. It's JSON of map[string]int
+	resp := map[string]int{
+		topic1: 2,
+		topic2: 3,
+	}
+	// make it into json:
+	body, _ := json.Marshal(resp)
 
 	//publish
 	gock.New("http://localhost:8080").
 		Get("/comqtt/acl").
 		MatchParam("user", user).
-		MatchParam("topic", topic).
-		Reply(200).BodyString("2")
-	result := a.OnACLCheck(client, topic, true)
+		Reply(200).BodyString(string(body))
+	result := a.OnACLCheck(client, topic1, true)
 	require.Equal(t, true, result)
 
 	//subscribe
 	gock.New("http://localhost:8080").
 		Get("/comqtt/acl").
 		MatchParam("user", user).
-		MatchParam("topic", topic).
-		Reply(200).BodyString("1")
-	result = a.OnACLCheck(client, topic, false)
+		// MatchParam("topic", topic1).
+		Reply(200).BodyString(string(body))
+	result = a.OnACLCheck(client, topic2, false)
 	require.Equal(t, true, result)
 
-	//publish topic2, topic2 does not exist
+	//publish topic3, topic3 does not exist
 	gock.New("http://localhost:8080").
 		Get("/comqtt/acl").
 		MatchParam("user", user).
-		MatchParam("topic", topic).
-		Reply(200).BodyString("0")
-	result = a.OnACLCheck(client, topic2, true)
+		// MatchParam("topic1", topic1).
+		Reply(200).BodyString(string(body))
+	result = a.OnACLCheck(client, topic3, true)
 	require.Equal(t, false, result)
 }
