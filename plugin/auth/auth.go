@@ -66,6 +66,9 @@ func (b *Blacklist) CheckBLAuth(cl *mqtt.Client, pk packets.Packet) (n int, ok b
 }
 
 func (b *Blacklist) CheckBLAcl(cl *mqtt.Client, topic string, write bool) (n int, ok bool) {
+	if b.rules == nil {
+		return -1, false
+	}
 	for _, rule := range b.rules.ACL {
 		if rule.Client.Matches(cl.ID) &&
 			rule.Username.Matches(string(cl.Properties.Username)) &&
