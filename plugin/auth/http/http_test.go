@@ -157,8 +157,8 @@ func TestAclWithGet(t *testing.T) {
 	defer gock.Off() // Flush pending mocks after test execution
 
 	//publish
-	gock.NewRequest().
-		Get("http://localhost:8080/comqtt/acl").
+	gock.New("http://localhost:8080").
+		Get("/comqtt/acl").
 		MatchParam("user", user).
 		MatchParam("topic", topic).
 		Reply(200).BodyString("2")
@@ -166,8 +166,8 @@ func TestAclWithGet(t *testing.T) {
 	require.Equal(t, true, result)
 
 	//subscribe
-	gock.NewRequest().
-		Get("http://localhost:8080/comqtt/acl").
+	gock.New("http://localhost:8080").
+		Get("/comqtt/acl").
 		MatchParam("user", user).
 		MatchParam("topic", topic).
 		Reply(200).BodyString("1")
@@ -175,8 +175,8 @@ func TestAclWithGet(t *testing.T) {
 	require.Equal(t, true, result)
 
 	//publish topic2, topic2 does not exist
-	gock.NewRequest().
-		Get("http://localhost:8080/comqtt/acl").
+	gock.New("http://localhost:8080").
+		Get("/comqtt/acl").
 		MatchParam("user", user).
 		MatchParam("topic", topic).
 		Reply(200).BodyString("0")
