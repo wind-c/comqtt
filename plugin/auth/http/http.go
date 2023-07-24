@@ -169,7 +169,7 @@ func (a *Auth) OnACLCheck(cl *mqtt.Client, topic string, write bool) bool {
 		builder.WriteString("?")
 		builder.WriteString("user=")
 		builder.WriteString(key)
-		//builder.WriteString("&")
+		//builder.WriteString("&") // todo: why is this commented out?
 		//builder.WriteString("topic=")
 		//builder.WriteString(topic)
 		resp, err = http.Get(builder.String())
