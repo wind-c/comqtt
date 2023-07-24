@@ -51,6 +51,9 @@ func (b *Blacklist) SetBlacklist(bl *auth.Ledger) {
 }
 
 func (b *Blacklist) CheckBLAuth(cl *mqtt.Client, pk packets.Packet) (n int, ok bool) {
+	if b.rules == nil {
+		return -1, false
+	}
 	for n, rule := range b.rules.Auth {
 		if rule.Client.Matches(cl.ID) &&
 			rule.Username.Matches(string(cl.Properties.Username)) &&
