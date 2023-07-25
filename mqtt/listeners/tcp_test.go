@@ -38,10 +38,11 @@ func TestTCPProtocolTLS(t *testing.T) {
 	l := NewTCP("t1", testAddr, &Config{
 		TLSConfig: tlsConfigBasic,
 	})
-
-	l.Init(&logger)
-	defer l.listen.Close()
+	err := l.Init(&logger)
+	require.NoError(t, err)
 	require.Equal(t, "tcp", l.Protocol())
+	err = l.listen.Close()
+	require.NoError(t, err)
 }
 
 func TestTCPInit(t *testing.T) {
