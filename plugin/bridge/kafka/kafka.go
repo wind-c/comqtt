@@ -88,10 +88,15 @@ type rules struct {
 	Filters []string `json:"filters" yaml:"filters"`
 }
 
+type abstractWriter interface {
+	Close() error
+	WriteMessages(ctx context.Context, msgs ...kafka.Message) error
+}
+
 type Bridge struct {
 	mqtt.HookBase
 	config *Options
-	writer *kafka.Writer
+	writer abstractWriter
 	ctx    context.Context // a context for the connection
 }
 
