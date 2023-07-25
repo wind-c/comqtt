@@ -35,7 +35,8 @@ func TestTCPProtocol(t *testing.T) {
 }
 
 func TestTCPProtocolTLS(t *testing.T) {
-	l := NewTCP("t1", testAddr, &Config{
+	// pick a random port:
+	l := NewTCP("t1", ":0", &Config{
 		TLSConfig: tlsConfigBasic,
 	})
 	err := l.Init(&logger)
@@ -46,12 +47,12 @@ func TestTCPProtocolTLS(t *testing.T) {
 }
 
 func TestTCPInit(t *testing.T) {
-	l := NewTCP("t1", testAddr, nil)
+	l := NewTCP("t1", ":0", nil)
 	err := l.Init(&logger)
 	l.Close(MockCloser)
 	require.NoError(t, err)
 
-	l2 := NewTCP("t2", testAddr, &Config{
+	l2 := NewTCP("t2", ":0", &Config{
 		TLSConfig: tlsConfigBasic,
 	})
 	err = l2.Init(&logger)
@@ -61,7 +62,7 @@ func TestTCPInit(t *testing.T) {
 }
 
 func TestTCPServeAndClose(t *testing.T) {
-	l := NewTCP("t1", testAddr, nil)
+	l := NewTCP("t1", ":0", nil)
 	err := l.Init(&logger)
 	require.NoError(t, err)
 
@@ -86,7 +87,7 @@ func TestTCPServeAndClose(t *testing.T) {
 }
 
 func TestTCPServeTLSAndClose(t *testing.T) {
-	l := NewTCP("t1", testAddr, &Config{
+	l := NewTCP("t1", ":0", &Config{
 		TLSConfig: tlsConfigBasic,
 	})
 	err := l.Init(&logger)
@@ -110,7 +111,7 @@ func TestTCPServeTLSAndClose(t *testing.T) {
 }
 
 func TestTCPEstablishThenEnd(t *testing.T) {
-	l := NewTCP("t1", testAddr, nil)
+	l := NewTCP("t1", ":0", nil)
 	err := l.Init(&logger)
 	require.NoError(t, err)
 
