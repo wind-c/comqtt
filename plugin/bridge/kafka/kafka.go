@@ -88,10 +88,15 @@ type rules struct {
 	Filters []string `json:"filters" yaml:"filters"`
 }
 
+type abstractWriter interface {
+	Close() error
+	WriteMessages(ctx context.Context, msgs ...kafka.Message) error
+}
+
 type Bridge struct {
 	mqtt.HookBase
 	config *Options
-	writer *kafka.Writer
+	writer abstractWriter
 	ctx    context.Context // a context for the connection
 }
 
@@ -147,7 +152,8 @@ func (b *Bridge) Init(config any) error {
 	default:
 		balancer = &kafka.LeastBytes{}
 	}
-
+	// set up a kafkaLogger to give the kafka library a way to log errors:
+	logger := newKafkaLogger(b.Log)
 	b.writer = &kafka.Writer{
 		Addr:                   kafka.TCP(b.config.KafkaOptions.Brokers...),
 		Topic:                  b.config.KafkaOptions.Topic,
@@ -158,6 +164,7 @@ func (b *Bridge) Init(config any) error {
 		Balancer:               balancer,
 		AllowAutoTopicCreation: true,
 		Completion:             b.handler,
+		ErrorLogger:            logger,
 	}
 
 	// verify connect
@@ -176,13 +183,14 @@ func (b *Bridge) kafkaTopics() (map[string]struct{}, error) {
 		return nil, err
 	}
 	defer conn.Close()
-	partitions, err := conn.ReadPartitions("comqtt") // if you want to get all topics, you don't need parameter
+	if b.config.KafkaOptions.Topic == "" {
+		return nil, fmt.Errorf("topic is empty")
+	}
+	partitions, err := conn.ReadPartitions(b.config.KafkaOptions.Topic) // if you want to get all topics, you don't need parameter
 	if err != nil {
 		return nil, err
 	}
-
 	m := map[string]struct{}{}
-
 	for _, p := range partitions {
 		m[p.Topic] = struct{}{}
 	}
@@ -190,7 +198,7 @@ func (b *Bridge) kafkaTopics() (map[string]struct{}, error) {
 	return m, nil
 }
 
-// Stop closes the redis connection.
+// Stop closes the kafka connection.
 func (b *Bridge) Stop() error {
 	b.Log.Info().Msg("disconnecting from kafka service")
 	return b.writer.Close()
