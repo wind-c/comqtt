@@ -77,7 +77,7 @@ func TestHTTPStatsServeAndClose(t *testing.T) {
 	time.Sleep(time.Millisecond)
 
 	// get body from stats address
-	resp, err := http.Get("http://localhost" + testAddr)
+	resp, err := http.Get("http://localhost" + testAddr + "/mqtt/stats")
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 
