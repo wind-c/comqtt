@@ -7,6 +7,7 @@ import (
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/auth"
 	"github.com/wind-c/comqtt/v2/mqtt/packets"
 	"github.com/wind-c/comqtt/v2/plugin"
+	"net"
 	"os"
 	"testing"
 )
@@ -73,6 +74,9 @@ func newAuth(t *testing.T) *Auth {
 }
 
 func TestInitFromConfFile(t *testing.T) {
+	if !hasPostgresql() {
+		t.Skip("no postgresql server running")
+	}
 	a := new(Auth)
 	a.SetOpts(&logger, nil)
 	opts := Options{}
@@ -92,6 +96,9 @@ func TestInitBadConfig(t *testing.T) {
 }
 
 func TestOnConnectAuthenticate(t *testing.T) {
+	if !hasPostgresql() {
+		t.Skip("no postgresql server running")
+	}
 	a := newAuth(t)
 	defer teardown(a, t)
 	result := a.OnConnectAuthenticate(client, pkc)
@@ -99,6 +106,9 @@ func TestOnConnectAuthenticate(t *testing.T) {
 }
 
 func TestOnACLCheck(t *testing.T) {
+	if !hasPostgresql() {
+		t.Skip("no postgresql server running")
+	}
 	a := newAuth(t)
 	defer teardown(a, t)
 	topic := "topictest/1"
@@ -111,4 +121,14 @@ func TestOnACLCheck(t *testing.T) {
 	require.Equal(t, false, result)
 	result = a.OnACLCheck(client, topic2, false)
 	require.Equal(t, false, result)
+}
+
+// hasPostgresql does a TCP connect to port 3306 to see if there is a MySQL server running on localhost.
+func hasPostgresql() bool {
+	c, err := net.Dial("tcp", "localhost:5432")
+	if err != nil {
+		return false
+	}
+	_ = c.Close()
+	return true
 }

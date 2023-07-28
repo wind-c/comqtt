@@ -96,31 +96,36 @@ func TestAuthenticateWithGet(t *testing.T) {
 func TestAclWithPost(t *testing.T) {
 	a := newAuth(t)
 	user := "zhangsan"
-	topic := "topictest/1"
+	topic1 := "topictest/1"
 	topic2 := "topictest/2"
+
+	payload := map[string]int{
+		topic1: 3,
+	}
+	body, _ := json.Marshal(payload)
 	defer gock.Off() // Flush pending mocks after test execution
 
 	//publish
 	gock.New("http://localhost:8080").
 		Post("/comqtt/acl").
-		JSON(map[string]string{"user": user, "topic": topic}).
-		Reply(200).BodyString("2")
-	result := a.OnACLCheck(client, topic, true)
+		JSON(map[string]string{"user": user}).
+		Reply(200).BodyString(string(body))
+	result := a.OnACLCheck(client, topic1, true)
 	require.Equal(t, true, result)
 
 	//subscribe
 	gock.New("http://localhost:8080").
 		Post("/comqtt/acl").
-		JSON(map[string]string{"user": user, "topic": topic}).
-		Reply(200).BodyString("1")
-	result = a.OnACLCheck(client, topic, false)
+		JSON(map[string]string{"user": user}).
+		Reply(200).BodyString(string(body))
+	result = a.OnACLCheck(client, topic1, false)
 	require.Equal(t, true, result)
 
 	//publish topic2, topic2 does not exist
 	gock.New("http://localhost:8080").
 		Post("/comqtt/acl").
-		JSON(map[string]string{"user": user, "topic": topic2}).
-		Reply(200).BodyString("0")
+		JSON(map[string]string{"user": user}).
+		Reply(200).BodyString(string(body))
 	result = a.OnACLCheck(client, topic2, true)
 	require.Equal(t, false, result)
 
@@ -128,24 +133,24 @@ func TestAclWithPost(t *testing.T) {
 	gock.New("http://localhost:8080").
 		Post("/comqtt/acl").
 		JSON(map[string]string{"user": user, "topic": topic2}).
-		Reply(200).BodyString("0")
+		Reply(200).BodyString(string(body))
 	result = a.OnACLCheck(client, topic2, false)
 	require.Equal(t, false, result)
 
 	//pubsub
 	gock.New("http://localhost:8080").
 		Post("/comqtt/acl").
-		JSON(map[string]string{"user": user, "topic": topic2}).
-		Reply(200).BodyString("3")
+		JSON(map[string]string{"user": user}).
+		Reply(200).BodyString(string(body))
 	result = a.OnACLCheck(client, topic2, true)
-	require.Equal(t, true, result)
+	require.Equal(t, false, result)
 
 	gock.New("http://localhost:8080").
 		Post("/comqtt/acl").
-		JSON(map[string]string{"user": user, "topic": topic2}).
-		Reply(200).BodyString("3")
+		JSON(map[string]string{"user": user}).
+		Reply(200).BodyString(string(body))
 	result = a.OnACLCheck(client, topic2, false)
-	require.Equal(t, true, result)
+	require.Equal(t, false, result)
 }
 
 func TestAclWithGet(t *testing.T) {

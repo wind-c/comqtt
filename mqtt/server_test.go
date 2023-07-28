@@ -1685,7 +1685,8 @@ func TestPublishToSubscribersPkIgnore(t *testing.T) {
 		pk.Ignore = true
 		s.PublishToSubscribers(pk)
 		time.Sleep(time.Millisecond)
-		w.Close()
+		err := w.Close()
+		require.NoError(t, err)
 	}()
 
 	receiverBuf := make(chan []byte)
