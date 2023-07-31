@@ -5,6 +5,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -45,6 +46,15 @@ func init() {
 }
 
 func main() {
+	sigCtx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
+	err := realMain(sigCtx)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func realMain(ctx context.Context) error {
 	var err error
 	var confFile string
 	var members string
@@ -79,7 +89,7 @@ func main() {
 	//load config file
 	if confFile != "" {
 		if cfg, err = config.Load(confFile); err != nil {
-			log.Fatal(err)
+			return fmt.Errorf("load config file error: %w", err)
 		}
 	} else {
 		if members != "" {
@@ -100,15 +110,6 @@ func main() {
 	if cfg.Log.Enable && cfg.Log.Format == 1 {
 		log.Println("log output to the files, please check")
 	}
-
-	//listen system operations
-	sigs := make(chan os.Signal, 1)
-	done := make(chan bool, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGABRT)
-	go func() {
-		<-sigs
-		done <- true
-	}()
 
 	// create server instance and init hooks
 	cfg.Mqtt.Options.Logger = logger
@@ -151,11 +152,12 @@ func main() {
 	http := listeners.NewHTTP("stats", cfg.Mqtt.HTTP, nil, server.Info, handles)
 	onError(server.AddListener(http), "add http listener")
 
+	errCh := make(chan error, 1)
 	// start server
 	go func() {
 		err := server.Serve()
 		if err != nil {
-			logger.Fatal().Err(err).Send()
+			errCh <- err
 		}
 	}()
 
@@ -164,11 +166,17 @@ func main() {
 	}
 
 	// exit
-	<-done
-	logger.Warn().Msg("caught signal, stopping...")
+	select {
+	case err := <-errCh:
+		log.Fatalf("server error: %s", err.Error())     // todo: change the formatting so the error is logged
+		server.Log.Fatal().Err(err).Msg("server error") // <-- this swallows the error.
+	case <-ctx.Done():
+		server.Log.Warn().Msg("caught signal, stopping...")
+	}
 	agent.Stop()
 	server.Close()
 	colog.Close()
+	return nil
 }
 
 func initAuth(server *mqtt.Server, conf *config.Config) {

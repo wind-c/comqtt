@@ -5,6 +5,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	rv8 "github.com/go-redis/redis/v8"
 	"github.com/rs/zerolog"
@@ -33,6 +34,15 @@ import (
 var logger *zerolog.Logger
 
 func main() {
+	sigCtx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
+	err := realMain(sigCtx)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func realMain(ctx context.Context) error {
 	var err error
 	var confFile string
 	cfg := config.New()
@@ -68,14 +78,6 @@ func main() {
 		log.Println("log output to the files, please check")
 	}
 
-	sigs := make(chan os.Signal, 1)
-	done := make(chan bool, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		<-sigs
-		done <- true
-	}()
-
 	// create server instance and init hooks
 	cfg.Mqtt.Options.Logger = logger
 	server := mqtt.New(&cfg.Mqtt.Options)
@@ -106,23 +108,29 @@ func main() {
 	http := listeners.NewHTTPStats("stats", cfg.Mqtt.HTTP, nil, server.Info)
 	onError(server.AddListener(http), "add http listener")
 
+	errCh := make(chan error, 1)
 	// start server
 	go func() {
 		err := server.Serve()
 		if err != nil {
-			log.Fatal(err)
+			errCh <- err
 		}
 	}()
 
 	if cfg.Log.Format == 1 {
 		log.Println("comqtt server started")
 	}
-
-	<-done
-	server.Log.Warn().Msg("caught signal, stopping...")
+	select {
+	case err := <-errCh:
+		log.Fatalf("server error: %s", err.Error())
+		server.Log.Fatal().Err(err).Msg("server error")
+	case <-ctx.Done():
+		server.Log.Warn().Msg("caught signal, stopping...")
+	}
 	server.Close()
 	server.Log.Info().Msg("main.go finished")
 	colog.Close()
+	return nil
 }
 
 func initAuth(server *mqtt.Server, conf *config.Config) {
