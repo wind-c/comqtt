@@ -84,7 +84,7 @@ func (m *Membership) Setup() (err error) {
 		return
 	}
 
-	go m.eventLoop()
+	go m.eventLoop() // start the event loop, will stop when serfCh is closed
 
 	if m.config.Members != nil {
 		if len(m.config.Members) > 0 {
@@ -123,8 +123,17 @@ func (m *Membership) Stat() map[string]int64 {
 }
 
 func (m *Membership) Stop() {
-	m.serf.Leave()
-	m.serf.Shutdown()
+	err := m.serf.Leave()
+	if err != nil {
+		zero.Error().Err(err).Msg("serf leave")
+	}
+	err = m.serf.Shutdown()
+	if err != nil {
+		zero.Error().Err(err).Msg("serf shutdown")
+	}
+	// this shuts down the event loop, note that this can't be called multiple times
+	// if we need to do so, we could use a bool, sync.Once or recover from the panic
+	close(m.serfCh)
 }
 
 func genEvent(tp int, node *serf.Member) *mb.Event {
