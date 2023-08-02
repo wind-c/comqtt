@@ -79,6 +79,10 @@ func (s *RpcService) StartRpcServer() error {
 }
 
 func (s *RpcService) StopRpcServer() {
+	// if s or the grpc server is nil, return, there is nothing to stop.
+	if s == nil || s.grpcServer == nil {
+		return
+	}
 	s.grpcServer.GracefulStop()
 }
 

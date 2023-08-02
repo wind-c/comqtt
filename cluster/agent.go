@@ -168,11 +168,6 @@ func (a *Agent) SubmitRaftTask(msg *message.Message) {
 }
 
 func (a *Agent) Stop() {
-	defer func() {
-		if err := recover(); err != nil {
-			zero.Error().Msg("not graceful stop")
-		}
-	}()
 	a.cancel()
 	a.OutPool.Release()
 	a.raftPool.Release()

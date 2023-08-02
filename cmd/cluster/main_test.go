@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"go.uber.org/goleak"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -22,6 +23,8 @@ func TestLeaks(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		os.Args = []string{"binary", "-node-name", "testnode", "-members", "localhost:7946",
+			"-raft-bootstrap", "true", "-storage-way", "memory"}
 		err := realMain(ctx)
 		if err != nil {
 			panic("realMain error" + err.Error())
@@ -31,4 +34,5 @@ func TestLeaks(t *testing.T) {
 	time.Sleep(time.Millisecond * 100)
 	cancel()
 	wg.Wait()
+	time.Sleep(time.Millisecond * 100)
 }
