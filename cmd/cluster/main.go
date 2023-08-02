@@ -39,6 +39,7 @@ import (
 var agent *cs.Agent
 var logger *zerolog.Logger
 
+// init for pprof:
 func init() {
 	go func() {
 		log.Println(http.ListenAndServe(":6060", nil))
