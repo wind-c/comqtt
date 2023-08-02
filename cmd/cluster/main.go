@@ -40,7 +40,6 @@ var agent *cs.Agent
 var logger *zerolog.Logger
 
 func init() {
-	return
 	go func() {
 		log.Println(http.ListenAndServe(":6060", nil))
 	}()
