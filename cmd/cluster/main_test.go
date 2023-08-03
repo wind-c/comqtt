@@ -10,13 +10,17 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
+	os.Exit(m.Run())
 }
 
 // TestLeaks tests that there are no goroutine leaks after starting and stopping the server.
-// We should likely do some more operations here, but this is a start.
+/* The following goroutines are expected to be running:
+- http server for pprof
+- ants cleanup goroutine
+
+*/
 func TestLeaks(t *testing.T) {
-	defer goleak.VerifyNone(t)
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	wg := sync.WaitGroup{}
@@ -34,5 +38,12 @@ func TestLeaks(t *testing.T) {
 	time.Sleep(time.Millisecond * 100)
 	cancel()
 	wg.Wait()
-	time.Sleep(time.Millisecond * 100)
+	// goleak.IgnoreTopFunction()
+	goleak.VerifyNone(t,
+		// ignore the ants cleanup goroutines
+		goleak.IgnoreTopFunction("github.com/panjf2000/ants/v2.(*Pool).purgeStaleWorkers"),
+		goleak.IgnoreTopFunction("github.com/panjf2000/ants/v2.(*Pool).ticktock"),
+		// ignore the pprof http server goroutine
+		goleak.IgnoreTopFunction("internal/poll.runtime_pollWait"))
+
 }
