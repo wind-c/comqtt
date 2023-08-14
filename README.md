@@ -1,6 +1,6 @@
 
 <p align="center">
-  
+
 [![Build Status](https://travis-ci.com/wind-c/comqtt.svg?token=59nqixhtefy2iQRwsPcu&branch=master)](https://travis-ci.com/wind-c/comqtt/v2)
 [![contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/wind-c/comqtt/issues)
 [![codecov](https://codecov.io/gh/wind-c/comqtt/branch/master/graph/badge.svg?token=6vBUgYVaVB)](https://codecov.io/gh/wind-c/comqtt/v2)
@@ -8,7 +8,7 @@
 
 </p>
 
-# Comqtt 
+# Comqtt
 ### A lightweight, high-performance MQTT server in Go (v3.0｜v3.1.1｜v5.0)
 
 Comqtt is an embeddable high-performance MQTT broker server written in Go, and supporting distributed cluster, and compliant with the MQTT v3.0 and v3.1.1 and v5.0 specification for the development of IoT and smarthome projects. The server can be used either as a standalone binary or embedded as a library in your own projects. Comqtt message throughput is comparable with everyone's favourites such as Mosquitto, Mosca, and VerneMQ.
@@ -19,7 +19,7 @@ Comqtt is an embeddable high-performance MQTT broker server written in Go, and s
 
 > #### 📦 💬 See Github Discussions for discussions about releases
 > Ongoing discussion about current and future releases can be found at https://github.com/wind-c/comqtt/discussions
-> 
+>
 > Developers in China can join wechat group discussions at https://github.com/wind-c/comqtt/discussions/32
 
 #### What is MQTT?
@@ -85,17 +85,17 @@ import (
 func main() {
   // Create the new MQTT Server.
   server := mqtt.New(nil)
-  
+
   // Allow all connections.
   _ = server.AddHook(new(auth.AllowHook), nil)
-  
+
   // Create a TCP listener on a standard port.
   tcp := listeners.NewTCP("t1", ":1883", nil)
   err := server.AddListener(tcp)
   if err != nil {
     log.Fatal(err)
   }
-  
+
   err = server.Serve()
   if err != nil {
     log.Fatal(err)
@@ -158,6 +158,43 @@ Hooks are stackable - you can add multiple hooks to a server, and they will be r
 | Debugging | [mqtt/hooks/debug](mqtt/hooks/debug/debug.go) | Additional debugging output to visualise packet flow. |
 
 Many of the internal server functions are now exposed to developers, so you can make your own Hooks by using the above as examples. If you do, please [Open an issue](https://github.com/wind-c/comqtt/issues) and let everyone know!
+
+### Authentication
+
+### Postgresql
+
+The schema required is as follows:
+
+```sql
+BEGIN;
+CREATE TABLE mqtt_user (
+    id serial PRIMARY KEY,
+    username TEXT NOT NULL UNIQUE,
+    password TEXT NOT NULL,
+    allow smallint DEFAULT 1 NOT NULL,
+    created timestamp with time zone DEFAULT NOW(),
+    updated timestamp
+);
+
+CREATE TABLE mqtt_acl(
+    id serial PRIMARY KEY,
+    username TEXT NOT NULL,
+    topic TEXT NOT NULL,
+    access smallint DEFAULT 3 NOT NULL,
+    created timestamp with time zone DEFAULT NOW(),
+    updated timestamp
+);
+CREATE INDEX mqtt_acl_username_idx ON mqtt_acl(username);
+COMMIT;
+```
+
+**Note** that password for MQTT clients stored in PostgreSQL is stored as bcrypt hashed passwords. Therefore, to create / update new MQTT clients you can use this Python snippet:
+```python
+import bcrypt
+salt = bcrypt.gensalt(rounds=10)
+hashed = bcrypt.hashpw(b"VeryVerySecretPa55w0rd", salt)
+print(f"Password hash for MQTT client: {hashed})
+```
 
 ### Access Control
 #### Allow Hook
