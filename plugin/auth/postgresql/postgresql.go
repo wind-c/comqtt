@@ -11,6 +11,7 @@ import (
 	"github.com/wind-c/comqtt/v2/mqtt/packets"
 	"github.com/wind-c/comqtt/v2/plugin"
 	pa "github.com/wind-c/comqtt/v2/plugin/auth"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type Options struct {
@@ -147,11 +148,10 @@ func (a *Auth) OnConnectAuthenticate(cl *mqtt.Client, pk packets.Packet) bool {
 		return false
 	}
 
-	if password == string(pk.Connect.Password) {
+	if ok := bcrypt.CompareHashAndPassword([]byte(password), pk.Connect.Password); ok == nil {
 		return true
-	} else {
-		return false
 	}
+	return false
 }
 
 // OnACLCheck returns true if the connecting client has matching read or write access to subscribe
