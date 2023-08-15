@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"go.uber.org/goleak"
+	"net"
 	"os"
 	"sync"
 	"testing"
@@ -20,7 +21,10 @@ func TestMain(m *testing.M) {
 
 */
 func TestLeaks(t *testing.T) {
-
+	// skip test if there is no redis server:
+	if !hasRedis() {
+		t.SkipNow()
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	wg := sync.WaitGroup{}
@@ -46,4 +50,14 @@ func TestLeaks(t *testing.T) {
 		// ignore the pprof http server goroutine
 		goleak.IgnoreTopFunction("internal/poll.runtime_pollWait"))
 
+}
+
+// hasRedis does a TCP connect to port 6379 to see if there is a redis server running on localhost.
+func hasRedis() bool {
+	c, err := net.Dial("tcp", "localhost:6379")
+	if err != nil {
+		return false
+	}
+	_ = c.Close()
+	return true
 }
