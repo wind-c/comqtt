@@ -150,8 +150,8 @@ Hooks are stackable - you can add multiple hooks to a server, and they will be r
 
 | Type | Import | Info |
 | -- | -- |  -- |
-| Access Control | [mqtt/hooks/auth . AllowHook](mqtt/hooks/auth/allow_all.go) | Allow access to all connecting clients and read/write to  all topics. |
-| Access Control | [mqtt/hooks/auth . Auth](mqtt/hooks/auth/auth.go) | Rule-based access control ledger.  |
+| Access Control | [mqtt/hooks/auth.AllowHook](mqtt/hooks/auth/allow_all.go) | Allow access to all connecting clients and read/write to  all topics. |
+| Access Control | [mqtt/hooks/auth.Auth](mqtt/hooks/auth/auth.go) | Rule-based access control ledger.  |
 | Persistence | [mqtt/hooks/storage/bolt](mqtt/hooks/storage/bolt/bolt.go)  | Persistent storage using [BoltDB](https://dbdb.io/db/boltdb) (deprecated). |
 | Persistence | [mqtt/hooks/storage/badger](mqtt/hooks/storage/badger/badger.go) | Persistent storage using [BadgerDB](https://github.com/dgraph-io/badger). |
 | Persistence | [mqtt/hooks/storage/redis](mqtt/hooks/storage/redis/redis.go)  | Persistent storage using [Redis](https://redis.io). |
