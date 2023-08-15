@@ -34,6 +34,7 @@ require (
 	go.etcd.io/etcd/server/v3 v3.5.4
 	go.uber.org/goleak v1.2.1
 	go.uber.org/zap v1.21.0
+	golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d
 	google.golang.org/grpc v1.53.0
 	gopkg.in/h2non/gock.v1 v1.1.2
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
