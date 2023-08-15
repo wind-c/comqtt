@@ -195,7 +195,15 @@ salt = bcrypt.gensalt(rounds=10)
 hashed = bcrypt.hashpw(b"VeryVerySecretPa55w0rd", salt)
 print(f"Password hash for MQTT client: {hashed})
 ```
-
+Go snippet:
+```go
+import "golang.org/x/crypto/bcrypt"
+hashed, err := bcrypt.GenerateFromPassword(pwd, bcrypt.DefaultCost)
+if err != nil {
+	return 
+}
+println("Password hash for MQTT client: ", hashed)
+```
 ### Access Control
 #### Allow Hook
 By default, Comqtt uses a DENY-ALL access control rule. To allow connections, this must overwritten using an Access Control hook. The simplest of these hooks is the `auth.AllowAll` hook, which provides ALLOW-ALL rules to all connections, subscriptions, and publishing. It's also the simplest hook to use:
