@@ -148,10 +148,6 @@ func (a *Auth) OnConnectAuthenticate(cl *mqtt.Client, pk packets.Packet) bool {
 		return false
 	}
 
-	if err != nil {
-		return false
-	}
-
 	if ok := bcrypt.CompareHashAndPassword([]byte(password), pk.Connect.Password); ok == nil {
 		return true
 	}
