@@ -160,7 +160,10 @@ Hooks are stackable - you can add multiple hooks to a server, and they will be r
 Many of the internal server functions are now exposed to developers, so you can make your own Hooks by using the above as examples. If you do, please [Open an issue](https://github.com/wind-c/comqtt/issues) and let everyone know!
 
 ### Authentication
+Currently, Auth and ACL support the following back-end storage: Redis, Mysql, Postgresql, and Http.
+User password supported encryption algorithm: 0 no encrypt, 1 bcrypt(cost=10), 2 md5, 3 sha1, 4 sha256, 5 sha512, 6 hmac-sha1, 7 hmac-sha256, 8 hmac-sha512.
 
+>The following uses the postgresql and bcrypt encryption algorithms as examples.
 ### Postgresql
 
 The schema required is as follows:
