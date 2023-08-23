@@ -16,6 +16,8 @@ auth:
   user-column: username
   password-column: password
   allow-column: allow
+  password-hash: 0 # 0 no encrypt, 1 bcrypt(cost=10), 2 md5, 3 sha1, 4 sha256, 5 sha512, 6 hmac-sha1, 7 hmac-sha256, 8 hmac-sha512
+  hash-key:  #The key is required for the HMAC algorithm
 
 acl:
   table: acl

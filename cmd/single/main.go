@@ -25,6 +25,7 @@ import (
 	cokafka "github.com/wind-c/comqtt/v2/plugin/bridge/kafka"
 	"go.etcd.io/bbolt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -32,6 +33,12 @@ import (
 )
 
 var logger *zerolog.Logger
+
+func pprof() {
+	go func() {
+		log.Println(http.ListenAndServe(":6060", nil))
+	}()
+}
 
 func main() {
 	sigCtx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -67,6 +74,11 @@ func realMain(ctx context.Context) error {
 		if cfg, err = config.Load(confFile); err != nil {
 			log.Fatal(err)
 		}
+	}
+
+	//enable pprof
+	if cfg.PprofEnable {
+		pprof()
 	}
 
 	//init log

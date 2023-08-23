@@ -39,8 +39,7 @@ import (
 var agent *cs.Agent
 var logger *zerolog.Logger
 
-// init for pprof:
-func init() {
+func pprof() {
 	go func() {
 		log.Println(http.ListenAndServe(":6060", nil))
 	}()
@@ -98,6 +97,11 @@ func realMain(ctx context.Context) error {
 		} else {
 			cfg.Cluster.Members = []string{net.JoinHostPort("127.0.0.1", strconv.Itoa(cfg.Cluster.BindPort))}
 		}
+	}
+
+	//enable pprof
+	if cfg.PprofEnable {
+		pprof()
 	}
 
 	//init log

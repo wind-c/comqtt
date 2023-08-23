@@ -91,6 +91,7 @@ type Config struct {
 	Cluster     Cluster `yaml:"cluster"`
 	Redis       redis   `yaml:"redis"`
 	Log         Log     `yaml:"log"`
+	PprofEnable bool    `yaml:"pprof-enable"`
 }
 
 type auth struct {

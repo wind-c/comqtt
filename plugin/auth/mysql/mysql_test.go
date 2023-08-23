@@ -31,7 +31,7 @@ var (
 
 	//pkf = packets.Packet{Filters: packets.Subscriptions{{Filter: "a/b/c"}}}
 
-	pkc = packets.Packet{Connect: packets.ConnectParams{Password: []byte("321654")}}
+	pkc = packets.Packet{Connect: packets.ConnectParams{Password: []byte("123456")}}
 )
 
 func teardown(a *Auth, t *testing.T) {
@@ -60,6 +60,8 @@ func newAuth(t *testing.T) *Auth {
 			UserColumn:     "username",
 			PasswordColumn: "password",
 			AllowColumn:    "allow",
+			PasswordHash:   1,
+			HashKey:        "",
 		},
 		Acl: AclTable{
 			Table:        "acl",

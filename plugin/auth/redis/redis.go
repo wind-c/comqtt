@@ -30,6 +30,8 @@ type Options struct {
 	AuthKeyPrefix string        `json:"auth-prefix" yaml:"auth-prefix"`
 	AclMode       byte          `json:"acl-mode" yaml:"acl-mode"`
 	AclKeyPrefix  string        `json:"acl-prefix" yaml:"acl-prefix"`
+	PasswordHash  pa.HashType   `json:"password-hash" yaml:"password-hash"`
+	HashKey       string        `json:"hash-key" yaml:"hash-key"`
 	//Blacklist     auth.Ledger   `json:"blacklist" yaml:"blacklist"`
 }
 
@@ -157,11 +159,7 @@ func (a *Auth) OnConnectAuthenticate(cl *mqtt.Client, pk packets.Packet) bool {
 		return false
 	}
 
-	if string(ar.Password) == string(pk.Connect.Password) {
-		return true
-	}
-
-	return false
+	return pa.CompareHash(string(ar.Password), string(pk.Connect.Password), a.config.HashKey, a.config.PasswordHash)
 }
 
 // OnACLCheck returns true if the connecting client has matching read or write access to subscribe

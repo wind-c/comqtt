@@ -6,6 +6,20 @@ import (
 	"github.com/wind-c/comqtt/v2/mqtt/packets"
 )
 
+type HashType int
+
+const (
+	HashNone HashType = iota
+	HashBcrypt
+	HashMd5
+	HashSha1
+	HashSha256
+	HashSha512
+	HashHmacSha1
+	HashHmacSha256
+	HashHmacSha512
+)
+
 func CheckAcl(tam map[string]auth.Access, write bool) bool {
 	// access 0 = deny, 1 = read only, 2 = write only, 3 = read and write
 	rm := make(map[string]bool)

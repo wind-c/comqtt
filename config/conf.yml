@@ -2,6 +2,7 @@ storage-way: 3  #Storage way optional items:0 memory、1 bolt、2 badger、3 red
 storage-path: comqtt.db  #Local storage path in single node mode.
 bridge-way: 1  #Bridge way optional items:0 disable、1 kafka
 bridge-path: ./cmd/config/bridge-kafka.yml  #The bridge config file path
+pprof-enable: false #Whether to enable the performance analysis tool http://ip:6060
 
 auth:
   way: 1  #Authentication way: 0 anonymous, 1 username and password, 2 clientid

@@ -11,7 +11,6 @@ import (
 	"github.com/wind-c/comqtt/v2/mqtt/packets"
 	"github.com/wind-c/comqtt/v2/plugin"
 	pa "github.com/wind-c/comqtt/v2/plugin/auth"
-	"golang.org/x/crypto/bcrypt"
 )
 
 type Options struct {
@@ -35,10 +34,12 @@ type DsnInfo struct {
 }
 
 type AuthTable struct {
-	Table          string `json:"table" yaml:"table"`
-	UserColumn     string `json:"user-column" yaml:"user-column"`
-	PasswordColumn string `json:"password-column" yaml:"password-column"`
-	AllowColumn    string `json:"allow-column" yaml:"allow-column"`
+	Table          string      `json:"table" yaml:"table"`
+	UserColumn     string      `json:"user-column" yaml:"user-column"`
+	PasswordColumn string      `json:"password-column" yaml:"password-column"`
+	AllowColumn    string      `json:"allow-column" yaml:"allow-column"`
+	PasswordHash   pa.HashType `json:"password-hash" yaml:"password-hash"`
+	HashKey        string      `json:"hash-key" yaml:"hash-key"`
 }
 
 type AclTable struct {
@@ -148,10 +149,7 @@ func (a *Auth) OnConnectAuthenticate(cl *mqtt.Client, pk packets.Packet) bool {
 		return false
 	}
 
-	if ok := bcrypt.CompareHashAndPassword([]byte(password), pk.Connect.Password); ok == nil {
-		return true
-	}
-	return false
+	return pa.CompareHash(password, string(pk.Connect.Password), a.config.Auth.HashKey, a.config.Auth.PasswordHash)
 }
 
 // OnACLCheck returns true if the connecting client has matching read or write access to subscribe

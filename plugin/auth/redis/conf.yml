@@ -9,3 +9,5 @@ auth-mode: 1  # 0 Anonymous, 1 Username, 2 ClientID
 auth-prefix: comqtt-auth
 acl-mode: 2  # 0 Anonymous, 1 Username, 2 ClientID
 acl-prefix: comqtt-acl
+password-hash: 0 # 0 no encrypt, 1 bcrypt(cost=10), 2 md5, 3 sha1, 4 sha256, 5 sha512, 6 hmac-sha1, 7 hmac-sha256, 8 hmac-sha512
+hash-key:  #The key is required for the HMAC algorithm

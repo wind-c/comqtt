@@ -33,10 +33,12 @@ type DsnInfo struct {
 }
 
 type AuthTable struct {
-	Table          string `json:"table" yaml:"table"`
-	UserColumn     string `json:"user-column" yaml:"user-column"`
-	PasswordColumn string `json:"password-column" yaml:"password-column"`
-	AllowColumn    string `json:"allow-column" yaml:"allow-column"`
+	Table          string      `json:"table" yaml:"table"`
+	UserColumn     string      `json:"user-column" yaml:"user-column"`
+	PasswordColumn string      `json:"password-column" yaml:"password-column"`
+	AllowColumn    string      `json:"allow-column" yaml:"allow-column"`
+	PasswordHash   pa.HashType `json:"password-hash" yaml:"password-hash"`
+	HashKey        string      `json:"hash-key" yaml:"hash-key"`
 }
 
 type AclTable struct {
@@ -137,11 +139,7 @@ func (a *Auth) OnConnectAuthenticate(cl *mqtt.Client, pk packets.Packet) bool {
 		return false
 	}
 
-	if password == string(pk.Connect.Password) {
-		return true
-	} else {
-		return false
-	}
+	return pa.CompareHash(password, string(pk.Connect.Password), a.config.Auth.HashKey, a.config.Auth.PasswordHash)
 }
 
 // OnACLCheck returns true if the connecting client has matching read or write access to subscribe
