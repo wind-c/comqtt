@@ -276,7 +276,10 @@ func (b *Bridge) OnDisconnect(cl *mqtt.Client, err error, expire bool) {
 		ClientID:  cl.ID,
 		Username:  string(cl.Properties.Username),
 		Timestamp: timestamp,
-		Payload:   []byte(err.Error()),
+	}
+
+	if err != nil {
+		msg.Payload = []byte(err.Error())
 	}
 
 	data, err := msg.MarshalBinary()

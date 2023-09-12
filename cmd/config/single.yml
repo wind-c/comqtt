@@ -5,9 +5,9 @@ bridge-path: ./cmd/config/bridge-kafka.yml  #The bridge config file path
 pprof-enable: false #Whether to enable the performance analysis tool http://ip:6060
 
 auth:
-  way: 1  #Authentication way: 0 anonymous, 1 username and password, 2 clientid
+  way: 0  #Authentication way: 0 anonymous, 1 username and password, 2 clientid
   datasource: 1   #Optional items:0 free、1 redis、2 mysql、3 postgresql、4 http ...
-  conf-path: ./config/auth-redis.yml  #The config file path should correspond to the auth-datasource
+  conf-path: ./cmd/config/auth-redis.yml  #The config file path should correspond to the auth-datasource
 
 mqtt:
   tcp: :1883
