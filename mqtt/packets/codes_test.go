@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// SPDX-FileCopyrightText: 2022 mochi-co
+// SPDX-FileCopyrightText: 2022 mochi-mqtt, mochi-co
 // SPDX-FileContributor: mochi-co
 
 package packets
@@ -19,7 +19,7 @@ func TestCodesString(t *testing.T) {
 	require.Equal(t, "test", c.String())
 }
 
-func TestCodesErrorr(t *testing.T) {
+func TestCodesError(t *testing.T) {
 	c := Code{
 		Reason: "error",
 		Code:   0x1,

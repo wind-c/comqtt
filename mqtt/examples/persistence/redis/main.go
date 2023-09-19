@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT
-// SPDX-FileCopyrightText: 2022 mochi-co
+// SPDX-FileCopyrightText: 2022 mochi-mqtt, mochi-co
 // SPDX-FileContributor: mochi-co
 
 package main
 
 import (
 	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 
-	"github.com/rs/zerolog"
 	"github.com/wind-c/comqtt/v2/mqtt"
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/auth"
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/storage/redis"
@@ -30,8 +30,12 @@ func main() {
 
 	server := mqtt.New(nil)
 	_ = server.AddHook(new(auth.AllowHook), nil)
-	l := server.Log.Level(zerolog.DebugLevel)
-	server.Log = &l
+
+	level := new(slog.LevelVar)
+	server.Log = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level: level,
+	}))
+	level.Set(slog.LevelDebug)
 
 	err := server.AddHook(new(redis.Hook), &redis.Options{
 		Options: &rv8.Options{
@@ -58,8 +62,7 @@ func main() {
 	}()
 
 	<-done
-	server.Log.Warn().Msg("caught signal, stopping...")
-	server.Close()
-	server.Log.Info().Msg("main.go finished")
-
+	server.Log.Warn("caught signal, stopping...")
+	_ = server.Close()
+	server.Log.Info("main.go finished")
 }

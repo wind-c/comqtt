@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
-// SPDX-FileCopyrightText: 2022 J. Blake / mochi-co
+// SPDX-FileCopyrightText: 2023 mochi-mqtt, mochi-co
 // SPDX-FileContributor: mochi-co
 
 package mqtt
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -856,4 +857,228 @@ func TestNewTopicAliases(t *testing.T) {
 	require.Equal(t, uint16(5), a.Inbound.maximum)
 	require.NotNil(t, a.Outbound)
 	require.Equal(t, uint16(5), a.Outbound.maximum)
+}
+
+func TestNewInlineSubscriptions(t *testing.T) {
+	subscriptions := NewInlineSubscriptions()
+	require.NotNil(t, subscriptions)
+	require.NotNil(t, subscriptions.internal)
+	require.Equal(t, 0, subscriptions.Len())
+}
+
+func TestInlineSubscriptionAdd(t *testing.T) {
+	subscriptions := NewInlineSubscriptions()
+	handler := func(cl *Client, sub packets.Subscription, pk packets.Packet) {
+		// handler logic
+	}
+
+	subscription := InlineSubscription{
+		Subscription: packets.Subscription{Filter: "a/b/c", Identifier: 1},
+		Handler:      handler,
+	}
+	subscriptions.Add(subscription)
+
+	sub, ok := subscriptions.Get(1)
+	require.True(t, ok)
+	require.Equal(t, "a/b/c", sub.Filter)
+	require.Equal(t, fmt.Sprintf("%p", handler), fmt.Sprintf("%p", sub.Handler))
+}
+
+func TestInlineSubscriptionGet(t *testing.T) {
+	subscriptions := NewInlineSubscriptions()
+	handler := func(cl *Client, sub packets.Subscription, pk packets.Packet) {
+		// handler logic
+	}
+
+	subscription := InlineSubscription{
+		Subscription: packets.Subscription{Filter: "a/b/c", Identifier: 1},
+		Handler:      handler,
+	}
+	subscriptions.Add(subscription)
+
+	sub, ok := subscriptions.Get(1)
+	require.True(t, ok)
+	require.Equal(t, "a/b/c", sub.Filter)
+	require.Equal(t, fmt.Sprintf("%p", handler), fmt.Sprintf("%p", sub.Handler))
+
+	_, ok = subscriptions.Get(999)
+	require.False(t, ok)
+}
+
+func TestInlineSubscriptionsGetAll(t *testing.T) {
+	subscriptions := NewInlineSubscriptions()
+
+	subscriptions.Add(InlineSubscription{
+		Subscription: packets.Subscription{Filter: "a/b/c", Identifier: 1},
+	})
+	subscriptions.Add(InlineSubscription{
+		Subscription: packets.Subscription{Filter: "a/b/c", Identifier: 1},
+	})
+	subscriptions.Add(InlineSubscription{
+		Subscription: packets.Subscription{Filter: "a/b/c", Identifier: 2},
+	})
+	subscriptions.Add(InlineSubscription{
+		Subscription: packets.Subscription{Filter: "d/e/f", Identifier: 3},
+	})
+
+	allSubs := subscriptions.GetAll()
+	require.Len(t, allSubs, 3)
+	require.Contains(t, allSubs, 1)
+	require.Contains(t, allSubs, 2)
+	require.Contains(t, allSubs, 3)
+}
+
+func TestInlineSubscriptionDelete(t *testing.T) {
+	subscriptions := NewInlineSubscriptions()
+	handler := func(cl *Client, sub packets.Subscription, pk packets.Packet) {
+		// handler logic
+	}
+
+	subscription := InlineSubscription{
+		Subscription: packets.Subscription{Filter: "a/b/c", Identifier: 1},
+		Handler:      handler,
+	}
+	subscriptions.Add(subscription)
+
+	subscriptions.Delete(1)
+	_, ok := subscriptions.Get(1)
+	require.False(t, ok)
+	require.Empty(t, subscriptions.GetAll())
+	require.Zero(t, subscriptions.Len())
+}
+
+func TestInlineSubscribe(t *testing.T) {
+
+	handler := func(cl *Client, sub packets.Subscription, pk packets.Packet) {
+		// handler logic
+	}
+
+	tt := []struct {
+		desc         string
+		filter       string
+		subscription InlineSubscription
+		wasNew       bool
+		count        int
+	}{
+		{
+			desc:         "subscribe",
+			filter:       "a/b/c",
+			subscription: InlineSubscription{Handler: handler, Subscription: packets.Subscription{Filter: "a/b/c", Identifier: 1}},
+			wasNew:       true,
+			count:        1,
+		},
+		{
+			desc:         "subscribe existed",
+			filter:       "a/b/c",
+			subscription: InlineSubscription{Handler: handler, Subscription: packets.Subscription{Filter: "a/b/c", Identifier: 1}},
+			wasNew:       false,
+			count:        1,
+		},
+		{
+			desc:         "subscribe different identifier",
+			filter:       "a/b/c",
+			subscription: InlineSubscription{Handler: handler, Subscription: packets.Subscription{Filter: "a/b/c", Identifier: 2}},
+			wasNew:       true,
+			count:        2,
+		},
+		{
+			desc:         "subscribe case sensitive didnt exist",
+			filter:       "A/B/c",
+			subscription: InlineSubscription{Handler: handler, Subscription: packets.Subscription{Filter: "A/B/c", Identifier: 1}},
+			wasNew:       true,
+			count:        1,
+		},
+		{
+			desc:         "wildcard+ sub",
+			filter:       "d/+",
+			subscription: InlineSubscription{Handler: handler, Subscription: packets.Subscription{Filter: "d/+", Identifier: 1}},
+			wasNew:       true,
+			count:        1,
+		},
+		{
+			desc:         "wildcard# sub",
+			filter:       "d/e/#",
+			subscription: InlineSubscription{Handler: handler, Subscription: packets.Subscription{Filter: "d/e/#", Identifier: 1}},
+			wasNew:       true,
+			count:        1,
+		},
+	}
+
+	index := NewTopicsIndex()
+	for _, tx := range tt {
+		t.Run(tx.desc, func(t *testing.T) {
+			exist, count := index.InlineSubscribe(tx.subscription)
+			require.Equal(t, tx.wasNew, exist)
+			require.Equal(t, tx.count, count)
+		})
+	}
+
+	final := index.root.particles.get("a").particles.get("b").particles.get("c")
+	require.NotNil(t, final)
+}
+
+func TestInlineUnsubscribe(t *testing.T) {
+	handler := func(cl *Client, sub packets.Subscription, pk packets.Packet) {
+		// handler logic
+	}
+
+	index := NewTopicsIndex()
+	index.InlineSubscribe(InlineSubscription{Handler: handler, Subscription: packets.Subscription{Filter: "a/b/c/d", Identifier: 1}})
+	sub, exists := index.root.particles.get("a").particles.get("b").particles.get("c").particles.get("d").inlineSubscriptions.Get(1)
+	require.NotNil(t, sub)
+	require.True(t, exists)
+
+	index = NewTopicsIndex()
+	index.InlineSubscribe(InlineSubscription{Handler: handler, Subscription: packets.Subscription{Filter: "a/b/c/d", Identifier: 1}})
+	sub, exists = index.root.particles.get("a").particles.get("b").particles.get("c").particles.get("d").inlineSubscriptions.Get(1)
+	require.NotNil(t, sub)
+	require.True(t, exists)
+
+	index.InlineSubscribe(InlineSubscription{Handler: handler, Subscription: packets.Subscription{Filter: "d/e/f", Identifier: 1}})
+	sub, exists = index.root.particles.get("d").particles.get("e").particles.get("f").inlineSubscriptions.Get(1)
+	require.NotNil(t, sub)
+	require.True(t, exists)
+
+	index.InlineSubscribe(InlineSubscription{Handler: handler, Subscription: packets.Subscription{Filter: "d/e/f", Identifier: 2}})
+	sub, exists = index.root.particles.get("d").particles.get("e").particles.get("f").inlineSubscriptions.Get(2)
+	require.NotNil(t, sub)
+	require.True(t, exists)
+
+	index.InlineSubscribe(InlineSubscription{Handler: handler, Subscription: packets.Subscription{Filter: "a/b/+/d", Identifier: 1}})
+	sub, exists = index.root.particles.get("a").particles.get("b").particles.get("+").particles.get("d").inlineSubscriptions.Get(1)
+	require.NotNil(t, sub)
+	require.True(t, exists)
+
+	index.InlineSubscribe(InlineSubscription{Handler: handler, Subscription: packets.Subscription{Filter: "d/e/f", Identifier: 1}})
+	sub, exists = index.root.particles.get("d").particles.get("e").particles.get("f").inlineSubscriptions.Get(1)
+	require.NotNil(t, sub)
+	require.True(t, exists)
+
+	index.InlineSubscribe(InlineSubscription{Handler: handler, Subscription: packets.Subscription{Filter: "d/e/f", Identifier: 1}})
+	sub, exists = index.root.particles.get("d").particles.get("e").particles.get("f").inlineSubscriptions.Get(1)
+	require.NotNil(t, sub)
+	require.True(t, exists)
+
+	index.InlineSubscribe(InlineSubscription{Handler: handler, Subscription: packets.Subscription{Filter: "#", Identifier: 1}})
+	sub, exists = index.root.particles.get("#").inlineSubscriptions.Get(1)
+	require.NotNil(t, sub)
+	require.True(t, exists)
+
+	ok, count := index.InlineUnsubscribe(1, "a/b/c/d")
+	require.Equal(t, 0, count)
+	require.True(t, ok)
+	require.Nil(t, index.root.particles.get("a").particles.get("b").particles.get("c"))
+
+	sub, exists = index.root.particles.get("a").particles.get("b").particles.get("+").particles.get("d").inlineSubscriptions.Get(1)
+	require.NotNil(t, sub)
+	require.True(t, exists)
+
+	ok, _ = index.InlineUnsubscribe(1, "d/e/f")
+	require.Equal(t, 0, count)
+	require.True(t, ok)
+	require.NotNil(t, index.root.particles.get("d").particles.get("e").particles.get("f"))
+
+	ok, _ = index.InlineUnsubscribe(1, "not/exist")
+	require.Equal(t, 0, count)
+	require.False(t, ok)
 }

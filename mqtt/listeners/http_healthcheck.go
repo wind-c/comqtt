@@ -1,74 +1,52 @@
 // SPDX-License-Identifier: MIT
-// SPDX-FileCopyrightText: 2022 mochi-mqtt, mochi-co
-// SPDX-FileContributor: mochi-co
+// SPDX-FileCopyrightText: 2023 mochi-mqtt, mochi-co
+// SPDX-FileContributor: Derek Duncan
 
 package listeners
 
 import (
 	"context"
-	"encoding/json"
-	"io"
 	"log/slog"
 	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/wind-c/comqtt/v2/mqtt/system"
 )
 
-// HTTPStats is a listener for presenting the server $SYS stats on a JSON http endpoint.
-type HTTPStats struct {
+// HTTPHealthCheck is a listener for providing an HTTP healthcheck endpoint.
+type HTTPHealthCheck struct {
 	sync.RWMutex
 	id      string       // the internal id of the listener
 	address string       // the network address to bind to
 	config  *Config      // configuration values for the listener
 	listen  *http.Server // the http server
-	sysInfo *system.Info // pointers to the server data
 	end     uint32       // ensure the close methods are only called once
-	handlers Handlers
 }
 
-type Handlers map[string]func(http.ResponseWriter, *http.Request)
-
-func NewHTTP(id, address string, config *Config, sysInfo *system.Info, handlers Handlers) *HTTPStats {
+// NewHTTPHealthCheck initialises and returns a new HTTP listener, listening on an address.
+func NewHTTPHealthCheck(id, address string, config *Config) *HTTPHealthCheck {
 	if config == nil {
 		config = new(Config)
 	}
-	return &HTTPStats{
-		id:       id,
-		address:  address,
-		sysInfo:  sysInfo,
-		config:   config,
-		handlers: handlers,
-	}
-}
-
-// NewHTTPStats initialises and returns a new HTTP listener, listening on an address.
-func NewHTTPStats(id, address string, config *Config, sysInfo *system.Info) *HTTPStats {
-	if config == nil {
-		config = new(Config)
-	}
-	return &HTTPStats{
+	return &HTTPHealthCheck{
 		id:      id,
 		address: address,
-		sysInfo: sysInfo,
 		config:  config,
 	}
 }
 
 // ID returns the id of the listener.
-func (l *HTTPStats) ID() string {
+func (l *HTTPHealthCheck) ID() string {
 	return l.id
 }
 
 // Address returns the address of the listener.
-func (l *HTTPStats) Address() string {
+func (l *HTTPHealthCheck) Address() string {
 	return l.address
 }
 
 // Protocol returns the address of the listener.
-func (l *HTTPStats) Protocol() string {
+func (l *HTTPHealthCheck) Protocol() string {
 	if l.listen != nil && l.listen.TLSConfig != nil {
 		return "https"
 	}
@@ -77,9 +55,13 @@ func (l *HTTPStats) Protocol() string {
 }
 
 // Init initializes the listener.
-func (l *HTTPStats) Init(_ *slog.Logger) error {
+func (l *HTTPHealthCheck) Init(_ *slog.Logger) error {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", l.jsonHandler)
+	mux.HandleFunc("/healthcheck", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
 	l.listen = &http.Server{
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 5 * time.Second,
@@ -95,7 +77,7 @@ func (l *HTTPStats) Init(_ *slog.Logger) error {
 }
 
 // Serve starts listening for new connections and serving responses.
-func (l *HTTPStats) Serve(establish EstablishFn) {
+func (l *HTTPHealthCheck) Serve(establish EstablishFn) {
 	if l.listen.TLSConfig != nil {
 		_ = l.listen.ListenAndServeTLS("", "")
 	} else {
@@ -104,7 +86,7 @@ func (l *HTTPStats) Serve(establish EstablishFn) {
 }
 
 // Close closes the listener and any client connections.
-func (l *HTTPStats) Close(closeClients CloseFn) {
+func (l *HTTPHealthCheck) Close(closeClients CloseFn) {
 	l.Lock()
 	defer l.Unlock()
 
@@ -115,16 +97,4 @@ func (l *HTTPStats) Close(closeClients CloseFn) {
 	}
 
 	closeClients(l.id)
-}
-
-// jsonHandler is an HTTP handler which outputs the $SYS stats as JSON.
-func (l *HTTPStats) jsonHandler(w http.ResponseWriter, req *http.Request) {
-	info := *l.sysInfo.Clone()
-
-	out, err := json.MarshalIndent(info, "", "\t")
-	if err != nil {
-		_, _ = io.WriteString(w, err.Error())
-	}
-
-	_, _ = w.Write(out)
 }
