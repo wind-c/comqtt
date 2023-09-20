@@ -125,8 +125,7 @@ func (s *Storage) Init(config any) error {
 		"address", s.config.Options.Addr,
 		"username", s.config.Options.Username,
 		"password-len", len(s.config.Options.Password),
-		"db", s.config.Options.DB,
-		"connecting to redis service")
+		"db", s.config.Options.DB)
 
 	s.db = redis.NewClient(s.config.Options)
 	_, err := s.db.Ping(context.Background()).Result()

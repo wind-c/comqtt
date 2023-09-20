@@ -28,7 +28,7 @@ type Options struct {
 	Format Format `json:"format" yaml:"format"`
 
 	// Log level, with supported values LevelDebug: 4, LevelInfo: 0, LevelWarn: 4, and LevelError: 8.
-	Level slog.Level `json:"level" yaml:"level"`
+	Level int `json:"level" yaml:"level"`
 
 	// Filename is the file to write logs to.  Backup log files will be retained
 	// in the same directory. If empty, logs will not be written to a file.
@@ -112,17 +112,17 @@ func NewHandler(opt *Options, writer io.Writer) *Handler {
 	switch opt.Format {
 	case Text:
 		handler = slog.NewTextHandler(writer, &slog.HandlerOptions{
-			Level: opt.Level,
+			Level: slog.Level(opt.Level),
 		})
 
 	case Json:
 		handler = slog.NewJSONHandler(writer, &slog.HandlerOptions{
-			Level: opt.Level,
+			Level: slog.Level(opt.Level),
 		})
 
 	default:
 		handler = slog.NewTextHandler(writer, &slog.HandlerOptions{
-			Level: opt.Level,
+			Level: slog.Level(opt.Level),
 		})
 	}
 

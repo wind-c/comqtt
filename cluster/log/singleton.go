@@ -30,38 +30,38 @@ func Writer() io.Writer {
 
 func Info(msg string, args ...any) {
 	if singleton != nil {
-		singleton.Info(msg, args)
+		singleton.Info(msg, args...)
 	}
 }
 
 func Warn(msg string, args ...any) {
 	if singleton != nil {
-		singleton.Warn(msg, args)
+		singleton.Warn(msg, args...)
 	}
 }
 
 func Error(msg string, args ...any) {
 	if singleton != nil {
-		singleton.Error(msg, args)
+		singleton.Error(msg, args...)
 	}
 }
 
 func Fatal(msg string, args ...any) {
 	if singleton != nil {
-		singleton.Error(msg, args)
+		singleton.Error(msg, args...)
 		os.Exit(1)
 	}
 }
 
 func Debug(msg string, args ...any) {
 	if singleton != nil {
-		singleton.Debug(msg, args)
+		singleton.Debug(msg, args...)
 	}
 }
 
 func Log(level slog.Level, msg string, args ...any) {
 	if singleton != nil {
 		slevel := slog.Level(level)
-		singleton.Log(context.TODO(), slevel, msg, args)
+		singleton.Log(context.TODO(), slevel, msg, args...)
 	}
 }
