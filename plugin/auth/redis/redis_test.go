@@ -37,7 +37,7 @@ var (
 
 func newAuth(t *testing.T, addr string) *Auth {
 	a := new(Auth)
-	a.SetOpts(&logger, nil)
+	a.SetOpts(logger, nil)
 
 	err := a.Init(&Options{
 		AuthMode: byte(auth.AuthUsername),
@@ -65,7 +65,7 @@ func TestInitUseDefaults(t *testing.T) {
 	defer s.Close()
 
 	a := newAuth(t, defaultAddr)
-	a.SetOpts(&logger, nil)
+	a.SetOpts(logger, nil)
 	err := a.Init(nil)
 	require.NoError(t, err)
 	defer teardown(t, a)
@@ -76,7 +76,7 @@ func TestInitUseDefaults(t *testing.T) {
 
 func TestInitBadConfig(t *testing.T) {
 	a := new(Auth)
-	a.SetOpts(&logger, nil)
+	a.SetOpts(logger, nil)
 
 	err := a.Init(map[string]any{})
 	require.Error(t, err)
@@ -84,7 +84,7 @@ func TestInitBadConfig(t *testing.T) {
 
 func TestInitBadAddr(t *testing.T) {
 	a := new(Auth)
-	a.SetOpts(&logger, nil)
+	a.SetOpts(logger, nil)
 	err := a.Init(&Options{
 		RedisOptions: &redisOptions{
 			Addr: "abc:123",

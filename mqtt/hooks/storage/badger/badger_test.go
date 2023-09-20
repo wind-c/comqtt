@@ -262,7 +262,7 @@ func TestOnSubscribedThenOnUnsubscribed(t *testing.T) {
 	require.NoError(t, err)
 	defer teardown(t, h.config.Path, h)
 
-	h.OnSubscribed(client, pkf, []byte{0})
+	h.OnSubscribed(client, pkf, []byte{0}, []int{0})
 	r := new(storage.Subscription)
 
 	err = h.db.Get(subscriptionKey(client, pkf.Filters[0].Filter), r)
@@ -271,7 +271,7 @@ func TestOnSubscribedThenOnUnsubscribed(t *testing.T) {
 	require.Equal(t, pkf.Filters[0].Filter, r.Filter)
 	require.Equal(t, byte(0), r.Qos)
 
-	h.OnUnsubscribed(client, pkf)
+	h.OnUnsubscribed(client, pkf, []byte{0}, []int{0})
 	err = h.db.Get(subscriptionKey(client, pkf.Filters[0].Filter), r)
 	require.Error(t, err)
 	require.Equal(t, badgerhold.ErrNotFound, err)
@@ -280,7 +280,7 @@ func TestOnSubscribedThenOnUnsubscribed(t *testing.T) {
 func TestOnSubscribedNoDB(t *testing.T) {
 	h := new(Hook)
 	h.SetOpts(logger, nil)
-	h.OnSubscribed(client, pkf, []byte{0})
+	h.OnSubscribed(client, pkf, []byte{0}, []int{0})
 }
 
 func TestOnSubscribedClosedDB(t *testing.T) {
@@ -289,13 +289,13 @@ func TestOnSubscribedClosedDB(t *testing.T) {
 	err := h.Init(nil)
 	require.NoError(t, err)
 	teardown(t, h.config.Path, h)
-	h.OnSubscribed(client, pkf, []byte{0})
+	h.OnSubscribed(client, pkf, []byte{0}, []int{0})
 }
 
 func TestOnUnsubscribedNoDB(t *testing.T) {
 	h := new(Hook)
 	h.SetOpts(logger, nil)
-	h.OnUnsubscribed(client, pkf)
+	h.OnUnsubscribed(client, pkf, []byte{0}, []int{0})
 }
 
 func TestOnUnsubscribedClosedDB(t *testing.T) {
@@ -304,7 +304,7 @@ func TestOnUnsubscribedClosedDB(t *testing.T) {
 	err := h.Init(nil)
 	require.NoError(t, err)
 	teardown(t, h.config.Path, h)
-	h.OnUnsubscribed(client, pkf)
+	h.OnUnsubscribed(client, pkf, []byte{0}, []int{0})
 }
 
 func TestOnRetainMessageThenUnset(t *testing.T) {

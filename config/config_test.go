@@ -6,8 +6,9 @@ package config
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 var buf = []byte(`
@@ -72,7 +73,6 @@ func TestLoadConfigFromFile(t *testing.T) {
 	require.Equal(t, 7946, cfg.Cluster.BindPort)
 	require.Equal(t, "127.0.0.1:6379", cfg.Redis.Options.Addr)
 	require.Equal(t, 10240, cfg.Cluster.QueueDepth)
-	require.Equal(t, 3, cfg.Log.Sampler.Burst)
 
 	fmt.Println(cfg)
 }
@@ -84,5 +84,4 @@ func TestParse(t *testing.T) {
 	require.Equal(t, 7946, cfg.Cluster.BindPort)
 	require.Equal(t, "127.0.0.1:6379", cfg.Redis.Options.Addr)
 	require.Equal(t, 10240, cfg.Cluster.QueueDepth)
-	require.Equal(t, 3, cfg.Log.Sampler.Burst)
 }

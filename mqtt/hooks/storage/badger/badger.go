@@ -7,6 +7,7 @@ package badger
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/wind-c/comqtt/v2/mqtt"
