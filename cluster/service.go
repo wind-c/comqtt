@@ -265,8 +265,6 @@ func (c *ClientManager) ConnectNotifyToOthers(msg *message.Message) {
 func (c *ClientManager) RelayRaftApply(nodeId string, msg *message.Message) {
 	client, err := c.getClient(nodeId)
 	if err != nil {
-		zero.Error().Err(err).Msg("get grpc client")
-
 		log.Error("get grpc client", "error", err)
 		return
 	}
@@ -296,7 +294,7 @@ func (c *ClientManager) RaftApplyToOthers(msg *message.Message) {
 func (c *ClientManager) RelayRaftJoin(nodeId string) {
 	client, err := c.getClient(nodeId)
 	if err != nil {
-		zero.Error().Err(err).Msg("get grpc client")
+		log.Error("get grpc client", "error", err)
 		return
 	}
 
