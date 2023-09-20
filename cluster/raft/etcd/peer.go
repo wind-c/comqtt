@@ -8,16 +8,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/wind-c/comqtt/v2/cluster/log/zero"
-	"github.com/wind-c/comqtt/v2/cluster/message"
-	"github.com/wind-c/comqtt/v2/config"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"net"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/wind-c/comqtt/v2/cluster/log"
+	"github.com/wind-c/comqtt/v2/cluster/message"
+	"github.com/wind-c/comqtt/v2/config"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 
 	"go.etcd.io/etcd/client/pkg/v3/fileutil"
 	"go.etcd.io/etcd/client/pkg/v3/transport"
@@ -185,14 +186,14 @@ func getZapLogger() *zap.Logger {
 		EncodeTime:     zapcore.ISO8601TimeEncoder,
 		EncodeDuration: zapcore.StringDurationEncoder,
 	}
-	core := zapcore.NewCore(zapcore.NewJSONEncoder(encoderCfg), zapcore.AddSync(zero.Logger()), zapcore.ErrorLevel)
+	core := zapcore.NewCore(zapcore.NewJSONEncoder(encoderCfg), zapcore.AddSync(log.Writer()), zapcore.ErrorLevel)
 	return zap.New(core)
 }
 
 func (p *Peer) startRaft() {
 	if !fileutil.Exist(p.snapDir) {
 		if err := os.MkdirAll(p.snapDir, 0750); err != nil {
-			zero.Fatal().Err(err).Msg("[raft] failed to create dir for dnapshot")
+			log.Fatal("[raft] failed to create dir for dnapshot", "error", err)
 		}
 	}
 	p.snapshotter = snap.New(p.logger, p.snapDir)
@@ -236,7 +237,7 @@ func (p *Peer) startRaft() {
 	}
 
 	if err := p.transport.Start(); err != nil {
-		zero.Fatal().Err(err).Msg("[raft] transport start")
+		log.Fatal("[raft] transport start", "error", err)
 	}
 
 	for i := range p.peers {
@@ -253,15 +254,15 @@ func (p *Peer) serveRaft() {
 	addr := net.JoinHostPort(p.conf.BindAddr, strconv.Itoa(p.conf.RaftPort))
 	listener, err := newStoppableListener(addr, p.httpStopC)
 	if err != nil {
-		zero.Fatal().Err(err).Msg("[raft] failed ti listen rafthttp")
+		log.Fatal("[raft] failed ti listen rafthttp", "error", err)
 	}
 
-	zero.Info().Str("host", p.genLocalAddr()).Msg("[raft] http is listeing at")
+	log.Info("[raft] http is listeing at", "host", p.genLocalAddr())
 	err = (&http.Server{Handler: p.transport.Handler()}).Serve(listener)
 	select {
 	case <-p.httpStopC:
 	default:
-		zero.Fatal().Err(err).Msg("[raft] failed to serve rafthttp")
+		log.Fatal("[raft] failed to serve rafthttp", "error", err)
 	}
 	close(p.httpStopC)
 }
@@ -269,7 +270,7 @@ func (p *Peer) serveRaft() {
 func (p *Peer) serveChannels() {
 	snapshot, err := p.raftStorage.Snapshot()
 	if err != nil {
-		zero.Panic().Err(err).Msg("[raft] snapshot")
+		log.Fatal("[raft] snapshot", "error", err)
 	}
 	p.confState = snapshot.Metadata.ConfState
 	p.snapshotIndex = snapshot.Metadata.Index
@@ -291,7 +292,7 @@ func (p *Peer) serveChannels() {
 					p.proposeC = nil
 				} else {
 					if err := p.node.Propose(context.TODO(), prop.MsgpackBytes()); err != nil {
-						zero.Error().Err(err).Bytes("filter", prop.Payload).Str("nid", prop.NodeID).Uint8("type", prop.Type).Msg("Propose")
+						log.Error("Propose", "error", err, "filter", prop.Payload, "nid", prop.NodeID, "type", prop.Type)
 					}
 				}
 
@@ -302,7 +303,7 @@ func (p *Peer) serveChannels() {
 					confChangeCount++
 					cc.ID = confChangeCount
 					if err := p.node.ProposeConfChange(context.TODO(), cc); err != nil {
-						zero.Error().Err(err).Uint64("nid", cc.NodeID).Int32("type", int32(cc.Type)).Msg("ProposeConfChange")
+						log.Error("ProposeConfChange", "error", err, "nid", cc.NodeID, "type", cc.Type)
 					}
 				}
 			}
@@ -324,11 +325,11 @@ func (p *Peer) serveChannels() {
 
 			if !raft.IsEmptySnap(rd.Snapshot) {
 				if err := p.saveSnap(rd.Snapshot); err != nil {
-					zero.Error().Err(err).Msg("saveSnap")
+					log.Error("saveSnap", "error", err)
 				}
 			}
 			if err := p.wal.Save(rd.HardState, rd.Entries); err != nil {
-				zero.Error().Err(err).Msg("wal.Save")
+				log.Error("wal.Save", "error", err)
 			}
 			if !raft.IsEmptySnap(rd.Snapshot) {
 				p.raftStorage.ApplySnapshot(rd.Snapshot)
@@ -357,12 +358,13 @@ func (p *Peer) serveChannels() {
 
 // replayWAL replays WAL entries into the raft instance.
 func (p *Peer) replayWAL() *wal.WAL {
-	zero.Info().Uint64("id", p.id).Msg("[raft] replaying WAL of member")
+
+	log.Info("[raft] replaying WAL of membe", "id", p.id)
 	snapshot := p.loadSnapshot()
 	w := p.openWAL(snapshot)
 	_, st, ents, err := w.ReadAll()
 	if err != nil {
-		zero.Fatal().Err(err).Msg("[raft] failed to read WAL")
+		log.Error("[raft] failed to read WAL", "error", err)
 	}
 	p.raftStorage = raft.NewMemoryStorage()
 	if snapshot != nil {
@@ -380,11 +382,11 @@ func (p *Peer) loadSnapshot() *raftpb.Snapshot {
 	if wal.Exist(p.walDir) {
 		walSnaps, err := wal.ValidSnapshotEntries(p.logger, p.walDir)
 		if err != nil {
-			zero.Fatal().Err(err).Msg("[raft] error listening snapshots")
+			log.Fatal("[raft] error listening snapshots", "error", err)
 		}
 		snapshot, err := p.snapshotter.LoadNewestAvailable(walSnaps)
 		if err != nil && err != snap.ErrNoSnapshot {
-			zero.Fatal().Err(err).Msg("[raft] error loading snapshit")
+			log.Fatal("[raft] error loading snapshit", "error", err)
 		}
 		return snapshot
 	}
@@ -396,11 +398,11 @@ func (p *Peer) openWAL(snapshot *raftpb.Snapshot) *wal.WAL {
 	if !wal.Exist(p.walDir) {
 		err := os.Mkdir(p.walDir, 0750)
 		if err != nil {
-			zero.Fatal().Err(err).Msg("[raft] cannot create dir for wal")
+			log.Fatal("[raft] cannot create dir for wal", "error", err)
 		}
 		w, err := wal.Create(p.logger, p.walDir, nil)
 		if err != nil {
-			zero.Fatal().Err(err).Msg("[raft] create dir for error")
+			log.Fatal("[raft] create dir for error", "error", err)
 		}
 		w.Close()
 	}
@@ -409,10 +411,10 @@ func (p *Peer) openWAL(snapshot *raftpb.Snapshot) *wal.WAL {
 	if snapshot != nil {
 		walSnap.Index, walSnap.Term = snapshot.Metadata.Index, snapshot.Metadata.Term
 	}
-	zero.Info().Uint64("term", walSnap.Term).Uint64("index", walSnap.Index).Msg("[raft] loading WAL")
+	log.Info("[raft] loading WAL", "term", walSnap.Term, "index", walSnap.Index)
 	w, err := wal.Open(p.logger, p.walDir, walSnap)
 	if err != nil {
-		zero.Fatal().Err(err).Msg("[raft] error loading wal")
+		log.Fatal("[raft] error loading wal", "error", err)
 	}
 	return w
 }
@@ -438,7 +440,7 @@ func (p *Peer) entriesToApply(ents []raftpb.Entry) (nents []raftpb.Entry) {
 	}
 	firstIdx := ents[0].Index
 	if firstIdx > p.appliedIndex+1 {
-		zero.Fatal().Uint64("first-idx", firstIdx).Uint64("fapplied-idx", p.appliedIndex).Msg("[raft] fisrt index of committed entry should <= progress.appliedIndex+1")
+		log.Fatal("[raft] fisrt index of committed entry should <= progress.appliedIndex+1", "first-idx", firstIdx, "fapplied-idx", p.appliedIndex)
 	}
 	if p.appliedIndex-firstIdx+1 < uint64(len(ents)) {
 		nents = ents[p.appliedIndex-firstIdx+1:]
@@ -451,11 +453,10 @@ func (p *Peer) publishSnapshot(snapshotToSave raftpb.Snapshot) {
 		return
 	}
 
-	zero.Info().Uint64("snap-idx", p.snapshotIndex).Msg("[raft] publishing snapshot at index")
-	defer zero.Info().Uint64("snap-idx", p.snapshotIndex).Msg("[raft] finished publishing snapshot at index")
-
+	log.Info("[raft] publishing snapshot at index", "snap-idx", p.snapshotIndex)
+	defer log.Info("[raft] finished publishing snapshot at index", "snap-idx", p.snapshotIndex)
 	if snapshotToSave.Metadata.Index <= p.appliedIndex {
-		zero.Info().Uint64("snap-idx", snapshotToSave.Metadata.Index).Uint64("applied-idx", p.appliedIndex).Msg("[raft] snapshot index shuold > progress.appliedIndex")
+		log.Info("[raft] snapshot index shuold > progress.appliedIndex", "snap-idx", snapshotToSave.Metadata.Index, "applied-idx", p.appliedIndex)
 	}
 
 	p.commitC <- nil // trigger kvstore to load snapshot
@@ -491,7 +492,7 @@ func (p *Peer) publishEntries(ents []raftpb.Entry) (<-chan struct{}, bool) {
 			case raftpb.ConfChangeAddNode:
 				if len(cc.Context) > 0 {
 					p.transport.AddPeer(types.ID(cc.NodeID), []string{string(cc.Context)})
-					zero.Info().Uint64("node", cc.NodeID).Msg("[raft] node is added to the cluster")
+					log.Info("[raft] node is added to the cluster", "node", cc.NodeID)
 				}
 			case raftpb.ConfChangeRemoveNode:
 				//if cc.NodeID == p.id {
@@ -499,7 +500,7 @@ func (p *Peer) publishEntries(ents []raftpb.Entry) (<-chan struct{}, bool) {
 				//	return nil, false
 				//}
 				p.transport.RemovePeer(types.ID(cc.NodeID))
-				zero.Info().Uint64("node", cc.NodeID).Msg("[raft] node is removed to the cluster")
+				log.Info("[raft] node is removed to the cluster", "node", cc.NodeID)
 			}
 		}
 	}
@@ -537,17 +538,17 @@ func (p *Peer) maybeTriggerSnapshot(applyDoneC <-chan struct{}) {
 		}
 	}
 
-	zero.Info().Uint64("applied-idx", p.appliedIndex).Uint64("snapshot-idx", p.snapshotIndex).Msg("[raft] start snapshot")
+	log.Info("[raft] start snapshot", "applied-idx", p.appliedIndex, "snapshot-idx", p.snapshotIndex)
 	data, err := p.getSnapshot()
 	if err != nil {
-		zero.Panic().Err(err).Msg("[raft] get snapshot")
+		log.Fatal("[raft] get snapshot", "error", err)
 	}
 	snapshot, err := p.raftStorage.CreateSnapshot(p.appliedIndex, &p.confState, data)
 	if err != nil {
-		zero.Panic().Err(err).Msg("[raft] create snapshot")
+		log.Fatal("[raft] create snapshot", "error", err)
 	}
 	if err = p.saveSnap(snapshot); err != nil {
-		zero.Panic().Err(err).Msg("[raft] save snapshot")
+		log.Fatal("[raft] save snapshot", "error", err)
 	}
 
 	compactIndex := uint64(1)
@@ -555,10 +556,10 @@ func (p *Peer) maybeTriggerSnapshot(applyDoneC <-chan struct{}) {
 		compactIndex = p.appliedIndex - snapshotCatchUpEntriesN
 	}
 	if err = p.raftStorage.Compact(compactIndex); err != nil {
-		zero.Panic().Err(err).Msg("[raft] compact snapshot")
+		log.Fatal("[raft] compact snapshot", "error", err)
 	}
 
-	zero.Info().Uint64("compact-idx", compactIndex).Msg("compacted log at index")
+	log.Info("compacted log at index", "compact-idx", compactIndex)
 	p.snapshotIndex = p.appliedIndex
 }
 

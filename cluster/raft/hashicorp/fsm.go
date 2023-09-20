@@ -7,10 +7,11 @@ package hashicorp
 import (
 	"bytes"
 	"encoding/gob"
-	"github.com/wind-c/comqtt/v2/cluster/message"
-	"github.com/wind-c/comqtt/v2/mqtt/packets"
 	"io"
 	"sync"
+
+	"github.com/wind-c/comqtt/v2/cluster/message"
+	"github.com/wind-c/comqtt/v2/mqtt/packets"
 
 	"github.com/hashicorp/raft"
 )
@@ -36,10 +37,8 @@ func (f *Fsm) Apply(l *raft.Log) interface{} {
 	filter := string(msg.Payload)
 	if msg.Type == packets.Subscribe {
 		f.kv.Set(filter, msg.NodeID)
-		//zero.Info().Str("from", msg.NodeID).Str("event", "subscribe").Str("filter", filter).Msg("apply")
 	} else if msg.Type == packets.Unsubscribe {
 		f.kv.Del(filter, msg.NodeID)
-		//zero.Info().Str("from", msg.NodeID).Str("event", "unsubscribe").Str("filter", filter).Msg("apply")
 	} else {
 		return nil
 	}

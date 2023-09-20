@@ -7,9 +7,14 @@ package main
 import (
 	"context"
 	"flag"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
 	rv8 "github.com/go-redis/redis/v8"
-	"github.com/rs/zerolog"
-	colog "github.com/wind-c/comqtt/v2/cluster/log/zero"
+	"github.com/wind-c/comqtt/v2/cluster/log"
 	"github.com/wind-c/comqtt/v2/config"
 	"github.com/wind-c/comqtt/v2/mqtt"
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/auth"
@@ -24,19 +29,11 @@ import (
 	rauth "github.com/wind-c/comqtt/v2/plugin/auth/redis"
 	cokafka "github.com/wind-c/comqtt/v2/plugin/bridge/kafka"
 	"go.etcd.io/bbolt"
-	"log"
-	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 )
-
-var logger *zerolog.Logger
 
 func pprof() {
 	go func() {
-		log.Println(http.ListenAndServe(":6060", nil))
+		log.Info("listen pprof", "error", http.ListenAndServe(":6060", nil))
 	}()
 }
 
@@ -44,9 +41,7 @@ func main() {
 	sigCtx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 	err := realMain(sigCtx)
-	if err != nil {
-		log.Fatal(err)
-	}
+	onError(err, "")
 }
 
 func realMain(ctx context.Context) error {
@@ -62,38 +57,29 @@ func realMain(ctx context.Context) error {
 	flag.StringVar(&cfg.Mqtt.TCP, "tcp", ":1883", "network address for Mqtt TCP listener")
 	flag.StringVar(&cfg.Mqtt.WS, "ws", ":1882", "network address for Mqtt Websocket listener")
 	flag.StringVar(&cfg.Mqtt.HTTP, "http", ":8080", "network address for web info dashboard listener")
-	flag.BoolVar(&cfg.Log.Enable, "log-enable", true, "log enabled or not")
-	flag.IntVar(&cfg.Log.Env, "env", 0, "app running environment，0 development or 1 production")
-	flag.IntVar(&cfg.Log.Level, "level", 1, "log level options:0Debug,1Info, 2Warn, 3Error, 4Fatal, 5Panic, 6NoLevel, 7Off")
-	flag.StringVar(&cfg.Log.InfoFile, "info-file", "./logs/co-info.log", "info log filename")
-	flag.StringVar(&cfg.Log.ErrorFile, "error-file", "./logs/co-err.log", "error log filename")
+	flag.BoolVar(&cfg.Log.Disable, "log-disable", true, "log disabled or not")
+	flag.StringVar(&cfg.Log.Filename, "log-file", "./logs/comqtt.log", "log filename")
 	//parse arguments
 	flag.Parse()
 	//load config file
 	if confFile != "" {
 		if cfg, err = config.Load(confFile); err != nil {
-			log.Fatal(err)
+			onError(err, "")
 		}
 	}
+
+	//init log
+	log.Init(&cfg.Log)
 
 	//enable pprof
 	if cfg.PprofEnable {
 		pprof()
 	}
 
-	//init log
-	if hn, err := os.Hostname(); err == nil {
-		cfg.Log.NodeName = hn
-	}
-	logger = colog.Init(cfg.Log)
-	if cfg.Log.Enable && cfg.Log.Format == 1 {
-		log.Println("log output to the files, please check")
-	}
-
 	// create server instance and init hooks
-	cfg.Mqtt.Options.Logger = logger
+	cfg.Mqtt.Options.Logger = log.Singleton()
 	server := mqtt.New(&cfg.Mqtt.Options)
-	logger.Info().Msg("comqtt server initializing...")
+	log.Info("comqtt server initializing...")
 	initStorage(server, cfg)
 	initAuth(server, cfg)
 	initBridge(server, cfg)
@@ -101,7 +87,7 @@ func realMain(ctx context.Context) error {
 	// gen tls config
 	var listenerConfig *listeners.Config
 	if tlsConfig, err := config.GenTlsConfig(cfg); err != nil {
-		server.Log.Fatal().Err(err)
+		onError(err, "")
 	} else {
 		if tlsConfig != nil {
 			listenerConfig = &listeners.Config{TLSConfig: tlsConfig}
@@ -129,19 +115,16 @@ func realMain(ctx context.Context) error {
 		}
 	}()
 
-	if cfg.Log.Format == 1 {
-		log.Println("comqtt server started")
-	}
+	log.Info("comqtt server started")
+
 	select {
 	case err := <-errCh:
-		log.Fatalf("server error: %s", err.Error())
-		server.Log.Fatal().Err(err).Msg("server error")
+		onError(err, "server error")
 	case <-ctx.Done():
-		server.Log.Warn().Msg("caught signal, stopping...")
+		log.Warn("caught signal, stopping...")
 	}
 	server.Close()
-	server.Log.Info().Msg("main.go finished")
-	colog.Close()
+	log.Info("main.go finished")
 	return nil
 }
 
@@ -213,6 +196,7 @@ func initBridge(server *mqtt.Server, conf *config.Config) {
 // onError handle errors and simplify code
 func onError(err error, msg string) {
 	if err != nil {
-		logger.Fatal().Err(err).Msg(msg)
+		log.Error(msg, "error", err)
+		os.Exit(1)
 	}
 }

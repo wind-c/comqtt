@@ -8,15 +8,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/wind-c/comqtt/v2/cluster/log/zero"
-	"github.com/wind-c/comqtt/v2/cluster/message"
-	"github.com/wind-c/comqtt/v2/cluster/utils"
-	"github.com/wind-c/comqtt/v2/config"
 	"net"
 	"os"
 	"path/filepath"
 	"strconv"
 	"time"
+
+	"github.com/wind-c/comqtt/v2/cluster/log"
+	"github.com/wind-c/comqtt/v2/cluster/message"
+	"github.com/wind-c/comqtt/v2/cluster/utils"
+	"github.com/wind-c/comqtt/v2/config"
 
 	"github.com/hashicorp/raft"
 	raftdb "github.com/hashicorp/raft-boltdb/v2"
@@ -74,7 +75,7 @@ func Setup(conf *config.Cluster, notifyCh chan<- *message.Message) (*Peer, error
 	config := raft.DefaultConfig()
 	config.LocalID = raft.ServerID(conf.NodeName)
 	config.LogLevel = "ERROR"
-	config.LogOutput = zero.Logger()
+	config.LogOutput = log.Writer()
 	config.ShutdownOnRemove = false            // Disable shutdown on removal
 	config.SnapshotInterval = 30 * time.Second // Check every 5 seconds to see if there are enough new entries for a snapshot, can be overridden
 	config.SnapshotThreshold = 16384           // Snapshots are created every 16384 entries by default, can be overridden
@@ -130,7 +131,7 @@ func Setup(conf *config.Cluster, notifyCh chan<- *message.Message) (*Peer, error
 	*/
 	peersFile := filepath.Join(conf.RaftDir, peersFIle)
 	if utils.PathExists(peersFile) {
-		zero.Info().Msg("found peers.json file, recovering Raft configuration...")
+		log.Info("found peers.json file, recovering Raft configuration...")
 
 		var configuration raft.Configuration
 		configuration, err = raft.ReadConfigJSON(peersFile)
@@ -146,7 +147,7 @@ func Setup(conf *config.Cluster, notifyCh chan<- *message.Message) (*Peer, error
 			return nil, fmt.Errorf("recovery failed to delete peers.json, please delete manually (see peers.info for details): %v", err)
 		}
 
-		zero.Info().Msg("deleted peers.json file after successful recovery")
+		log.Info("deleted peers.json file after successful recovery")
 	}
 
 	if conf.RaftBootstrap {
@@ -165,7 +166,7 @@ func Setup(conf *config.Cluster, notifyCh chan<- *message.Message) (*Peer, error
 				},
 			}
 			if err := raft.BootstrapCluster(config, logCache, stable, snapshot, transport, configuration); err != nil {
-				zero.Error().Err(err).Msg("raft bootstrap cluster")
+				log.Error("raft bootstrap cluster", "error", err)
 				return nil, err
 			}
 		}
@@ -178,9 +179,9 @@ func Setup(conf *config.Cluster, notifyCh chan<- *message.Message) (*Peer, error
 
 	peer := &Peer{config, rf, fm, store, transport}
 	if id, err := peer.waitForLeader(peer.electionTimeout() * 3); err != nil {
-		zero.Warn().Str("leader", "unknow").Msg("timeout waiting for raft leader")
+		log.Warn("timeout waiting for raft leader", "leader", "unknow")
 	} else {
-		zero.Info().Str("leader", id).Msg("found raft leader")
+		log.Info("found raft leader", "leader", id)
 	}
 
 	return peer, nil
@@ -194,13 +195,13 @@ func (p *Peer) Stop() {
 
 	// snapshot
 	if err := p.snapshot().Error(); err != "" {
-		zero.Warn().Msg("failed to create snapshot!")
+		log.Warn("failed to create snapshot!")
 	}
 
 	// close raft
 	shutdownFuture := p.raft.Shutdown()
 	if err := shutdownFuture.Error(); err != nil {
-		zero.Error().Err(err).Msg("shutdown raft")
+		log.Error("shutdown raft", "error", err)
 	}
 	// close store
 	p.store.Close()
@@ -264,7 +265,7 @@ func (p *Peer) Join(nodeId, addr string) error {
 			// However if *both* the ID and the address are the same, then nothing -- not even
 			// a join operation -- is needed.
 			if srv.Address == raft.ServerAddress(addr) && srv.ID == raft.ServerID(nodeId) {
-				zero.Warn().Str("node", nodeId).Str("addr", addr).Msg("it is already a cluster member, ignoring join request")
+				log.Warn("it is already a cluster member, ignoring join request", "node", nodeId, "addr", addr)
 				return nil
 			}
 

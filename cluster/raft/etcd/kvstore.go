@@ -7,11 +7,11 @@ package etcd
 import (
 	"bytes"
 	"encoding/gob"
-	"github.com/wind-c/comqtt/v2/cluster/log/zero"
-	"github.com/wind-c/comqtt/v2/cluster/message"
-	"github.com/wind-c/comqtt/v2/mqtt/packets"
 	"sync"
 
+	"github.com/wind-c/comqtt/v2/cluster/log"
+	"github.com/wind-c/comqtt/v2/cluster/message"
+	"github.com/wind-c/comqtt/v2/mqtt/packets"
 	"go.etcd.io/etcd/raft/v3/raftpb"
 	"go.etcd.io/etcd/server/v3/etcdserver/api/snap"
 )
@@ -36,12 +36,12 @@ func newKVStore(snapshotter *snap.Snapshotter, commitC <-chan *commit, errorC <-
 	}
 	snapshot, err := s.loadSnapshot()
 	if err != nil {
-		zero.Fatal().Err(err).Msg("[store] load snapshot")
+		log.Fatal("[store] load snapshot", "error", err)
 	}
 	if snapshot != nil {
-		zero.Info().Uint64("term", snapshot.Metadata.Term).Uint64("index", snapshot.Metadata.Index).Msg("[store] loading snapshot at term and index")
+		log.Info("[store] loading snapshot at term and index", "term", snapshot.Metadata.Term, "index", snapshot.Metadata.Index)
 		if err := s.recoverFromSnapshot(snapshot.Data); err != nil {
-			zero.Fatal().Err(err).Msg("[store] recover snapshot")
+			log.Fatal("[store] recover snapshot", "error", err)
 		}
 	}
 	// read commits from raft into kvStore map until error
@@ -117,12 +117,12 @@ func (s *KVStore) readCommits() {
 			// signaled to load snapshot
 			snapshot, err := s.loadSnapshot()
 			if err != nil {
-				zero.Fatal().Err(err).Msg("[store] load snapshot")
+				log.Fatal("[store] load snapshot", "error", err)
 			}
 			if snapshot != nil {
-				zero.Info().Uint64("term", snapshot.Metadata.Term).Uint64("index", snapshot.Metadata.Index).Msg("[store] loading snapshot at term and index")
+				log.Info("[store] loading snapshot at term and index", "term", snapshot.Metadata.Term, "index", snapshot.Metadata.Index)
 				if err := s.recoverFromSnapshot(snapshot.Data); err != nil {
-					zero.Fatal().Err(err).Msg("[store] recover snapshot")
+					log.Fatal("[store] recover snapshot", "error", err)
 				}
 			}
 			continue
@@ -146,7 +146,7 @@ func (s *KVStore) readCommits() {
 		close(commit.applyDoneC)
 	}
 	if err, ok := <-s.errorC; ok {
-		zero.Fatal().Err(err).Msg("[store] read commit")
+		log.Fatal("[store] read commit", "error", err)
 	}
 }
 

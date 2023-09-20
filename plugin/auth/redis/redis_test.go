@@ -2,18 +2,21 @@ package redis
 
 import (
 	"context"
+	"io"
+	"log/slog"
+	"testing"
+
 	"github.com/alicebob/miniredis/v2"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/wind-c/comqtt/v2/mqtt"
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/auth"
 	"github.com/wind-c/comqtt/v2/mqtt/packets"
-	"os"
-	"testing"
 )
 
 var (
-	logger = zerolog.New(os.Stderr).With().Timestamp().Logger().Level(zerolog.Disabled)
+	// Currently, the input is directed to /dev/null. If you need to
+	// output to stdout, just modify 'io.Discard' here to 'os.Stdout'.
+	logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	client = &mqtt.Client{
 		ID: "test",

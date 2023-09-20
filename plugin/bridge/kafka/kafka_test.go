@@ -4,19 +4,22 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/rs/zerolog"
+	"io"
+	"log/slog"
+	"sync"
+	"testing"
+
 	"github.com/segmentio/kafka-go"
 	"github.com/stretchr/testify/require"
 	"github.com/wind-c/comqtt/v2/mqtt"
 	"github.com/wind-c/comqtt/v2/mqtt/packets"
 	"github.com/wind-c/comqtt/v2/plugin"
-	"os"
-	"sync"
-	"testing"
 )
 
 var (
-	logger = zerolog.New(os.Stderr).With().Timestamp().Logger().Level(zerolog.Disabled)
+	// Currently, the input is directed to /dev/null. If you need to
+	// output to stdout, just modify 'io.Discard' here to 'os.Stdout'.
+	logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	client = &mqtt.Client{
 		ID: "test",
@@ -44,7 +47,7 @@ func teardown(t *testing.T, b *Bridge) {
 
 func newBridge(t *testing.T) *Bridge {
 	b := new(Bridge)
-	b.SetOpts(&logger, nil)
+	b.SetOpts(logger, nil)
 	opts := &Options{}
 	err := plugin.LoadYaml("./conf.yml", opts)
 	require.NoError(t, err)
