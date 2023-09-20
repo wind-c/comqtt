@@ -17,7 +17,7 @@ func Init(opt *Options) {
 	singleton = New(opt)
 }
 
-func Singleton() *slog.Logger {
+func Default() *slog.Logger {
 	return singleton.Logger
 }
 

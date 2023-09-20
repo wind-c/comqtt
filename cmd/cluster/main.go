@@ -101,7 +101,7 @@ func realMain(ctx context.Context) error {
 	}
 
 	// create server instance and init hooks
-	cfg.Mqtt.Options.Logger = log.Singleton()
+	cfg.Mqtt.Options.Logger = log.Default()
 	server := mqtt.New(&cfg.Mqtt.Options)
 	log.Info("comqtt server initializing...")
 	initStorage(server, cfg)
