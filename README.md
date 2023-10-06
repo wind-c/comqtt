@@ -196,7 +196,7 @@ COMMIT;
 import bcrypt
 salt = bcrypt.gensalt(rounds=10)
 hashed = bcrypt.hashpw(b"VeryVerySecretPa55w0rd", salt)
-print(f"Password hash for MQTT client: {hashed})
+print(f"Password hash for MQTT client: {hashed}")
 ```
 Go snippet:
 ```go
