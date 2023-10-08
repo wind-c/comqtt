@@ -470,20 +470,18 @@ func OnApplyLog(leaderId, nodeId string, tp byte, filter []byte, prompt string, 
 
 func OnPublishPacketLog(direction byte, nodeId, cid, topic string, pid uint16) {
 	if direction == DirectionInbound {
-		log.Info("", "d", "inbound", "from", nodeId)
+		log.Info("publish message", "d", "inbound", "from", nodeId, "cid", cid, "pid", pid, "topic", topic)
 	} else {
-		log.Info("", "d", "outbound", "to", nodeId)
+		log.Info("publish message", "d", "outbound", "to", nodeId, "cid", cid, "pid", pid, "topic", topic)
 	}
-	log.Info("publish message", "cid", cid, "pid", pid, "topic", topic)
 }
 
 func OnConnectPacketLog(direction byte, node, clientId string) {
 	if direction == DirectionInbound {
-		log.Info("", "d", "inbound", "from", node)
+		log.Info("connection notification", "d", "inbound", "from", node, "cid", clientId)
 	} else {
-		log.Info("", "d", "outbound", "to", node)
+		log.Info("connection notification", "d", "outbound", "to", node, "cid", clientId)
 	}
-	log.Info("connection notification", "cid", clientId)
 }
 
 func (a *Agent) Join(nodeName, addr string) error {
