@@ -7,7 +7,7 @@ package mlist
 import (
 	"github.com/hashicorp/memberlist"
 	"github.com/wind-c/comqtt/v2/cluster/discovery"
-	"github.com/wind-c/comqtt/v2/cluster/log/zero"
+	"github.com/wind-c/comqtt/v2/cluster/log"
 )
 
 //type Event struct {
@@ -50,5 +50,5 @@ func (n *NodeEvents) NotifyUpdate(node *memberlist.Node) {
 }
 
 func onLog(node *memberlist.Node, prompt string) {
-	zero.Info().Str("node", node.Name).Str("addr", node.Addr.String()).Msg(prompt)
+	log.Info(prompt, "node", node.Name, "addr", node.Addr.String())
 }

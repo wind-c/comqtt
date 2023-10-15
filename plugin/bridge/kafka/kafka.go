@@ -9,12 +9,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/segmentio/kafka-go"
 	"github.com/wind-c/comqtt/v2/mqtt"
 	"github.com/wind-c/comqtt/v2/mqtt/packets"
 	"github.com/wind-c/comqtt/v2/plugin"
-	"strings"
-	"time"
 )
 
 const defaultAddr = "localhost:9092"
@@ -133,11 +134,10 @@ func (b *Bridge) Init(config any) error {
 	}
 
 	b.config = config.(*Options)
-	b.Log.Info().
-		Str("brokers", strings.Join(b.config.KafkaOptions.Brokers, ",")).
-		Str("topic", b.config.KafkaOptions.Topic).
-		Bool("async", b.config.KafkaOptions.Async).
-		Msg("connecting to kafka service")
+	b.Log.Info("connecting to kafka service",
+		"brokers", strings.Join(b.config.KafkaOptions.Brokers, ","),
+		"topic", b.config.KafkaOptions.Topic,
+		"async", b.config.KafkaOptions.Async)
 
 	var balancer kafka.Balancer
 	switch b.config.KafkaOptions.Balancer {
@@ -169,9 +169,9 @@ func (b *Bridge) Init(config any) error {
 
 	// verify connect
 	if _, err := b.kafkaTopics(); err != nil {
-		b.Log.Error().Err(err).Msg("cannot connect to kafka service")
+		b.Log.Error("cannot connect to kafka service", "error", err)
 	} else {
-		b.Log.Info().Msg("connected to kafka service")
+		b.Log.Error("connected to kafka service", "error", err)
 	}
 
 	return nil
@@ -200,7 +200,7 @@ func (b *Bridge) kafkaTopics() (map[string]struct{}, error) {
 
 // Stop closes the kafka connection.
 func (b *Bridge) Stop() error {
-	b.Log.Info().Msg("disconnecting from kafka service")
+	b.Log.Info("disconnecting from kafka service")
 	return b.writer.Close()
 }
 
@@ -210,7 +210,7 @@ func (b *Bridge) handler(messages []kafka.Message, err error) {
 		for _, msg := range messages {
 			keys = append(keys, string(msg.Key))
 		}
-		b.Log.Err(err).Strs("keys", keys).Msg("write msg to kafka")
+		b.Log.Error("write msg to kafka", "error", err, "keys", keys)
 	}
 }
 
@@ -255,7 +255,7 @@ func (b *Bridge) OnSessionEstablished(cl *mqtt.Client, pk packets.Packet) {
 	}
 	data, err := msg.MarshalBinary()
 	if err != nil {
-		b.Log.Error().Err(err).Msg("bridge-kafka:OnSessionEstablished")
+		b.Log.Error("bridge-kafka:OnSessionEstablished", "error", err)
 		return
 	}
 
@@ -264,7 +264,7 @@ func (b *Bridge) OnSessionEstablished(cl *mqtt.Client, pk packets.Packet) {
 		Value: data,
 	})
 	if err != nil {
-		b.Log.Error().Err(err).Msg("bridge-kafka:OnSessionEstablished")
+		b.Log.Error("bridge-kafka:OnSessionEstablished", "error", err)
 	}
 }
 
@@ -284,7 +284,7 @@ func (b *Bridge) OnDisconnect(cl *mqtt.Client, err error, expire bool) {
 
 	data, err := msg.MarshalBinary()
 	if err != nil {
-		b.Log.Error().Err(err).Msg("bridge-kafka:OnDisconnect")
+		b.Log.Error("bridge-kafka:OnDisconnect", "error", err)
 		return
 	}
 
@@ -293,7 +293,7 @@ func (b *Bridge) OnDisconnect(cl *mqtt.Client, err error, expire bool) {
 		Value: data,
 	})
 	if err != nil {
-		b.Log.Error().Err(err).Msg("bridge-kafka:OnDisconnect")
+		b.Log.Error("bridge-kafka:OnDisconnect", "error", err)
 	}
 }
 
@@ -314,7 +314,7 @@ func (b *Bridge) OnPublished(cl *mqtt.Client, pk packets.Packet) {
 	}
 	data, err := msg.MarshalBinary()
 	if err != nil {
-		b.Log.Error().Err(err).Msg("bridge-kafka:OnPublished")
+		b.Log.Error("bridge-kafka:OnPublished", "error", err)
 		return
 	}
 
@@ -323,7 +323,7 @@ func (b *Bridge) OnPublished(cl *mqtt.Client, pk packets.Packet) {
 		Value: data,
 	})
 	if err != nil {
-		b.Log.Error().Err(err).Msg("bridge-kafka:OnPublished")
+		b.Log.Error("bridge-kafka:OnPublished", "error", err)
 	}
 }
 
@@ -352,7 +352,7 @@ func (b *Bridge) OnSubscribed(cl *mqtt.Client, pk packets.Packet, reasonCodes []
 	}
 	data, err := msg.MarshalBinary()
 	if err != nil {
-		b.Log.Error().Err(err).Msg("bridge-kafka:OnSubscribed")
+		b.Log.Error("bridge-kafka:OnSubscribed", "error", err)
 		return
 	}
 
@@ -361,7 +361,7 @@ func (b *Bridge) OnSubscribed(cl *mqtt.Client, pk packets.Packet, reasonCodes []
 		Value: data,
 	})
 	if err != nil {
-		b.Log.Error().Err(err).Msg("bridge-kafka:OnSubscribed")
+		b.Log.Error("bridge-kafka:OnSubscribed", "error", err)
 	}
 }
 
@@ -386,7 +386,7 @@ func (b *Bridge) OnUnsubscribed(cl *mqtt.Client, pk packets.Packet, reasonCodes 
 	}
 	data, err := msg.MarshalBinary()
 	if err != nil {
-		b.Log.Error().Err(err).Msg("bridge-kafka:OnUnsubscribed")
+		b.Log.Error("bridge-kafka:OnUnsubscribed", "error", err)
 		return
 	}
 
@@ -395,7 +395,7 @@ func (b *Bridge) OnUnsubscribed(cl *mqtt.Client, pk packets.Packet, reasonCodes 
 		Value: data,
 	})
 	if err != nil {
-		b.Log.Error().Err(err).Msg("bridge-kafka:OnUnsubscribed")
+		b.Log.Error("bridge-kafka:OnUnsubscribed", "error", err)
 	}
 }
 

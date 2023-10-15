@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// SPDX-FileCopyrightText: 2022 mochi-co
+// SPDX-FileCopyrightText: 2022 mochi-mqtt, mochi-co
 // SPDX-FileContributor: mochi-co
 
 package auth
@@ -124,8 +124,8 @@ func (r RString) Matches(a string) bool {
 }
 
 // FilterMatches returns true if a filter matches a topic rule.
-func (f RString) FilterMatches(a string) bool {
-	_, ok := MatchTopic(string(f), a)
+func (r RString) FilterMatches(a string) bool {
+	_, ok := MatchTopic(string(r), a)
 	return ok
 }
 
@@ -205,7 +205,7 @@ func (l *Ledger) AuthOk(cl *mqtt.Client, pk packets.Packet) (n int, ok bool) {
 }
 
 // ACLOk returns true if the rules indicate the user is allowed to read or write to
-// a specific filter or topic respectively, based on the write bool.
+// a specific filter or topic respectively, based on the `write` bool.
 func (l *Ledger) ACLOk(cl *mqtt.Client, topic string, write bool) (n int, ok bool) {
 	// If the users map is set, always check for a predefined user first instead
 	// of iterating through global rules.
@@ -233,15 +233,29 @@ func (l *Ledger) ACLOk(cl *mqtt.Client, topic string, write bool) (n int, ok boo
 				return n, true
 			}
 
-			for filter, access := range rule.Filters {
-				if filter.FilterMatches(topic) {
-					if !write && (access == ReadOnly || access == ReadWrite) {
-						return n, true
-					} else if write && (access == WriteOnly || access == ReadWrite) {
-						return n, true
-					} else {
-						return n, false
+			if write {
+				for filter, access := range rule.Filters {
+					if access == WriteOnly || access == ReadWrite {
+						if filter.FilterMatches(topic) {
+							return n, true
+						}
 					}
+				}
+			}
+
+			if !write {
+				for filter, access := range rule.Filters {
+					if access == ReadOnly || access == ReadWrite {
+						if filter.FilterMatches(topic) {
+							return n, true
+						}
+					}
+				}
+			}
+
+			for filter := range rule.Filters {
+				if filter.FilterMatches(topic) {
+					return n, false
 				}
 			}
 		}

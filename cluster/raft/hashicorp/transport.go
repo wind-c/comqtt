@@ -5,10 +5,11 @@
 package hashicorp
 
 import (
-	"github.com/hashicorp/raft"
-	"github.com/wind-c/comqtt/v2/cluster/log/zero"
 	"net"
 	"time"
+
+	"github.com/hashicorp/raft"
+	"github.com/wind-c/comqtt/v2/cluster/log"
 )
 
 func newRaftTrans(ln net.Listener) *raft.NetworkTransport {
@@ -16,17 +17,17 @@ func newRaftTrans(ln net.Listener) *raft.NetworkTransport {
 	addr, ok := layer.Addr().(*net.TCPAddr)
 	if !ok {
 		if err := ln.Close(); err != nil {
-			zero.Error().Err(err).Msg("raft addr is not tcp addr")
+			log.Error("raft addr is not tcp addr", "error", err)
 		}
 		return nil
 	}
 	if addr.IP == nil || addr.IP.IsUnspecified() {
 		if err := ln.Close(); err != nil {
-			zero.Error().Err(err).Msg("raft addr is not valid")
+			log.Error("raft addr is not valid", "error", err)
 		}
 		return nil
 	}
-	return raft.NewNetworkTransport(layer, maxPool, DefaultRaftTimeout, zero.Logger())
+	return raft.NewNetworkTransport(layer, maxPool, DefaultRaftTimeout, log.Writer())
 }
 
 type raftLayer struct {

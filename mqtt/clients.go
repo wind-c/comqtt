@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// SPDX-FileCopyrightText: 2022 J. Blake / mochi-co
+// SPDX-FileCopyrightText: 2023 mochi-mqtt, mochi-co
 // SPDX-FileContributor: mochi-co, wind
 
 package mqtt
@@ -104,13 +104,13 @@ func (cl *Clients) GetByListener(id string) []*Client {
 
 // Client contains information about a client known by the broker.
 type Client struct {
-	ops          *ops             // ops provides a reference to server ops.
-	State        ClientState      // the operational state of the client.
-	ID           string           // the client id.
-	Net          ClientConnection // network connection state of the clinet
 	Properties   ClientProperties // client properties
-	InheritWay   int              // session inheritance way
+	State        ClientState      // the operational state of the client.
+	Net          ClientConnection // network connection state of the client
+	ID           string           // the client id.
+	ops          *ops             // ops provides a reference to server ops.
 	sync.RWMutex                  // mutex
+	InheritWay   int              // session inheritance way
 }
 
 // ClientConnection contains the connection transport and metadata for the client.
@@ -119,42 +119,42 @@ type ClientConnection struct {
 	bconn    *bufio.ReadWriter // a buffered net.Conn for reading packets
 	Remote   string            // the remote address of the client
 	Listener string            // listener id of the client
-	Inline   bool              // client is an inline programmetic client
+	Inline   bool              // if true, the client is the built-in 'inline' embedded client
 }
 
 // ClientProperties contains the properties which define the client behaviour.
 type ClientProperties struct {
-	Username        []byte
-	Will            Will
 	Props           packets.Properties
+	Will            Will
+	Username        []byte
 	ProtocolVersion byte
 	Clean           bool
 }
 
 // Will contains the last will and testament details for a client connection.
 type Will struct {
-	TopicName         string                 // -
 	Payload           []byte                 // -
 	User              []packets.UserProperty // -
+	TopicName         string                 // -
 	Flag              uint32                 // 0,1
 	WillDelayInterval uint32                 // -
 	Qos               byte                   // -
 	Retain            bool                   // -
 }
 
-// State tracks the state of the client.
+// ClientState tracks the state of the client.
 type ClientState struct {
 	TopicAliases    TopicAliases         // a map of topic aliases
 	stopCause       atomic.Value         // reason for stopping
-	open            context.Context      // indicate that the client is open for packet exchange
-	Subscriptions   *Subscriptions       // a map of the subscription filters a client maintains
-	outbound        chan *packets.Packet // queue for pending outbound packets
 	Inflight        *Inflight            // a map of in-flight qos messages
-	cancelOpen      context.CancelFunc   // cancel function for open context
+	Subscriptions   *Subscriptions       // a map of the subscription filters a client maintains
 	disconnected    int64                // the time the client disconnected in unix time, for calculating expiry
+	outbound        chan *packets.Packet // queue for pending outbound packets
 	endOnce         sync.Once            // only end once
 	isTakenOver     uint32               // used to identify orphaned clients
 	packetID        uint32               // the current highest packetID
+	open            context.Context      // indicate that the client is open for packet exchange
+	cancelOpen      context.CancelFunc   // cancel function for open context
 	outboundQty     int32                // number of messages currently in the outbound queue
 	Keepalive       uint16               // the number of seconds the connection can wait
 	ServerKeepalive bool                 // keepalive was set by the server
@@ -200,7 +200,8 @@ func (cl *Client) WriteLoop() {
 		select {
 		case pk := <-cl.State.outbound:
 			if err := cl.WritePacket(*pk); err != nil {
-				cl.ops.log.Debug().Err(err).Str("client", cl.ID).Interface("packet", pk).Msg("failed publishing packet")
+				// TODO : Figure out what to do with error
+				cl.ops.log.Debug("failed publishing packet", "error", err, "client", cl.ID, "packet", pk)
 			}
 			atomic.AddInt32(&cl.State.outboundQty, -1)
 		case <-cl.State.open.Done():
@@ -318,7 +319,7 @@ func (cl *Client) ResendInflightMessages(force bool) error {
 	return nil
 }
 
-// ClearInflights deletes all inflight messages for the client, eg. for a disconnected user with a clean session.
+// ClearInflights deletes all inflight messages for the client, e.g. for a disconnected user with a clean session.
 func (cl *Client) ClearInflights(now, maximumExpiry int64) []uint16 {
 	deleted := []uint16{}
 	for _, tk := range cl.State.Inflight.GetAll(false) {

@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	redis "github.com/go-redis/redis/v8"
 	"github.com/wind-c/comqtt/v2/cluster/utils"
 	"github.com/wind-c/comqtt/v2/mqtt"
@@ -120,12 +121,11 @@ func (s *Storage) Init(config any) error {
 	}
 	s.config.HPrefix += ":"
 
-	s.Log.Info().
-		Str("address", s.config.Options.Addr).
-		Str("username", s.config.Options.Username).
-		Int("password-len", len(s.config.Options.Password)).
-		Int("db", s.config.Options.DB).
-		Msg("connecting to redis service")
+	s.Log.Info("connecting to redis service",
+		"address", s.config.Options.Addr,
+		"username", s.config.Options.Username,
+		"password-len", len(s.config.Options.Password),
+		"db", s.config.Options.DB)
 
 	s.db = redis.NewClient(s.config.Options)
 	_, err := s.db.Ping(context.Background()).Result()
@@ -133,14 +133,14 @@ func (s *Storage) Init(config any) error {
 		return fmt.Errorf("failed to ping service: %w", err)
 	}
 
-	s.Log.Info().Msg("connected to redis service")
+	s.Log.Info("connected to redis service")
 
 	return nil
 }
 
 // Stop closes the redis connection.
 func (s *Storage) Stop() error {
-	s.Log.Info().Msg("disconnecting from redis service")
+	s.Log.Info("disconnecting from redis service")
 	return s.db.Close()
 }
 
@@ -158,7 +158,7 @@ func (s *Storage) OnWillSent(cl *mqtt.Client, pk packets.Packet) {
 // updateClient writes the client data to the store.
 func (s *Storage) updateClient(cl *mqtt.Client) {
 	if s.db == nil {
-		s.Log.Error().Err(storage.ErrDBFileNotOpen)
+		s.Log.Error("", "error", storage.ErrDBFileNotOpen)
 		return
 	}
 
@@ -186,14 +186,14 @@ func (s *Storage) updateClient(cl *mqtt.Client) {
 
 	err := s.db.HSet(s.ctx, s.hKey(storage.ClientKey), clientKey(cl), in).Err()
 	if err != nil {
-		s.Log.Error().Err(err).Interface("data", in).Msg("failed to hset client data")
+		s.Log.Error("failed to hset client data", "error", storage.ErrDBFileNotOpen, "data", in)
 	}
 }
 
 // OnDisconnect removes a client from the store if they were using a clean session.
 func (s *Storage) OnDisconnect(cl *mqtt.Client, _ error, expire bool) {
 	if s.db == nil {
-		s.Log.Error().Err(storage.ErrDBFileNotOpen)
+		s.Log.Error("", "error", storage.ErrDBFileNotOpen)
 		return
 	}
 
@@ -203,14 +203,14 @@ func (s *Storage) OnDisconnect(cl *mqtt.Client, _ error, expire bool) {
 
 	err := s.db.HDel(s.ctx, s.hKey(storage.ClientKey), clientKey(cl)).Err()
 	if err != nil {
-		s.Log.Error().Err(err).Str("id", clientKey(cl)).Msg("failed to delete client")
+		s.Log.Error("failed to delete client", "error", err, "id", clientKey(cl))
 	}
 }
 
 // OnSubscribed adds one or more client subscriptions to the store.
 func (s *Storage) OnSubscribed(cl *mqtt.Client, pk packets.Packet, reasonCodes []byte, counts []int) {
 	if s.db == nil {
-		s.Log.Error().Err(storage.ErrDBFileNotOpen)
+		s.Log.Error("", "error", storage.ErrDBFileNotOpen)
 		return
 	}
 
@@ -229,7 +229,7 @@ func (s *Storage) OnSubscribed(cl *mqtt.Client, pk packets.Packet, reasonCodes [
 
 		err := s.db.HSet(s.ctx, s.hKey(utils.JoinStrings(storage.SubscriptionKey, cl.ID)), pk.Filters[i].Filter, in).Err()
 		if err != nil {
-			s.Log.Error().Err(err).Interface("data", in).Msg("failed to hset subscription data")
+			s.Log.Error("failed to hset subscription data", "error", err, "data", in)
 		}
 	}
 }
@@ -237,14 +237,14 @@ func (s *Storage) OnSubscribed(cl *mqtt.Client, pk packets.Packet, reasonCodes [
 // OnUnsubscribed removes one or more client subscriptions from the store.
 func (s *Storage) OnUnsubscribed(cl *mqtt.Client, pk packets.Packet, reasonCodes []byte, counts []int) {
 	if s.db == nil {
-		s.Log.Error().Err(storage.ErrDBFileNotOpen)
+		s.Log.Error("", "error", storage.ErrDBFileNotOpen)
 		return
 	}
 
 	for i := 0; i < len(pk.Filters); i++ {
 		err := s.db.HDel(s.ctx, s.hKey(utils.JoinStrings(storage.SubscriptionKey, cl.ID)), pk.Filters[i].Filter).Err()
 		if err != nil {
-			s.Log.Error().Err(err).Str("id", clientKey(cl)).Msg("failed to delete subscription data")
+			s.Log.Error("failed to delete subscription data", "error", err, "id", clientKey(cl))
 		}
 	}
 }
@@ -252,14 +252,14 @@ func (s *Storage) OnUnsubscribed(cl *mqtt.Client, pk packets.Packet, reasonCodes
 // OnRetainMessage adds a retained message for a topic to the store.
 func (s *Storage) OnRetainMessage(cl *mqtt.Client, pk packets.Packet, r int64) {
 	if s.db == nil {
-		s.Log.Error().Err(storage.ErrDBFileNotOpen)
+		s.Log.Error("", "error", storage.ErrDBFileNotOpen)
 		return
 	}
 
 	if r == -1 {
 		err := s.db.HDel(s.ctx, s.hKey(storage.RetainedKey), retainedKey(pk.TopicName)).Err()
 		if err != nil {
-			s.Log.Error().Err(err).Str("id", clientKey(cl)).Msg("failed to delete retained message data")
+			s.Log.Error("failed to delete retained message data", "error", err, "id", clientKey(cl))
 		}
 
 		return
@@ -285,14 +285,14 @@ func (s *Storage) OnRetainMessage(cl *mqtt.Client, pk packets.Packet, r int64) {
 
 	err := s.db.HSet(s.ctx, s.hKey(storage.RetainedKey), retainedKey(pk.TopicName), in).Err()
 	if err != nil {
-		s.Log.Error().Err(err).Interface("data", in).Msg("failed to hset retained message data")
+		s.Log.Error("failed to hset retained message data", "error", err, "data", in)
 	}
 }
 
 // OnQosPublish adds or updates an inflight message in the store.
 func (s *Storage) OnQosPublish(cl *mqtt.Client, pk packets.Packet, sent int64, resends int) {
 	if s.db == nil {
-		s.Log.Error().Err(storage.ErrDBFileNotOpen)
+		s.Log.Error("", "error", storage.ErrDBFileNotOpen)
 		return
 	}
 
@@ -319,27 +319,27 @@ func (s *Storage) OnQosPublish(cl *mqtt.Client, pk packets.Packet, sent int64, r
 
 	err := s.db.HSet(s.ctx, s.hKey(utils.JoinStrings(storage.InflightKey, cl.ID)), inflightKey(cl, pk), in).Err()
 	if err != nil {
-		s.Log.Error().Err(err).Interface("data", in).Msg("failed to hset qos inflight message data")
+		s.Log.Error("failed to hset qos inflight message data", "error", err, "data", in)
 	}
 }
 
 // OnQosComplete removes a resolved inflight message from the store.
 func (s *Storage) OnQosComplete(cl *mqtt.Client, pk packets.Packet) {
 	if s.db == nil {
-		s.Log.Error().Err(storage.ErrDBFileNotOpen)
+		s.Log.Error("", "error", storage.ErrDBFileNotOpen)
 		return
 	}
 
 	err := s.db.HDel(s.ctx, s.hKey(utils.JoinStrings(storage.InflightKey, cl.ID)), inflightKey(cl, pk)).Err()
 	if err != nil {
-		s.Log.Error().Err(err).Str("id", clientKey(cl)).Msg("failed to delete inflight message data")
+		s.Log.Error("failed to delete inflight message data", "error", err, "id", clientKey(cl))
 	}
 }
 
 // OnQosDropped removes a dropped inflight message from the store.
 func (s *Storage) OnQosDropped(cl *mqtt.Client, pk packets.Packet) {
 	if s.db == nil {
-		s.Log.Error().Err(storage.ErrDBFileNotOpen)
+		s.Log.Error("", "error", storage.ErrDBFileNotOpen)
 	}
 
 	s.OnQosComplete(cl, pk)
@@ -348,7 +348,7 @@ func (s *Storage) OnQosDropped(cl *mqtt.Client, pk packets.Packet) {
 // OnSysInfoTick stores the latest system info in the store.
 func (s *Storage) OnSysInfoTick(sys *system.Info) {
 	if s.db == nil {
-		s.Log.Error().Err(storage.ErrDBFileNotOpen)
+		s.Log.Error("", "error", storage.ErrDBFileNotOpen)
 		return
 	}
 
@@ -358,40 +358,40 @@ func (s *Storage) OnSysInfoTick(sys *system.Info) {
 
 	err := s.db.HSet(s.ctx, s.hKey(storage.SysInfoKey), sysInfoKey(), in).Err()
 	if err != nil {
-		s.Log.Error().Err(err).Interface("data", in).Msg("failed to hset server info data")
+		s.Log.Error("failed to hset server info data", "error", err, "data", in)
 	}
 }
 
 // OnRetainedExpired deletes expired retained messages from the store.
 func (s *Storage) OnRetainedExpired(filter string) {
 	if s.db == nil {
-		s.Log.Error().Err(storage.ErrDBFileNotOpen)
+		s.Log.Error("", "error", storage.ErrDBFileNotOpen)
 		return
 	}
 
 	err := s.db.HDel(s.ctx, s.hKey(storage.RetainedKey), retainedKey(filter)).Err()
 	if err != nil {
-		s.Log.Error().Err(err).Str("id", retainedKey(filter)).Msg("failed to delete retained message data")
+		s.Log.Error("failed to delete retained message data", "error", err, "id", retainedKey(filter))
 	}
 }
 
 // OnClientExpired deleted expired clients from the store.
 func (s *Storage) OnClientExpired(cl *mqtt.Client) {
 	if s.db == nil {
-		s.Log.Error().Err(storage.ErrDBFileNotOpen)
+		s.Log.Error("", "error", storage.ErrDBFileNotOpen)
 		return
 	}
 
 	err := s.db.HDel(s.ctx, s.hKey(storage.ClientKey), clientKey(cl)).Err()
 	if err != nil {
-		s.Log.Error().Err(err).Str("id", clientKey(cl)).Msg("failed to delete expired client")
+		s.Log.Error("failed to delete expired client", "error", err, "id", clientKey(cl))
 	}
 }
 
 // StoredSysInfo returns the system info from the store.
 func (s *Storage) StoredSysInfo() (v storage.SystemInfo, err error) {
 	if s.db == nil {
-		s.Log.Error().Err(storage.ErrDBFileNotOpen)
+		s.Log.Error("", "error", storage.ErrDBFileNotOpen)
 		return
 	}
 
@@ -401,7 +401,7 @@ func (s *Storage) StoredSysInfo() (v storage.SystemInfo, err error) {
 	}
 
 	if err = v.UnmarshalBinary([]byte(row)); err != nil {
-		s.Log.Error().Err(err).Str("data", row).Msg("failed to unmarshal sys info data")
+		s.Log.Error("failed to unmarshal sys info data", "error", err, "data", row)
 	}
 
 	return v, nil
@@ -410,17 +410,17 @@ func (s *Storage) StoredSysInfo() (v storage.SystemInfo, err error) {
 // StoredClientByCid returns a stored client from the store.
 func (s *Storage) StoredClientByCid(cid string) (v storage.Client, err error) {
 	if s.db == nil {
-		s.Log.Error().Err(storage.ErrDBFileNotOpen)
+		s.Log.Error("", "error", storage.ErrDBFileNotOpen)
 		return
 	}
 	row, err := s.db.HGet(s.ctx, s.hKey(storage.ClientKey), cid).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
-		s.Log.Error().Err(err).Msg("failed to HGet client data")
+		s.Log.Error("failed to HGet client data", "error", err)
 		return
 	}
 
 	if err = v.UnmarshalBinary([]byte(row)); err != nil {
-		s.Log.Error().Err(err).Str("data", row).Msg("failed to unmarshal client data")
+		s.Log.Error("failed to unmarshal client data", "error", err, "data", row)
 	}
 
 	return v, nil
@@ -429,20 +429,20 @@ func (s *Storage) StoredClientByCid(cid string) (v storage.Client, err error) {
 // StoredSubscriptionsByCid returns all stored subscriptions of client from the store.
 func (s *Storage) StoredSubscriptionsByCid(cid string) (v []storage.Subscription, err error) {
 	if s.db == nil {
-		s.Log.Error().Err(storage.ErrDBFileNotOpen)
+		s.Log.Error("", "error", storage.ErrDBFileNotOpen)
 		return
 	}
 
 	rows, err := s.db.HGetAll(s.ctx, s.hKey(utils.JoinStrings(storage.SubscriptionKey, cid))).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
-		s.Log.Error().Err(err).Msg("failed to HGetAll subscription data")
+		s.Log.Error("failed to HGetAll subscription data", "error", err)
 		return
 	}
 
 	for filter, row := range rows {
 		var d storage.Subscription
 		if err = d.UnmarshalBinary([]byte(row)); err != nil {
-			s.Log.Error().Err(err).Str("data", row).Msg("failed to unmarshal subscription data")
+			s.Log.Error("failed to unmarshal subscription data", "error", err, "data", row)
 		}
 
 		if d.Filter == "" {
@@ -458,18 +458,18 @@ func (s *Storage) StoredSubscriptionsByCid(cid string) (v []storage.Subscription
 // StoredRetainedMessageByTopic returns a stored retained message of topic from the store.
 func (s *Storage) StoredRetainedMessageByTopic(topic string) (v storage.Message, err error) {
 	if s.db == nil {
-		s.Log.Error().Err(storage.ErrDBFileNotOpen)
+		s.Log.Error("", "error", storage.ErrDBFileNotOpen)
 		return
 	}
 
 	row, err := s.db.HGet(s.ctx, s.hKey(storage.RetainedKey), retainedKey(topic)).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
-		s.Log.Error().Err(err).Msg("failed to HGetAll retained message data")
+		s.Log.Error("failed to HGetAll retained message data", "error", err)
 		return
 	}
 
 	if err = v.UnmarshalBinary([]byte(row)); err != nil {
-		s.Log.Error().Err(err).Str("data", row).Msg("failed to unmarshal retained message data")
+		s.Log.Error("failed to unmarshal retained message dat", "error", err, "data", row)
 	}
 
 	if v.TopicName == "" {
@@ -482,20 +482,20 @@ func (s *Storage) StoredRetainedMessageByTopic(topic string) (v storage.Message,
 // StoredInflightMessagesByCid returns all stored inflight messages of client from the store.
 func (s *Storage) StoredInflightMessagesByCid(cid string) (v []storage.Message, err error) {
 	if s.db == nil {
-		s.Log.Error().Err(storage.ErrDBFileNotOpen)
+		s.Log.Error("", "error", storage.ErrDBFileNotOpen)
 		return
 	}
 
 	rows, err := s.db.HGetAll(s.ctx, s.hKey(utils.JoinStrings(storage.InflightKey, cid))).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
-		s.Log.Error().Err(err).Msg("failed to HGetAll inflight message data")
+		s.Log.Error("failed to HGetAll inflight message data", "error", err)
 		return
 	}
 
 	for _, row := range rows {
 		var d storage.Message
 		if err = d.UnmarshalBinary([]byte(row)); err != nil {
-			s.Log.Error().Err(err).Str("data", row).Msg("failed to unmarshal inflight message data")
+			s.Log.Error("failed to unmarshal inflight message data", "error", err, "data", row)
 		}
 
 		v = append(v, d)

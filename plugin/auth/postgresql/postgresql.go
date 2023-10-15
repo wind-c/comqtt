@@ -77,12 +77,11 @@ func (a *Auth) Init(config any) error {
 	}
 
 	a.config = config.(*Options)
-	a.Log.Info().
-		Str("host", a.config.Dsn.Host).
-		Str("username", a.config.Dsn.LoginName).
-		Int("password-len", len(a.config.Dsn.LoginPassword)).
-		Str("db", a.config.Dsn.Schema).
-		Msg("connecting to postgresql")
+	a.Log.Info("connecting to postgresql",
+		"host", a.config.Dsn.Host,
+		"username", a.config.Dsn.LoginName,
+		"password-len", len(a.config.Dsn.LoginPassword),
+		"db", a.config.Dsn.Schema)
 
 	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 		a.config.Dsn.Host, a.config.Dsn.Port, a.config.Dsn.LoginName, a.config.Dsn.LoginPassword, a.config.Dsn.Schema, a.config.Dsn.SslMode)
@@ -99,12 +98,12 @@ func (a *Auth) Init(config any) error {
 		a.config.Acl.TopicColumn, a.config.Acl.AccessColumn, a.config.Acl.Table, a.config.Acl.UserColumn)
 	a.authStmt, err = sqlxDB.Preparex(authSql)
 	if err != nil {
-		a.Log.Error().Str("authSql", authSql).Msg("Unable to create prepared statement for auth-sql")
+		a.Log.Error("Unable to create prepared statement for auth-sql", "authSql", authSql)
 		return err
 	}
 	a.aclStmt, err = sqlxDB.Preparex(aclSql)
 	if err != nil {
-		a.Log.Error().Str("aclStmt", aclSql).Msg("Unable to create prepared statement for acl-sql")
+		a.Log.Error("Unable to create prepared statement for acl-sql", "aclStmt", aclSql)
 		return err
 	}
 	a.db = sqlxDB
@@ -113,7 +112,7 @@ func (a *Auth) Init(config any) error {
 
 // Stop closes the postgresql connection.
 func (a *Auth) Stop() error {
-	a.Log.Info().Msg("disconnecting from postgresql")
+	a.Log.Info("disconnecting from postgresql")
 	a.authStmt.Close()
 	a.aclStmt.Close()
 	return a.db.Close()

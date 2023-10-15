@@ -5,13 +5,14 @@
 package mlist
 
 import (
-	"github.com/hashicorp/memberlist"
-	mb "github.com/wind-c/comqtt/v2/cluster/discovery"
-	"github.com/wind-c/comqtt/v2/cluster/log/zero"
-	"github.com/wind-c/comqtt/v2/config"
-	"github.com/wind-c/comqtt/v2/mqtt"
 	"net"
 	"time"
+
+	"github.com/hashicorp/memberlist"
+	mb "github.com/wind-c/comqtt/v2/cluster/discovery"
+	"github.com/wind-c/comqtt/v2/cluster/log"
+	"github.com/wind-c/comqtt/v2/config"
+	"github.com/wind-c/comqtt/v2/mqtt"
 )
 
 type Membership struct {
@@ -25,7 +26,7 @@ type Membership struct {
 
 func wrapOptions(conf *config.Cluster) *memberlist.Config {
 	opts := make([]Option, 3)
-	opts[0] = WithLogOutput(zero.Logger(), LogLevelInfo) //Used to filter memberlist logs
+	opts[0] = WithLogOutput(log.Writer(), LogLevelInfo) //Used to filter memberlist logs
 	opts[1] = WithBindPort(conf.BindPort)
 	opts[2] = WithHandoffQueueDepth(conf.QueueDepth)
 	if conf.NodeName != "" {
@@ -62,7 +63,7 @@ func (m *Membership) Setup() error {
 			return err
 		}
 	}
-	zero.Info().Str("addr", m.LocalAddr()).Int("port", m.config.BindPort).Msg("local member")
+	log.Info("local member", "addr", m.LocalAddr(), "port", m.config.BindPort)
 
 	return nil
 }
@@ -153,7 +154,7 @@ func (m *Membership) SendToOthers(msg []byte) {
 			continue // skip self
 		}
 		if err := m.send(node, msg); err != nil {
-			zero.Error().Err(err).Str("from", m.config.NodeName).Str("to", node.Name).Msg("send to others")
+			log.Error("send to others", "error", err, "from", m.config.NodeName, "to", node.Name)
 		}
 	}
 }
@@ -163,7 +164,7 @@ func (m *Membership) SendToNode(nodeName string, msg []byte) error {
 	for _, node := range m.aliveMembers() {
 		if node.Name == nodeName {
 			if err := m.send(node, msg); err != nil {
-				zero.Error().Err(err).Str("from", m.config.NodeName).Str("to", nodeName).Msg("send to node")
+				log.Error("send to others", "error", err, "from", m.config.NodeName, "to", nodeName)
 				return err
 			}
 		}

@@ -4,15 +4,16 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"strings"
+
 	"github.com/wind-c/comqtt/v2/mqtt"
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/auth"
 	"github.com/wind-c/comqtt/v2/mqtt/packets"
 	"github.com/wind-c/comqtt/v2/plugin"
 	pa "github.com/wind-c/comqtt/v2/plugin/auth"
-	"io"
-	"net/http"
-	"net/url"
-	"strings"
 )
 
 const (
@@ -58,9 +59,7 @@ func (a *Auth) Init(config any) error {
 	}
 
 	a.config = config.(*Options)
-	a.Log.Info().
-		Str("auth-url", a.config.AuthUrl).
-		Str("acl-url", a.config.AclUrl)
+	a.Log.Info("", "auth-url", a.config.AuthUrl, "acl-url", a.config.AclUrl)
 
 	return nil
 }

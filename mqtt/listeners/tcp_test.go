@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// SPDX-FileCopyrightText: 2022 mochi-co
+// SPDX-FileCopyrightText: 2022 mochi-mqtt, mochi-co
 // SPDX-FileContributor: mochi-co
 
 package listeners
@@ -35,35 +35,33 @@ func TestTCPProtocol(t *testing.T) {
 }
 
 func TestTCPProtocolTLS(t *testing.T) {
-	// pick a random port:
-	l := NewTCP("t1", ":0", &Config{
+	l := NewTCP("t1", testAddr, &Config{
 		TLSConfig: tlsConfigBasic,
 	})
-	err := l.Init(&logger)
-	require.NoError(t, err)
+
+	_ = l.Init(logger)
+	defer l.listen.Close()
 	require.Equal(t, "tcp", l.Protocol())
-	err = l.listen.Close()
-	require.NoError(t, err)
 }
 
 func TestTCPInit(t *testing.T) {
-	l := NewTCP("t1", ":0", nil)
-	err := l.Init(&logger)
+	l := NewTCP("t1", testAddr, nil)
+	err := l.Init(logger)
 	l.Close(MockCloser)
 	require.NoError(t, err)
 
-	l2 := NewTCP("t2", ":0", &Config{
+	l2 := NewTCP("t2", testAddr, &Config{
 		TLSConfig: tlsConfigBasic,
 	})
-	err = l2.Init(&logger)
+	err = l2.Init(logger)
 	l2.Close(MockCloser)
 	require.NoError(t, err)
 	require.NotNil(t, l2.config.TLSConfig)
 }
 
 func TestTCPServeAndClose(t *testing.T) {
-	l := NewTCP("t1", ":0", nil)
-	err := l.Init(&logger)
+	l := NewTCP("t1", testAddr, nil)
+	err := l.Init(logger)
 	require.NoError(t, err)
 
 	o := make(chan bool)
@@ -87,10 +85,10 @@ func TestTCPServeAndClose(t *testing.T) {
 }
 
 func TestTCPServeTLSAndClose(t *testing.T) {
-	l := NewTCP("t1", ":0", &Config{
+	l := NewTCP("t1", testAddr, &Config{
 		TLSConfig: tlsConfigBasic,
 	})
-	err := l.Init(&logger)
+	err := l.Init(logger)
 	require.NoError(t, err)
 
 	o := make(chan bool)
@@ -111,8 +109,8 @@ func TestTCPServeTLSAndClose(t *testing.T) {
 }
 
 func TestTCPEstablishThenEnd(t *testing.T) {
-	l := NewTCP("t1", ":0", nil)
-	err := l.Init(&logger)
+	l := NewTCP("t1", testAddr, nil)
+	err := l.Init(logger)
 	require.NoError(t, err)
 
 	o := make(chan bool)
@@ -126,7 +124,7 @@ func TestTCPEstablishThenEnd(t *testing.T) {
 	}()
 
 	time.Sleep(time.Millisecond)
-	net.Dial("tcp", l.listen.Addr().String())
+	_, _ = net.Dial("tcp", l.listen.Addr().String())
 	require.Equal(t, true, <-established)
 	l.Close(MockCloser)
 	<-o

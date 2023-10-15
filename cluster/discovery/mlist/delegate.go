@@ -6,11 +6,12 @@ package mlist
 
 import (
 	"encoding/json"
-	"github.com/hashicorp/memberlist"
-	"github.com/wind-c/comqtt/v2/cluster/log/zero"
-	mqtt "github.com/wind-c/comqtt/v2/mqtt"
 	"sync"
 	"time"
+
+	"github.com/hashicorp/memberlist"
+	"github.com/wind-c/comqtt/v2/cluster/log"
+	mqtt "github.com/wind-c/comqtt/v2/mqtt"
 )
 
 // Maximum number of messages to be held in the queue.
@@ -126,7 +127,7 @@ func (d *Delegate) handleQueueDepth() {
 		case <-time.After(15 * time.Minute):
 			n := d.Broadcasts.NumQueued()
 			if n > maxQueueSize {
-				zero.Info().Int("current", n).Int("limit", maxQueueSize).Msg("delete messages")
+				log.Info("delete messages", "current", n, "limit", maxQueueSize)
 				d.Broadcasts.Prune(maxQueueSize)
 			}
 		}

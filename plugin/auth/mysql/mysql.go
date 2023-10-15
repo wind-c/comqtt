@@ -3,6 +3,7 @@ package mysql
 import (
 	"bytes"
 	"fmt"
+
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 	"github.com/wind-c/comqtt/v2/mqtt"
@@ -76,12 +77,11 @@ func (a *Auth) Init(config any) error {
 	}
 
 	a.config = config.(*Options)
-	a.Log.Info().
-		Str("host", a.config.Dsn.Host).
-		Str("username", a.config.Dsn.LoginName).
-		Int("password-len", len(a.config.Dsn.LoginPassword)).
-		Str("db", a.config.Dsn.Schema).
-		Msg("connecting to mysql")
+	a.Log.Info("connecting to mysql",
+		"host", a.config.Dsn.Host,
+		"username", a.config.Dsn.LoginName,
+		"password-len", len(a.config.Dsn.LoginPassword),
+		"db", a.config.Dsn.Schema)
 
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=%s&parseTime=True&loc=UTC",
 		a.config.Dsn.LoginName, a.config.Dsn.LoginPassword, a.config.Dsn.Host, a.config.Dsn.Port, a.config.Dsn.Schema, a.config.Dsn.Charset)
@@ -104,7 +104,7 @@ func (a *Auth) Init(config any) error {
 
 // Stop closes the mysql connection.
 func (a *Auth) Stop() error {
-	a.Log.Info().Msg("disconnecting from mysql")
+	a.Log.Info("disconnecting from mysql")
 	a.authStmt.Close()
 	a.aclStmt.Close()
 	return a.db.Close()

@@ -5,24 +5,28 @@
 package redis
 
 import (
+	"io"
+	"sort"
+	"testing"
+	"time"
+
+	"log/slog"
+
 	"github.com/wind-c/comqtt/v2/cluster/utils"
 	"github.com/wind-c/comqtt/v2/mqtt"
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/storage"
 	"github.com/wind-c/comqtt/v2/mqtt/packets"
 	"github.com/wind-c/comqtt/v2/mqtt/system"
-	"os"
-	"sort"
-	"testing"
-	"time"
 
 	miniredis "github.com/alicebob/miniredis/v2"
 	redis "github.com/go-redis/redis/v8"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	logger = zerolog.New(os.Stderr).With().Timestamp().Logger().Level(zerolog.Disabled)
+	// Currently, the input is directed to /dev/null. If you need to
+	// output to stdout, just modify 'io.Discard' here to 'os.Stdout'.
+	logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	client = &mqtt.Client{
 		ID: "test",
@@ -41,7 +45,7 @@ var (
 
 func newHook(t *testing.T, addr string) *Storage {
 	s := new(Storage)
-	s.SetOpts(&logger, nil)
+	s.SetOpts(logger, nil)
 
 	err := s.Init(&Options{
 		Options: &redis.Options{
@@ -83,13 +87,13 @@ func TestInflightKey(t *testing.T) {
 
 func TestID(t *testing.T) {
 	s := new(Storage)
-	s.SetOpts(&logger, nil)
+	s.SetOpts(logger, nil)
 	require.Equal(t, "redis-db", s.ID())
 }
 
 func TestProvides(t *testing.T) {
 	s := new(Storage)
-	s.SetOpts(&logger, nil)
+	s.SetOpts(logger, nil)
 	require.True(t, s.Provides(mqtt.OnSessionEstablished))
 	require.True(t, s.Provides(mqtt.OnDisconnect))
 	require.True(t, s.Provides(mqtt.OnSubscribed))
@@ -112,7 +116,7 @@ func TestHKey(t *testing.T) {
 	m := miniredis.RunT(t)
 	defer m.Close()
 	s := newHook(t, m.Addr())
-	s.SetOpts(&logger, nil)
+	s.SetOpts(logger, nil)
 	require.Equal(t, defaultHPrefix+":test", s.hKey("test"))
 }
 
@@ -122,7 +126,7 @@ func TestInitUseDefaults(t *testing.T) {
 	defer m.Close()
 
 	s := newHook(t, defaultAddr)
-	s.SetOpts(&logger, nil)
+	s.SetOpts(logger, nil)
 	err := s.Init(nil)
 	require.NoError(t, err)
 	defer teardown(t, s)
@@ -133,7 +137,7 @@ func TestInitUseDefaults(t *testing.T) {
 
 func TestInitBadConfig(t *testing.T) {
 	s := new(Storage)
-	s.SetOpts(&logger, nil)
+	s.SetOpts(logger, nil)
 
 	err := s.Init(map[string]any{})
 	require.Error(t, err)
@@ -141,7 +145,7 @@ func TestInitBadConfig(t *testing.T) {
 
 func TestInitBadAddr(t *testing.T) {
 	s := new(Storage)
-	s.SetOpts(&logger, nil)
+	s.SetOpts(logger, nil)
 	err := s.Init(&Options{
 		Options: &redis.Options{
 			Addr: "abc:123",

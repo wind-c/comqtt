@@ -5,13 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
+
 	"github.com/go-redis/redis/v8"
 	"github.com/wind-c/comqtt/v2/mqtt"
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/auth"
 	"github.com/wind-c/comqtt/v2/mqtt/packets"
 	"github.com/wind-c/comqtt/v2/plugin"
 	pa "github.com/wind-c/comqtt/v2/plugin/auth"
-	"strconv"
 )
 
 // defaultAddr is the default address to the redis service.
@@ -86,12 +87,10 @@ func (a *Auth) Init(config any) error {
 		a.config.AclKeyPrefix = defaultAclKeyPrefix
 	}
 
-	a.Log.Info().
-		Str("address", a.config.RedisOptions.Addr).
-		Str("username", a.config.RedisOptions.Username).
-		Int("password-len", len(a.config.RedisOptions.Password)).
-		Int("db", a.config.RedisOptions.DB).
-		Msg("connecting to redis service")
+	a.Log.Info("connecting to redis service",
+		"address", a.config.RedisOptions.Addr, "username", a.config.RedisOptions.Username,
+		"password-len", len(a.config.RedisOptions.Password),
+		"db", a.config.RedisOptions.DB)
 
 	a.db = redis.NewClient(&redis.Options{
 		Addr:     a.config.RedisOptions.Addr,
@@ -104,13 +103,13 @@ func (a *Auth) Init(config any) error {
 		return fmt.Errorf("failed to ping service: %w", err)
 	}
 
-	a.Log.Info().Msg("connected to redis service")
+	a.Log.Info("connected to redis service")
 	return nil
 }
 
 // Stop closes the redis connection.
 func (a *Auth) Stop() error {
-	a.Log.Info().Msg("disconnecting from redis service")
+	a.Log.Info("disconnecting from redis service")
 	return a.db.Close()
 }
 
@@ -151,7 +150,7 @@ func (a *Auth) OnConnectAuthenticate(cl *mqtt.Client, pk packets.Packet) bool {
 
 	var ar auth.AuthRule
 	if err = json.Unmarshal([]byte(res), &ar); err != nil {
-		a.Log.Error().Err(err).Str("data", res).Msg("failed to unmarshal redis auth data")
+		a.Log.Error("failed to unmarshal redis auth data", "error", err, "data", res)
 		return false
 	}
 

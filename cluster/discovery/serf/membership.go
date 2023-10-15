@@ -5,16 +5,15 @@
 package serf
 
 import (
+	"strconv"
+
 	"github.com/hashicorp/logutils"
 	"github.com/hashicorp/memberlist"
 	"github.com/hashicorp/serf/serf"
 	mb "github.com/wind-c/comqtt/v2/cluster/discovery"
-	"github.com/wind-c/comqtt/v2/cluster/log/zero"
+	"github.com/wind-c/comqtt/v2/cluster/log"
 	"github.com/wind-c/comqtt/v2/config"
 	"github.com/wind-c/comqtt/v2/mqtt"
-	"io"
-	"os"
-	"strconv"
 )
 
 const (
@@ -42,16 +41,11 @@ func wrapOptions(conf *config.Cluster, ech chan serf.Event) *serf.Config {
 	if conf.QueueDepth != 0 {
 		config.MaxQueueDepth = conf.QueueDepth
 	}
-	var logger io.Writer
-	if zero.Logger() != nil {
-		logger = zero.Logger()
-	} else {
-		logger = os.Stderr
-	}
+
 	filter := &logutils.LevelFilter{
 		Levels:   []logutils.LogLevel{LogLevelDebug, LogLevelWarn, LogLevelError, LogLevelInfo},
 		MinLevel: logutils.LogLevel(LogLevelError),
-		Writer:   logger,
+		Writer:   log.Writer(),
 	}
 	config.MemberlistConfig.LogOutput = filter
 	config.LogOutput = filter
@@ -93,8 +87,7 @@ func (m *Membership) Setup() (err error) {
 			}
 		}
 	}
-	zero.Info().Str("addr", m.LocalAddr()).Int("port", m.config.BindPort).Msg("local member")
-
+	log.Info("local member", "addr", m.LocalAddr(), "port", m.config.BindPort)
 	return
 }
 
@@ -125,11 +118,11 @@ func (m *Membership) Stat() map[string]int64 {
 func (m *Membership) Stop() {
 	err := m.serf.Leave()
 	if err != nil {
-		zero.Error().Err(err).Msg("serf leave")
+		log.Error("serf leave", "error", err)
 	}
 	err = m.serf.Shutdown()
 	if err != nil {
-		zero.Error().Err(err).Msg("serf shutdown")
+		log.Error("serf shutdown", "error", err)
 	}
 	// this shuts down the event loop, note that this can't be called multiple times
 	// if we need to do so, we could use a bool, sync.Once or recover from the panic
@@ -189,7 +182,6 @@ func (m *Membership) eventLoop() {
 				continue
 			}
 			m.msgCh <- ue.Payload
-			//zero.Info().Str("name", ue.Name).Msg("serf message")
 		case serf.EventQuery:
 			q := e.(*serf.Query)
 			if q.SourceNode() == m.config.NodeName {
@@ -217,7 +209,7 @@ func (m *Membership) SendToNode(nodeName string, msg []byte) error {
 	qp := m.serf.DefaultQueryParams()
 	qp.FilterNodes = m.otherNames(nodeName)
 	if _, err := m.serf.Query(m.config.NodeName, msg, qp); err != nil {
-		zero.Error().Err(err).Str("from", m.config.NodeName).Str("to", nodeName).Msg("send to node")
+		log.Error("send to node", "error", err, "from", m.config.NodeName, "to", nodeName)
 		return err
 	}
 
@@ -229,7 +221,7 @@ func (m *Membership) Broadcast(msg []byte) {
 }
 
 func onLog(node *serf.Member, prompt string) {
-	zero.Info().Str("node", node.Name).Str("addr", node.Addr.String()).Msg(prompt)
+	log.Info(prompt, "node", node.Name, "addr", node.Addr.String())
 }
 
 func (m *Membership) isLocal(member serf.Member) bool {

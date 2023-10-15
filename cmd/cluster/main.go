@@ -9,10 +9,19 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
+	"net"
+	"net/http"
+	_ "net/http/pprof"
+	"os"
+	"os/signal"
+	"strconv"
+	"strings"
+	"syscall"
+
 	"github.com/go-redis/redis/v8"
-	"github.com/rs/zerolog"
 	cs "github.com/wind-c/comqtt/v2/cluster"
-	colog "github.com/wind-c/comqtt/v2/cluster/log/zero"
+	"github.com/wind-c/comqtt/v2/cluster/log"
 	coredis "github.com/wind-c/comqtt/v2/cluster/storage/redis"
 	"github.com/wind-c/comqtt/v2/config"
 	mqtt "github.com/wind-c/comqtt/v2/mqtt"
@@ -24,24 +33,13 @@ import (
 	pauth "github.com/wind-c/comqtt/v2/plugin/auth/postgresql"
 	rauth "github.com/wind-c/comqtt/v2/plugin/auth/redis"
 	cokafka "github.com/wind-c/comqtt/v2/plugin/bridge/kafka"
-	"io"
-	"log"
-	"net"
-	"net/http"
-	_ "net/http/pprof"
-	"os"
-	"os/signal"
-	"strconv"
-	"strings"
-	"syscall"
 )
 
 var agent *cs.Agent
-var logger *zerolog.Logger
 
 func pprof() {
 	go func() {
-		log.Println(http.ListenAndServe(":6060", nil))
+		log.Info("listen pprof", "error", http.ListenAndServe(":6060", nil))
 	}()
 }
 
@@ -49,9 +47,7 @@ func main() {
 	sigCtx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 	err := realMain(sigCtx)
-	if err != nil {
-		log.Fatal(err)
-	}
+	onError(err, "")
 }
 
 func realMain(ctx context.Context) error {
@@ -79,11 +75,8 @@ func realMain(ctx context.Context) error {
 	flag.StringVar(&cfg.Redis.Options.Addr, "redis", "127.0.0.1:6379", "redis address for cluster mode")
 	flag.StringVar(&cfg.Redis.Options.Password, "redis-pass", "", "redis password for cluster mode")
 	flag.IntVar(&cfg.Redis.Options.DB, "redis-db", 0, "redis db for cluster mode")
-	flag.BoolVar(&cfg.Log.Enable, "log-enable", true, "log enabled or not")
-	flag.IntVar(&cfg.Log.Env, "env", 0, "app running environment:0 development or 1 production")
-	flag.IntVar(&cfg.Log.Level, "level", 1, "log level options:0Debug,1Info, 2Warn, 3Error, 4Fatal, 5Panic, 6NoLevel, 7Off")
-	flag.StringVar(&cfg.Log.InfoFile, "info-file", "./logs/co-info.log", "info log filename")
-	flag.StringVar(&cfg.Log.ErrorFile, "error-file", "./logs/co-err.log", "error log filename")
+	flag.BoolVar(&cfg.Log.Disable, "log-disable", false, "log disabled or not")
+	flag.StringVar(&cfg.Log.Filename, "log-file", "./logs/comqtt.log", "log filename")
 	//parse arguments
 	flag.Parse()
 	//load config file
@@ -99,27 +92,18 @@ func realMain(ctx context.Context) error {
 		}
 	}
 
+	//init log
+	log.Init(&cfg.Log)
+
 	//enable pprof
 	if cfg.PprofEnable {
 		pprof()
 	}
 
-	//init log
-	if cfg.Cluster.NodeName == "" {
-		if hn, err := os.Hostname(); err == nil {
-			cfg.Log.NodeName = hn
-		}
-	}
-
-	logger = colog.Init(cfg.Log)
-	if cfg.Log.Enable && cfg.Log.Format == 1 {
-		log.Println("log output to the files, please check")
-	}
-
 	// create server instance and init hooks
-	cfg.Mqtt.Options.Logger = logger
+	cfg.Mqtt.Options.Logger = log.Default()
 	server := mqtt.New(&cfg.Mqtt.Options)
-	logger.Info().Msg("comqtt server initializing...")
+	log.Info("comqtt server initializing...")
 	initStorage(server, cfg)
 	initAuth(server, cfg)
 	initBridge(server, cfg)
@@ -165,22 +149,18 @@ func realMain(ctx context.Context) error {
 			errCh <- err
 		}
 	}()
-
-	if cfg.Log.Format == 1 {
-		log.Println("comqtt server started")
-	}
+	log.Info("comqtt server started")
 
 	// exit
 	select {
 	case err := <-errCh:
-		log.Fatalf("server error: %s", err.Error())     // todo: change the formatting so the error is logged
-		server.Log.Fatal().Err(err).Msg("server error") // <-- this swallows the error.
+		onError(err, "server error")
+
 	case <-ctx.Done():
-		server.Log.Warn().Msg("caught signal, stopping...")
+		server.Log.Warn("caught signal, stopping...")
 	}
 	agent.Stop()
 	server.Close()
-	colog.Close()
 	return nil
 }
 
@@ -253,14 +233,14 @@ func initClusterNode(server *mqtt.Server, conf *config.Config) {
 	agent = cs.NewAgent(&conf.Cluster)
 	agent.BindMqttServer(server)
 	onError(agent.Start(), "create node and join cluster")
-
-	logger.Info().Msg("cluster node created")
+	log.Info("cluster node created")
 }
 
 // onError handle errors and simplify code
 func onError(err error, msg string) {
 	if err != nil {
-		logger.Fatal().Err(err).Msg(msg)
+		log.Error(msg, "error", err)
+		os.Exit(1)
 	}
 }
 

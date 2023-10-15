@@ -2,18 +2,21 @@ package redis
 
 import (
 	"context"
+	"io"
+	"log/slog"
+	"testing"
+
 	"github.com/alicebob/miniredis/v2"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/wind-c/comqtt/v2/mqtt"
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/auth"
 	"github.com/wind-c/comqtt/v2/mqtt/packets"
-	"os"
-	"testing"
 )
 
 var (
-	logger = zerolog.New(os.Stderr).With().Timestamp().Logger().Level(zerolog.Disabled)
+	// Currently, the input is directed to /dev/null. If you need to
+	// output to stdout, just modify 'io.Discard' here to 'os.Stdout'.
+	logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	client = &mqtt.Client{
 		ID: "test",
@@ -34,7 +37,7 @@ var (
 
 func newAuth(t *testing.T, addr string) *Auth {
 	a := new(Auth)
-	a.SetOpts(&logger, nil)
+	a.SetOpts(logger, nil)
 
 	err := a.Init(&Options{
 		AuthMode: byte(auth.AuthUsername),
@@ -62,7 +65,7 @@ func TestInitUseDefaults(t *testing.T) {
 	defer s.Close()
 
 	a := newAuth(t, defaultAddr)
-	a.SetOpts(&logger, nil)
+	a.SetOpts(logger, nil)
 	err := a.Init(nil)
 	require.NoError(t, err)
 	defer teardown(t, a)
@@ -73,7 +76,7 @@ func TestInitUseDefaults(t *testing.T) {
 
 func TestInitBadConfig(t *testing.T) {
 	a := new(Auth)
-	a.SetOpts(&logger, nil)
+	a.SetOpts(logger, nil)
 
 	err := a.Init(map[string]any{})
 	require.Error(t, err)
@@ -81,7 +84,7 @@ func TestInitBadConfig(t *testing.T) {
 
 func TestInitBadAddr(t *testing.T) {
 	a := new(Auth)
-	a.SetOpts(&logger, nil)
+	a.SetOpts(logger, nil)
 	err := a.Init(&Options{
 		RedisOptions: &redisOptions{
 			Addr: "abc:123",

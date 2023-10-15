@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// SPDX-FileCopyrightText: 2022 J. Blake / mochi-co
+// SPDX-FileCopyrightText: 2023 mochi-mqtt, mochi-co
 // SPDX-FileContributor: mochi-co
 
 package mqtt
@@ -14,12 +14,12 @@ import (
 
 // Inflight is a map of InflightMessage keyed on packet id.
 type Inflight struct {
-	internal map[uint16]packets.Packet // internal contains the inflight packets
 	sync.RWMutex
-	receiveQuota        int32 // remaining inbound qos quota for flow control
-	sendQuota           int32 // remaining outbound qos quota for flow control
-	maximumReceiveQuota int32 // maximum allowed receive quota
-	maximumSendQuota    int32 // maximum allowed send quota
+	internal            map[uint16]packets.Packet // internal contains the inflight packets
+	receiveQuota        int32                     // remaining inbound qos quota for flow control
+	sendQuota           int32                     // remaining outbound qos quota for flow control
+	maximumReceiveQuota int32                     // maximum allowed receive quota
+	maximumSendQuota    int32                     // maximum allowed send quota
 }
 
 // NewInflights returns a new instance of an Inflight packets map.

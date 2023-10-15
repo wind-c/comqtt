@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// SPDX-FileCopyrightText: 2022 mochi-co
+// SPDX-FileCopyrightText: 2022 mochi-mqtt, mochi-co
 // SPDX-FileContributor: mochi-co
 
 package listeners
@@ -16,7 +16,7 @@ func TestMockEstablisher(t *testing.T) {
 	_, w := net.Pipe()
 	err := MockEstablisher("t1", w)
 	require.NoError(t, err)
-	w.Close()
+	_ = w.Close()
 }
 
 func TestNewMockListener(t *testing.T) {
@@ -86,7 +86,7 @@ func TestMockListenerServe(t *testing.T) {
 	require.Equal(t, true, closed)
 	<-o
 
-	mocked.Init(nil)
+	_ = mocked.Init(nil)
 }
 
 func TestMockListenerClose(t *testing.T) {

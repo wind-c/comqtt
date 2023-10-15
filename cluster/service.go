@@ -8,8 +8,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
+	"strconv"
+	"sync"
+	"time"
+
 	grpc_retry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
-	"github.com/wind-c/comqtt/v2/cluster/log/zero"
+	"github.com/wind-c/comqtt/v2/cluster/log"
 	"github.com/wind-c/comqtt/v2/cluster/message"
 	crpc "github.com/wind-c/comqtt/v2/cluster/rpc"
 	"github.com/wind-c/comqtt/v2/mqtt/packets"
@@ -17,10 +22,6 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	_ "google.golang.org/grpc/health"
 	"google.golang.org/grpc/keepalive"
-	"net"
-	"strconv"
-	"sync"
-	"time"
 )
 
 const (
@@ -71,7 +72,7 @@ func (s *RpcService) StartRpcServer() error {
 	// serve grpc
 	go func() {
 		if err := grpcServer.Serve(grpcListen); err != nil {
-			zero.Error().Err(err).Msg("grpc server serve")
+			log.Error("grpc server serve", "error", err)
 		}
 	}()
 
@@ -216,7 +217,7 @@ func (c *ClientManager) getClient(nodeId string) (*client, error) {
 func (c *ClientManager) RelayPublishPacket(nodeId string, msg *message.Message) {
 	client, err := c.getClient(nodeId)
 	if err != nil {
-		zero.Error().Err(err).Msg("get grpc client")
+		log.Error("get grpc client", "error", err)
 		return
 	}
 
@@ -229,7 +230,7 @@ func (c *ClientManager) RelayPublishPacket(nodeId string, msg *message.Message) 
 		Payload:         msg.Payload,
 	}
 	if _, err := client.PublishPacket(ctx, &req); err != nil {
-		zero.Error().Err(err).Str("to", nodeId).Str("cid", msg.ClientID).Msg("relay publish packet")
+		log.Error("relay publish packet", "error", err, "to", nodeId, "cid", msg.ClientID)
 	}
 }
 
@@ -247,7 +248,7 @@ func (c *ClientManager) ConnectNotifyToNode(nodeId, clientId string) {
 	}
 	OnConnectPacketLog(DirectionOutbound, nodeId, clientId)
 	if _, err := client.ConnectNotify(ctx, &req); err != nil {
-		zero.Error().Err(err).Str("to", nodeId).Str("cid", clientId).Msg("connection notification")
+		log.Error("connection notification", "error", err, "to", nodeId, "cid", clientId)
 	}
 }
 
@@ -264,7 +265,7 @@ func (c *ClientManager) ConnectNotifyToOthers(msg *message.Message) {
 func (c *ClientManager) RelayRaftApply(nodeId string, msg *message.Message) {
 	client, err := c.getClient(nodeId)
 	if err != nil {
-		zero.Error().Err(err).Msg("get grpc client")
+		log.Error("get grpc client", "error", err)
 		return
 	}
 
@@ -293,7 +294,7 @@ func (c *ClientManager) RaftApplyToOthers(msg *message.Message) {
 func (c *ClientManager) RelayRaftJoin(nodeId string) {
 	client, err := c.getClient(nodeId)
 	if err != nil {
-		zero.Error().Err(err).Msg("get grpc client")
+		log.Error("get grpc client", "error", err)
 		return
 	}
 

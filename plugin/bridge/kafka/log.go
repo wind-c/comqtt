@@ -1,13 +1,16 @@
 package kafka
 
-import "github.com/rs/zerolog"
+import (
+	"fmt"
+	"log/slog"
+)
 
 type kafkaLogger struct {
-	logger *zerolog.Logger
+	logger *slog.Logger
 	prefix string
 }
 
-func newKafkaLogger(logger *zerolog.Logger) *kafkaLogger {
+func newKafkaLogger(logger *slog.Logger) *kafkaLogger {
 	return &kafkaLogger{
 		logger: logger,
 		prefix: "kafka: ",
@@ -15,5 +18,5 @@ func newKafkaLogger(logger *zerolog.Logger) *kafkaLogger {
 }
 
 func (k kafkaLogger) Printf(format string, v ...interface{}) {
-	k.logger.Printf(k.prefix+format, v...)
+	k.logger.Info(fmt.Sprintf(k.prefix+format, v...))
 }

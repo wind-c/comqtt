@@ -1,6 +1,6 @@
 module github.com/wind-c/comqtt/v2
 
-go 1.20
+go 1.21
 
 require (
 	github.com/alicebob/miniredis/v2 v2.23.0
@@ -22,7 +22,6 @@ require (
 	github.com/lib/pq v1.2.0
 	github.com/panjf2000/ants/v2 v2.7.1
 	github.com/rs/xid v1.4.0
-	github.com/rs/zerolog v1.28.0
 	github.com/satori/go.uuid v1.2.0
 	github.com/segmentio/kafka-go v0.4.38
 	github.com/stretchr/testify v1.8.2

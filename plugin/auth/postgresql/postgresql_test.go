@@ -1,21 +1,24 @@
 package postgresql
 
 import (
-	"github.com/rs/zerolog"
+	"io"
+	"log/slog"
+	"net"
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/wind-c/comqtt/v2/mqtt"
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/auth"
 	"github.com/wind-c/comqtt/v2/mqtt/packets"
 	"github.com/wind-c/comqtt/v2/plugin"
-	"net"
-	"os"
-	"testing"
 )
 
 const path = "./conf.yml"
 
 var (
-	logger = zerolog.New(os.Stderr).With().Timestamp().Logger().Level(zerolog.Disabled)
+	// Currently, the input is directed to /dev/null. If you need to
+	// output to stdout, just modify 'io.Discard' here to 'os.Stdout'.
+	logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	client = &mqtt.Client{
 		ID: "test",
@@ -42,7 +45,7 @@ func teardown(a *Auth, t *testing.T) {
 
 func newAuth(t *testing.T) *Auth {
 	a := new(Auth)
-	a.SetOpts(&logger, nil)
+	a.SetOpts(logger, nil)
 
 	err := a.Init(&Options{
 		AuthMode: byte(auth.AuthUsername),
@@ -78,7 +81,7 @@ func TestInitFromConfFile(t *testing.T) {
 		t.Skip("no postgresql server running")
 	}
 	a := new(Auth)
-	a.SetOpts(&logger, nil)
+	a.SetOpts(logger, nil)
 	opts := Options{}
 	err := plugin.LoadYaml(path, &opts)
 	require.NoError(t, err)
@@ -89,7 +92,7 @@ func TestInitFromConfFile(t *testing.T) {
 
 func TestInitBadConfig(t *testing.T) {
 	a := new(Auth)
-	a.SetOpts(&logger, nil)
+	a.SetOpts(logger, nil)
 
 	err := a.Init(map[string]any{})
 	require.Error(t, err)

@@ -7,11 +7,16 @@ package cluster
 import (
 	"bytes"
 	"context"
+	"net"
+	"path"
+	"path/filepath"
+	"strconv"
+
 	"github.com/panjf2000/ants/v2"
 	"github.com/wind-c/comqtt/v2/cluster/discovery"
 	"github.com/wind-c/comqtt/v2/cluster/discovery/mlist"
 	"github.com/wind-c/comqtt/v2/cluster/discovery/serf"
-	"github.com/wind-c/comqtt/v2/cluster/log/zero"
+	"github.com/wind-c/comqtt/v2/cluster/log"
 	"github.com/wind-c/comqtt/v2/cluster/message"
 	"github.com/wind-c/comqtt/v2/cluster/raft"
 	"github.com/wind-c/comqtt/v2/cluster/raft/etcd"
@@ -21,10 +26,6 @@ import (
 	"github.com/wind-c/comqtt/v2/config"
 	"github.com/wind-c/comqtt/v2/mqtt"
 	"github.com/wind-c/comqtt/v2/mqtt/packets"
-	"net"
-	"path"
-	"path/filepath"
-	"strconv"
 )
 
 const (
@@ -119,7 +120,7 @@ func (a *Agent) Start() (err error) {
 		if err := a.grpcService.StartRpcServer(); err != nil {
 			return err
 		}
-		zero.Info().Str("addr", net.JoinHostPort(a.Config.BindAddr, strconv.Itoa(a.Config.GrpcPort))).Msg("grpc listen at")
+		log.Info("grpc listen at", "addr", net.JoinHostPort(a.Config.BindAddr, strconv.Itoa(a.Config.GrpcPort)))
 	}
 
 	// init goroutine pool
@@ -176,17 +177,16 @@ func (a *Agent) Stop() {
 	}
 
 	// stop raft
-	zero.Info().Msg("stopping raft...")
+	log.Info("stopping raft...")
 	a.raftPeer.Stop()
-	zero.Info().Msg("raft stopped")
+	log.Info("raft stopped")
 
 	// stop node
-	zero.Info().Msg("stopping node...")
+	log.Info("stopping node...")
 	a.membership.Stop()
 	a.grpcService.StopRpcServer()
-	zero.Info().Msg("grpc server stopped")
-	zero.Info().Msg("node stopped")
-	zero.Close()
+	log.Info("grpc server stopped")
+	log.Info("node stopped")
 }
 
 func (a *Agent) BindMqttServer(server *mqtt.Server) {
@@ -264,7 +264,7 @@ func (a *Agent) raftApplyListener() {
 			} else {
 				continue
 			}
-			zero.Info().Str("from", msg.NodeID).Str("filter", filter).Uint8("type", msg.Type).Msg("apply listening")
+			log.Info("apply listening", "from", msg.NodeID, "filter", filter, "type", msg.Type)
 		case <-a.ctx.Done():
 			return
 		}
@@ -306,10 +306,10 @@ func (a *Agent) getPeersFile() string {
 
 func (a *Agent) genNodesFile() {
 	if err := discovery.GenNodesFile(a.getNodesFile(), a.membership.Members()); err != nil {
-		zero.Error().Err(err).Msg("gen nodes file")
+		log.Error("gen nodes file", "error", err)
 	}
 	if err := a.raftPeer.GenPeersFile(a.getPeersFile()); err != nil {
-		zero.Error().Err(err).Msg("gen peers file")
+		log.Error("gen peers file", "error", err)
 	}
 }
 
@@ -461,39 +461,27 @@ func (a *Agent) processOutboundPacket(pk *packets.Packet) {
 }
 
 func OnJoinLog(nodeId, addr, prompt string, err error) {
-	logEvent := zero.Info()
-	if err != nil {
-		logEvent.Err(err)
-	}
-	logEvent.Str("node", nodeId).Str("addr", addr).Msg(prompt)
+	log.Info(prompt, "error", err, "addr", addr)
 }
 
 func OnApplyLog(leaderId, nodeId string, tp byte, filter []byte, prompt string, err error) {
-	logEvent := zero.Info()
-	if err != nil {
-		logEvent.Err(err)
-	}
-	logEvent.Str("leader", leaderId).Str("from", nodeId).Uint8("type", tp).Bytes("filter", filter).Msg(prompt)
+	log.Info(prompt, "error", err, "leader", leaderId, "from", nodeId, "type", tp, "filter", filter)
 }
 
 func OnPublishPacketLog(direction byte, nodeId, cid, topic string, pid uint16) {
-	logEvent := zero.Info()
 	if direction == DirectionInbound {
-		logEvent.Str("d", "inbound").Str("from", nodeId)
+		log.Info("publish message", "d", "inbound", "from", nodeId, "cid", cid, "pid", pid, "topic", topic)
 	} else {
-		logEvent.Str("d", "outbound").Str("to", nodeId)
+		log.Info("publish message", "d", "outbound", "to", nodeId, "cid", cid, "pid", pid, "topic", topic)
 	}
-	logEvent.Str("cid", cid).Uint16("pid", pid).Str("topic", topic).Msg("publish message")
 }
 
 func OnConnectPacketLog(direction byte, node, clientId string) {
-	logEvent := zero.Info()
 	if direction == DirectionInbound {
-		logEvent.Str("d", "inbound").Str("from", node)
+		log.Info("connection notification", "d", "inbound", "from", node, "cid", clientId)
 	} else {
-		logEvent.Str("d", "outbound").Str("to", node)
+		log.Info("connection notification", "d", "outbound", "to", node, "cid", clientId)
 	}
-	logEvent.Str("cid", clientId).Msg("connection notification")
 }
 
 func (a *Agent) Join(nodeName, addr string) error {
@@ -513,15 +501,15 @@ func (a *Agent) Leave() error {
 
 func (a *Agent) AddRaftPeer(id, addr string) {
 	a.raftPeer.Join(id, addr)
-	zero.Info().Str("nid", id).Str("addr", addr).Msg("add peer")
+	log.Info("add peer", "nid", id, "addr", addr)
 }
 
 func (a *Agent) RemoveRaftPeer(id string) {
 	a.raftPeer.Leave(id)
-	zero.Info().Str("nid", id).Msg("remove peer")
+	log.Info("remove peer", "nid", id)
 }
 
 func (a *Agent) GetValue(key string) []string {
-	zero.Info().Str("key", key).Msg("get value")
+	log.Info("get value", "key", key)
 	return a.raftPeer.Lookup(key)
 }
