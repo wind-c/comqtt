@@ -2,30 +2,42 @@ package log
 
 import (
 	"context"
+	"gopkg.in/natefinch/lumberjack.v2"
 	"io"
 	"log/slog"
 	"os"
-
-	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 // Constants for log formats
 const (
-	Text = iota // Log format is TEXT.
-	Json        // Log format is JSON.
+	FormatText = iota // Log format is TEXT.
+	FormatJson        // Log format is JSON.
+)
+
+// Constants for log output
+const (
+	OutputConsole = iota // Log output is Console.
+	OutputFile           // Log output is File.
+	OutputBoth           // Log output is Console and File.
 )
 
 // Format represents the log format type.
 type Format int
 
+// Output represents the log output type.
+type Output int
+
 // Options defines configuration options for the logger.
 type Options struct {
 
 	// Indicates whether logging is enabled.
-	Disable bool `json:"disable" yaml:"disable"`
+	Enable bool `json:"enable" yaml:"enable"`
 
 	// Log format, currently supports Text: 0 and JSON: 1, with Text as the default.
 	Format Format `json:"format" yaml:"format"`
+
+	// Log output location Console: 0 or File: 1 or Both: 2, with Console as the default.
+	Output Output `json:"output" yaml:"output"`
 
 	// Log level, with supported values LevelDebug: 4, LevelInfo: 0, LevelWarn: 4, and LevelError: 8.
 	Level int `json:"level" yaml:"level"`
@@ -61,7 +73,8 @@ func DefaultOptions() *Options {
 		MaxSize:    100,
 		MaxAge:     30,
 		MaxBackups: 1,
-		Format:     Text,
+		Format:     FormatText,
+		Output:     OutputConsole,
 	}
 }
 
@@ -72,17 +85,19 @@ func New(opt *Options) *Logger {
 	}
 
 	var writer io.Writer
-	writer = os.Stdout
-
-	if len(opt.Filename) != 0 {
-		fileWriter := &lumberjack.Logger{
-			Filename:   opt.Filename,
-			MaxSize:    opt.MaxSize,
-			MaxBackups: opt.MaxBackups,
-			MaxAge:     opt.MaxAge,
-			Compress:   opt.Compress,
+	switch opt.Output {
+	case OutputConsole:
+		writer = os.Stdout
+	case OutputFile:
+		writer = createFileWriter(opt)
+	case OutputBoth:
+		if fileWriter := createFileWriter(opt); fileWriter != nil {
+			writer = io.MultiWriter(os.Stdout, fileWriter)
 		}
-		writer = io.MultiWriter(os.Stdout, fileWriter)
+	}
+
+	if writer == nil {
+		writer = os.Stdout
 	}
 
 	return &Logger{
@@ -90,6 +105,19 @@ func New(opt *Options) *Logger {
 		Logger: slog.New(NewHandler(opt, writer)),
 		opt:    opt,
 	}
+}
+
+func createFileWriter(opt *Options) (writer io.Writer) {
+	if len(opt.Filename) != 0 {
+		writer = &lumberjack.Logger{
+			Filename:   opt.Filename,
+			MaxSize:    opt.MaxSize,
+			MaxBackups: opt.MaxBackups,
+			MaxAge:     opt.MaxAge,
+			Compress:   opt.Compress,
+		}
+	}
+	return
 }
 
 // Logger is a wrapper for slog.Logger.
@@ -110,12 +138,12 @@ func NewHandler(opt *Options, writer io.Writer) *Handler {
 	var handler slog.Handler
 
 	switch opt.Format {
-	case Text:
+	case FormatText:
 		handler = slog.NewTextHandler(writer, &slog.HandlerOptions{
 			Level: slog.Level(opt.Level),
 		})
 
-	case Json:
+	case FormatJson:
 		handler = slog.NewJSONHandler(writer, &slog.HandlerOptions{
 			Level: slog.Level(opt.Level),
 		})
@@ -135,7 +163,7 @@ func NewHandler(opt *Options, writer io.Writer) *Handler {
 // Enabled reports whether the handler handles records at the given level.
 // The handler ignores records whose level is lower.
 func (h *Handler) Enabled(ctx context.Context, level slog.Level) bool {
-	return !h.opt.Disable && h.internal.Enabled(ctx, level)
+	return h.opt.Enable && h.internal.Enabled(ctx, level)
 }
 
 // Handle handles the Record.

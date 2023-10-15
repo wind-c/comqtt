@@ -7,6 +7,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -57,23 +58,26 @@ func realMain(ctx context.Context) error {
 	flag.StringVar(&cfg.Mqtt.TCP, "tcp", ":1883", "network address for Mqtt TCP listener")
 	flag.StringVar(&cfg.Mqtt.WS, "ws", ":1882", "network address for Mqtt Websocket listener")
 	flag.StringVar(&cfg.Mqtt.HTTP, "http", ":8080", "network address for web info dashboard listener")
-	flag.BoolVar(&cfg.Log.Disable, "log-disable", true, "log disabled or not")
+	flag.BoolVar(&cfg.Log.Enable, "log-enable", true, "log enabled or not")
 	flag.StringVar(&cfg.Log.Filename, "log-file", "./logs/comqtt.log", "log filename")
 	//parse arguments
 	flag.Parse()
 	//load config file
-	if confFile != "" {
+	if len(confFile) > 0 {
 		if cfg, err = config.Load(confFile); err != nil {
 			onError(err, "")
 		}
 	}
 
-	//init log
-	log.Init(&cfg.Log)
-
 	//enable pprof
 	if cfg.PprofEnable {
 		pprof()
+	}
+
+	//init log
+	log.Init(&cfg.Log)
+	if cfg.Log.Enable && cfg.Log.Output == log.OutputFile {
+		fmt.Println("log output to the files, please check")
 	}
 
 	// create server instance and init hooks
@@ -115,7 +119,7 @@ func realMain(ctx context.Context) error {
 		}
 	}()
 
-	log.Info("comqtt server started")
+	//log.Info("comqtt server started")
 
 	select {
 	case err := <-errCh:

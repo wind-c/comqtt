@@ -186,8 +186,3 @@ func GenTlsConfig(conf *Config) (*tls2.Config, error) {
 
 	return tlsConfig, nil
 }
-
-type Sampler struct {
-	Burst  int `json:"burst" yaml:"burst"`
-	Period int `json:"period" yaml:"period"`
-}

@@ -68,19 +68,12 @@ redis:
   prefix: comqtt
 
 log:
-  enable: true
-  env: 0  #0 dev or 1 prod
-  format: 0  #output format 0console or 1json
-  caller: false #whether to display code line number
-  info-file: ./logs/comqtt-info.log
-  error-file: ./logs/comqtt-error.log
-  thirdparty-file: ./logs/thirdparty.log  # level 6NoLevel, logs of the third-party library
-  maxsize: 100      #100M
-  max-age: 30        #30day
-  max-backups: 10    #number of log files
-  localtime: true   #true or false
-  compress:  true   #true or false
-  level: 1          #-1Trace 0Debug 1Info 2Warn 3Error(default) 4Fatal 5Panic 6NoLevel 7Off
-  sampler:          #a maximum of three logs can be output every second
-    burst: 3        #log count
-    period: 1       #second
+  enable: true #Indicates whether logging is enabled.
+  format: 0 #Log format, currently supports Text: 0 and JSON: 1, with Text as the default.
+  output: 2 #Log output location Console: 0 or File: 1 or Both: 2, with Console as the default.
+  filename: ./logs/comqtt2.log #Filename is the file to write logs to
+  maxsize: 100 #MaxSize is the maximum size in megabytes of the log file before it gets rotated. It defaults to 100 megabytes.
+  max-age: 30 #MaxAge is the maximum number of days to retain old log files based on the timestamp encoded in their filename
+  max-backups: 10 #MaxBackups is the maximum number of old log files to retain
+  compress:  true #Compress determines if the rotated log files should be compressed using gzip
+  level: 0 #Log level, with supported values LevelDebug: -4, LevelInfo: 0, LevelWarn: 4, and LevelError: 8.

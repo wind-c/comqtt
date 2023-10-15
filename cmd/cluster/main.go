@@ -75,12 +75,12 @@ func realMain(ctx context.Context) error {
 	flag.StringVar(&cfg.Redis.Options.Addr, "redis", "127.0.0.1:6379", "redis address for cluster mode")
 	flag.StringVar(&cfg.Redis.Options.Password, "redis-pass", "", "redis password for cluster mode")
 	flag.IntVar(&cfg.Redis.Options.DB, "redis-db", 0, "redis db for cluster mode")
-	flag.BoolVar(&cfg.Log.Disable, "log-disable", false, "log disabled or not")
+	flag.BoolVar(&cfg.Log.Enable, "log-enable", true, "log enabled or not")
 	flag.StringVar(&cfg.Log.Filename, "log-file", "./logs/comqtt.log", "log filename")
 	//parse arguments
 	flag.Parse()
 	//load config file
-	if confFile != "" {
+	if len(confFile) > 0 {
 		if cfg, err = config.Load(confFile); err != nil {
 			return fmt.Errorf("load config file error: %w", err)
 		}
@@ -92,12 +92,15 @@ func realMain(ctx context.Context) error {
 		}
 	}
 
-	//init log
-	log.Init(&cfg.Log)
-
 	//enable pprof
 	if cfg.PprofEnable {
 		pprof()
+	}
+
+	//init log
+	log.Init(&cfg.Log)
+	if cfg.Log.Enable && cfg.Log.Output == log.OutputFile {
+		fmt.Println("log output to the files, please check")
 	}
 
 	// create server instance and init hooks
@@ -149,7 +152,7 @@ func realMain(ctx context.Context) error {
 			errCh <- err
 		}
 	}()
-	log.Info("comqtt server started")
+	log.Info("cluster node started")
 
 	// exit
 	select {
