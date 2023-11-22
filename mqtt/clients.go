@@ -21,8 +21,9 @@ import (
 )
 
 const (
-	defaultKeepalive             uint16 = 10 // the default connection keepalive value in seconds
+	defaultKeepalive             uint16 = 10 // the default connection keepalive value in seconds.
 	defaultClientProtocolVersion byte   = 4  // the default mqtt protocol version of connecting clients (if somehow unspecified).
+	minimumKeepalive             uint16 = 5  // the minimum recommended keepalive - values under with display a warning.
 )
 
 // Client session inheritance way
@@ -30,6 +31,10 @@ const (
 	InheritWayNew = iota
 	InheritWayLocal
 	InheritWayRemote
+)
+
+var (
+	ErrMinimumKeepalive = errors.New("client keepalive is below minimum recommended value and may exhibit connection instability")
 )
 
 // ReadFn is the function signature for the function used for reading and processing new packets.
@@ -329,10 +334,26 @@ func (cl *Client) ResendInflightMessages(force bool) error {
 }
 
 // ClearInflights deletes all inflight messages for the client, e.g. for a disconnected user with a clean session.
-func (cl *Client) ClearInflights(now, maximumExpiry int64) []uint16 {
+func (cl *Client) ClearInflights() {
+	for _, tk := range cl.State.Inflight.GetAll(false) {
+		if ok := cl.State.Inflight.Delete(tk.PacketID); ok {
+			cl.ops.hooks.OnQosDropped(cl, tk)
+			atomic.AddInt64(&cl.ops.info.Inflight, -1)
+		}
+	}
+}
+
+// ClearExpiredInflights deletes any inflight messages which have expired.
+func (cl *Client) ClearExpiredInflights(now, maximumExpiry int64) []uint16 {
 	deleted := []uint16{}
 	for _, tk := range cl.State.Inflight.GetAll(false) {
-		if (tk.Expiry > 0 && tk.Expiry < now) || tk.Created+maximumExpiry < now {
+		expired := tk.ProtocolVersion == 5 && tk.Expiry > 0 && tk.Expiry < now // [MQTT-3.3.2-5]
+
+		// If the maximum message expiry interval is set (greater than 0), and the message
+		// retention period exceeds the maximum expiry, the message will be forcibly removed.
+		enforced := maximumExpiry > 0 && now-tk.Created > maximumExpiry
+
+		if expired || enforced {
 			if ok := cl.State.Inflight.Delete(tk.PacketID); ok {
 				cl.ops.hooks.OnQosDropped(cl, tk)
 				atomic.AddInt64(&cl.ops.info.Inflight, -1)
