@@ -1432,6 +1432,7 @@ func (s *Server) publishSysTopics() {
 // Close attempts to gracefully shut down the server, all listeners, clients, and stores.
 func (s *Server) Close() error {
 	close(s.done)
+	s.Log.Info("gracefully stopping server")
 	s.Listeners.CloseAll(s.closeListenerClients)
 	s.hooks.OnStopped()
 	s.hooks.Stop()
