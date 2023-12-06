@@ -319,23 +319,23 @@ func (a *Agent) processNodeEvent() {
 		select {
 		case event := <-a.membership.EventChan():
 			var err error
-			prompt := "raft joining"
+			prompt := "raft join"
 			nodeName := event.Name
 			addr := getRaftPeerAddr(&event.Member)
 			//addr := event.Addr
 			if event.Type == discovery.EventJoin {
 				if nodeName != a.GetLocalName() && a.raftPeer.IsApplyRight() {
 					err = a.raftPeer.Join(nodeName, addr)
-					prompt = "raft joined"
+					prompt = "raft join"
 				}
 			} else if event.Type == discovery.EventLeave {
 				err = a.raftPeer.Leave(nodeName)
 				if a.Config.GrpcEnable {
 					a.grpcClientManager.RemoveGrpcClient(nodeName)
 				}
-				prompt = "raft leaved"
+				prompt = "raft leave"
 			} else {
-				prompt = "raft updated"
+				prompt = "raft update"
 			}
 			OnJoinLog(nodeName, addr, prompt, err)
 			go a.genNodesFile()
@@ -461,11 +461,19 @@ func (a *Agent) processOutboundPacket(pk *packets.Packet) {
 }
 
 func OnJoinLog(nodeId, addr, prompt string, err error) {
-	log.Info(prompt, "error", err, "addr", addr)
+	if err != nil {
+		log.Error(prompt, "error", err, "node", nodeId, "addr", addr)
+	} else {
+		log.Info(prompt, "node", nodeId, "addr", addr)
+	}
 }
 
 func OnApplyLog(leaderId, nodeId string, tp byte, filter []byte, prompt string, err error) {
-	log.Info(prompt, "error", err, "leader", leaderId, "from", nodeId, "type", tp, "filter", filter)
+	if err != nil {
+		log.Error(prompt, "error", err, "leader", leaderId, "from", nodeId, "type", tp, "filter", filter)
+	} else {
+		log.Info(prompt, "leader", leaderId, "from", nodeId, "type", tp, "filter", filter)
+	}
 }
 
 func OnPublishPacketLog(direction byte, nodeId, cid, topic string, pid uint16) {

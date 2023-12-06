@@ -21,6 +21,7 @@ mqtt:
     client-write-buffer-size: 1024 #It is the number of individual workers and queues to initialize.
     client-read-buffer-size: 1024  #It is the size of the queue per worker.
     sys-topic-resend-interval: 1 #It specifies the interval between $SYS topic updates in seconds.
+    inline-client: false #Whether to enable the inline client.
     capabilities:
       compatibilities:
         obscure-not-authorized: false #Return unspecified errors instead of not authorized

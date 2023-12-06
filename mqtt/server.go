@@ -89,10 +89,10 @@ type Options struct {
 	Capabilities *Capabilities
 
 	// ClientNetWriteBufferSize specifies the size of the client *bufio.Writer write buffer.
-	ClientNetWriteBufferSize int
+	ClientNetWriteBufferSize int `yaml:"client-write-buffer-size"`
 
 	// ClientNetReadBufferSize specifies the size of the client *bufio.Reader read buffer.
-	ClientNetReadBufferSize int
+	ClientNetReadBufferSize int `yaml:"client-read-buffer-size"`
 
 	// Logger specifies a custom configured implementation of zerolog to override
 	// the servers default logger configuration. If you wish to change the log level,
@@ -106,11 +106,11 @@ type Options struct {
 	Logger *slog.Logger
 
 	// SysTopicResendInterval specifies the interval between $SYS topic updates in seconds.
-	SysTopicResendInterval int64
+	SysTopicResendInterval int64 `yaml:"sys-topic-resend-interval"`
 
 	// Enable Inline client to allow direct subscribing and publishing from the parent codebase,
 	// with negligible performance difference (disabled by default to prevent confusion in statistics).
-	InlineClient bool
+	InlineClient bool `yaml:"inline-client"`
 }
 
 // Server is an MQTT broker server. It should be created with server.New()
