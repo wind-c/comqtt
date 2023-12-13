@@ -7,23 +7,23 @@ package hashicorp
 import (
 	"bytes"
 	"encoding/gob"
-	"io"
-	"sync"
-
-	"github.com/wind-c/comqtt/v2/cluster/message"
-	"github.com/wind-c/comqtt/v2/mqtt/packets"
-
 	"github.com/hashicorp/raft"
+	"github.com/wind-c/comqtt/v2/cluster/log"
+	"github.com/wind-c/comqtt/v2/cluster/message"
+	base "github.com/wind-c/comqtt/v2/cluster/raft"
+	"github.com/wind-c/comqtt/v2/mqtt/packets"
+	"io"
+	"strings"
 )
 
 type Fsm struct {
-	kv       KVStore
+	*base.KV
 	notifyCh chan<- *message.Message
 }
 
 func NewFsm(notifyCh chan<- *message.Message) *Fsm {
 	fsm := &Fsm{
-		kv:       NewKVStore(),
+		KV:       base.NewKV(),
 		notifyCh: notifyCh,
 	}
 	return fsm
@@ -35,34 +35,36 @@ func (f *Fsm) Apply(l *raft.Log) interface{} {
 		return nil
 	}
 	filter := string(msg.Payload)
+	deliverable := false
 	if msg.Type == packets.Subscribe {
-		f.kv.Set(filter, msg.NodeID)
+		deliverable = f.Add(filter, msg.NodeID)
 	} else if msg.Type == packets.Unsubscribe {
-		f.kv.Del(filter, msg.NodeID)
+		deliverable = f.Del(filter, msg.NodeID)
 	} else {
 		return nil
 	}
-	if f.notifyCh != nil {
+	log.Info("raft apply", "from", msg.NodeID, "filter", filter, "type", msg.Type)
+	if f.notifyCh != nil && deliverable {
 		f.notifyCh <- &msg
 	}
 
 	return nil
 }
 
-func (f *Fsm) Search(key string) []string {
-	return f.kv.Get(key)
+func (f *Fsm) Lookup(key string) []string {
+	return f.Get(key)
 }
 
 func (f *Fsm) DelByNode(node string) int {
-	return f.kv.DelByValue(node)
+	return f.DelByValue(node)
 }
 
 func (f *Fsm) Snapshot() (raft.FSMSnapshot, error) {
-	return &f.kv, nil
+	return f, nil
 }
 
 func (f *Fsm) Restore(ir io.ReadCloser) error {
-	if err := gob.NewDecoder(ir).Decode(&f.kv.Data); err != nil {
+	if err := gob.NewDecoder(ir).Decode(f.GetAll()); err != nil {
 		return err
 	}
 	f.notifyReplay()
@@ -70,92 +72,20 @@ func (f *Fsm) Restore(ir io.ReadCloser) error {
 }
 
 func (f *Fsm) notifyReplay() {
-	for filter, ns := range f.kv.Data {
-		for _, nodeId := range ns {
-			msg := message.Message{
-				Type:    packets.Subscribe,
-				NodeID:  nodeId,
-				Payload: []byte(filter),
-			}
-			f.notifyCh <- &msg
+	for filter, ns := range *f.GetAll() {
+		msg := message.Message{
+			Type:    packets.Subscribe,
+			NodeID:  strings.Join(ns, ","),
+			Payload: []byte(filter),
 		}
+		f.notifyCh <- &msg
+		log.Info("raft replay", "from", msg.NodeID, "filter", filter, "type", msg.Type)
 	}
 }
 
-type KVStore struct {
-	Data map[string][]string
-	mu   sync.RWMutex
-}
-
-func NewKVStore() KVStore {
-	return KVStore{
-		Data: make(map[string][]string),
-	}
-}
-
-func (d *KVStore) Get(key string) []string {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
-	vs := d.Data[key]
-	return vs
-}
-
-func (d *KVStore) Set(key, value string) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	if vs, ok := d.Data[key]; ok {
-		for _, item := range vs {
-			if item == value {
-				return
-			}
-		}
-		d.Data[key] = append(vs, value)
-	} else {
-		d.Data[key] = []string{value}
-	}
-}
-
-func (d *KVStore) Del(key, value string) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	if vs, ok := d.Data[key]; ok {
-		if value == "" || len(vs) == 1 {
-			delete(d.Data, key)
-			return
-		}
-
-		for i, item := range vs {
-			if item == value {
-				d.Data[key] = append(vs[:i], vs[i+1:]...)
-			}
-		}
-	}
-}
-
-func (d *KVStore) DelByValue(value string) int {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	c := 0
-	for k, vs := range d.Data {
-		for i, v := range vs {
-			if v == value {
-				if len(vs) == 1 {
-					delete(d.Data, k)
-				} else {
-					d.Data[k] = append(vs[:i], vs[i+1:]...)
-				}
-				c++
-			}
-		}
-	}
-	return c
-}
-
-func (d *KVStore) Persist(sink raft.SnapshotSink) error {
-	d.mu.Lock()
-	defer d.mu.Unlock()
+func (f *Fsm) Persist(sink raft.SnapshotSink) error {
 	var buffer bytes.Buffer
-	err := gob.NewEncoder(&buffer).Encode(d.Data)
+	err := gob.NewEncoder(&buffer).Encode(f.GetAll())
 	if err != nil {
 		return err
 	}
@@ -164,4 +94,4 @@ func (d *KVStore) Persist(sink raft.SnapshotSink) error {
 	return nil
 }
 
-func (d *KVStore) Release() {}
+func (f *Fsm) Release() {}

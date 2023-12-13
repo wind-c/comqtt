@@ -54,6 +54,7 @@ type Message struct {
 	ProtocolVersion byte     `json:"protocolVersion,omitempty"` // mqtt protocol version of the client
 	Clean           bool     `json:"clean,omitempty"`           // if the client requested a clean start/session
 	Timestamp       int64    `json:"ts"`                        // event time
+	PacketID        uint16   `json:"packetid,omitempty"`        // the packet id
 }
 
 // MarshalBinary encodes the values into a json string.
@@ -311,6 +312,7 @@ func (b *Bridge) OnPublished(cl *mqtt.Client, pk packets.Packet) {
 		Topics:    []string{pk.TopicName},
 		Payload:   pk.Payload,
 		Timestamp: timestamp,
+		PacketID:  pk.PacketID,
 	}
 	data, err := msg.MarshalBinary()
 	if err != nil {

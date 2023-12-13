@@ -216,7 +216,7 @@ func (p *Peer) Propose(msg *message.Message) error {
 }
 
 func (p *Peer) Lookup(key string) []string {
-	return p.fsm.Search(key)
+	return p.fsm.Lookup(key)
 }
 
 func (p *Peer) DelByNode(node string) int {

@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"sort"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -265,7 +266,6 @@ func (s *Server) AddListener(l listeners.Listener) error {
 	}
 
 	s.Listeners.Add(l)
-
 	s.Log.Info("attached listener", "id", l.ID(), "protocol", l.Protocol(), "address", l.Address())
 	return nil
 }
@@ -872,7 +872,7 @@ func (s *Server) processPublish(cl *Client, pk packets.Packet) error {
 	// When it publishes a package with a qos > 0, the server treats
 	// the package as qos=0, and the client receives it as qos=1 or 2.
 	if pk.FixedHeader.Qos == 0 || cl.Net.Inline {
-		s.PublishToSubscribers(pk)
+		s.publishToSubscribers(pk)
 		s.hooks.OnPublished(cl, pk)
 		return nil
 	}
@@ -901,7 +901,7 @@ func (s *Server) processPublish(cl *Client, pk packets.Packet) error {
 		s.hooks.OnQosComplete(cl, ack)
 	}
 
-	s.PublishToSubscribers(pk)
+	s.publishToSubscribers(pk)
 	s.hooks.OnPublished(cl, pk)
 
 	return nil
@@ -921,7 +921,13 @@ func (s *Server) retainMessage(cl *Client, pk packets.Packet) {
 }
 
 // PublishToSubscribers publishes a publish packet to all subscribers with matching topic filters.
-func (s *Server) PublishToSubscribers(pk packets.Packet) {
+func (s *Server) publishToSubscribers(pk packets.Packet) {
+	s.PublishToSubscribers(pk, true)
+}
+
+// PublishToSubscribers publishes a publish packet to all subscribers with matching topic filters.
+// local: true indicates the current process call,false indicates external forwarding
+func (s *Server) PublishToSubscribers(pk packets.Packet, local bool) {
 	if pk.Ignore {
 		return
 	}
@@ -935,13 +941,25 @@ func (s *Server) PublishToSubscribers(pk packets.Packet) {
 		pk.Expiry = pk.Created + int64(pk.Properties.MessageExpiryInterval)
 	}
 
+	sharedFilters := make(map[string]bool)
 	subscribers := s.Topics.Subscribers(pk.TopicName)
 	if len(subscribers.Shared) > 0 {
 		subscribers = s.hooks.OnSelectSubscribers(subscribers, pk)
 		if len(subscribers.SharedSelected) == 0 {
 			subscribers.SelectShared()
 		}
+
+		// records shared subscriptions for different groups
+		for _, sub := range subscribers.SharedSelected {
+			sharedFilters[sub.Filter] = false
+		}
+
 		subscribers.MergeSharedSelected()
+	} else {
+		// no shared subscription, publish directly to the cluster
+		if !strings.HasPrefix(pk.TopicName, SysPrefix) && local {
+			s.hooks.OnPublishedWithSharedFilters(pk, sharedFilters)
+		}
 	}
 
 	for _, inlineSubscription := range subscribers.InlineSubscriptions {
@@ -950,11 +968,22 @@ func (s *Server) PublishToSubscribers(pk packets.Packet) {
 
 	for id, subs := range subscribers.Subscriptions {
 		if cl, ok := s.Clients.Get(id); ok {
-			_, err := s.publishToClient(cl, subs, pk)
-			if err != nil {
+			if _, err := s.publishToClient(cl, subs, pk); err != nil {
+				if strings.HasPrefix(subs.Filter, "$share") {
+					sharedFilters[subs.Filter] = false
+				}
 				s.Log.Debug("failed publishing packet", "error", err, "client", cl.ID, "packet", pk)
+			} else {
+				if strings.HasPrefix(subs.Filter, "$share") {
+					sharedFilters[subs.Filter] = true
+				}
 			}
 		}
+	}
+
+	// publish results with local shared subscriptions
+	if len(sharedFilters) > 0 && local {
+		s.hooks.OnPublishedWithSharedFilters(pk, sharedFilters)
 	}
 }
 
@@ -1423,7 +1452,7 @@ func (s *Server) publishSysTopics() {
 		pk.TopicName = topic
 		pk.Payload = []byte(payload)
 		s.Topics.RetainMessage(pk.Copy(false))
-		s.PublishToSubscribers(pk)
+		s.publishToSubscribers(pk)
 	}
 
 	s.hooks.OnSysInfoTick(s.Info)
@@ -1482,7 +1511,7 @@ func (s *Server) sendLWT(cl *Client) {
 		s.retainMessage(cl, pk)
 	}
 
-	s.PublishToSubscribers(pk)                      // [MQTT-3.1.2-8]
+	s.publishToSubscribers(pk)                      // [MQTT-3.1.2-8]
 	atomic.StoreUint32(&cl.Properties.Will.Flag, 0) // [MQTT-3.1.2-10]
 	s.hooks.OnWillSent(cl, pk)
 }
@@ -1666,7 +1695,7 @@ func (s *Server) clearExpiredInflights(now int64) {
 func (s *Server) sendDelayedLWT(dt int64) {
 	for id, pk := range s.loop.willDelayed.GetAll() {
 		if dt > pk.Expiry {
-			s.PublishToSubscribers(pk) // [MQTT-3.1.2-8]
+			s.publishToSubscribers(pk) // [MQTT-3.1.2-8]
 			if cl, ok := s.Clients.Get(id); ok {
 				if pk.FixedHeader.Retain {
 					s.retainMessage(cl, pk)
