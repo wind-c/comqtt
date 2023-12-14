@@ -1689,7 +1689,7 @@ func TestPublishToSubscribersSelfNoLocal(t *testing.T) {
 	go func() {
 		pkx := *packets.TPacketData[packets.Publish].Get(packets.TPublishBasic).Packet
 		pkx.Origin = cl.ID
-		s.PublishToSubscribers(pkx)
+		s.publishToSubscribers(pkx)
 		time.Sleep(time.Millisecond)
 		_ = w.Close()
 	}()
@@ -1747,7 +1747,7 @@ func TestPublishToSubscribers(t *testing.T) {
 	}()
 
 	go func() {
-		s.PublishToSubscribers(*packets.TPacketData[packets.Publish].Get(packets.TPublishBasic).Packet)
+		s.publishToSubscribers(*packets.TPacketData[packets.Publish].Get(packets.TPublishBasic).Packet)
 		time.Sleep(time.Millisecond)
 		_ = w1.Close()
 		_ = w2.Close()
@@ -1791,7 +1791,7 @@ func TestPublishToSubscribersMessageExpiryDelta(t *testing.T) {
 	go func() {
 		pkx := *packets.TPacketData[packets.Publish].Get(packets.TPublishBasic).Packet
 		pkx.Created = time.Now().Unix() - 30
-		s.PublishToSubscribers(pkx)
+		s.publishToSubscribers(pkx)
 		time.Sleep(time.Millisecond)
 		_ = w1.Close()
 	}()
@@ -1815,7 +1815,7 @@ func TestPublishToSubscribersIdentifiers(t *testing.T) {
 	require.True(t, subbed)
 
 	go func() {
-		s.PublishToSubscribers(*packets.TPacketData[packets.Publish].Get(packets.TPublishBasic).Packet)
+		s.publishToSubscribers(*packets.TPacketData[packets.Publish].Get(packets.TPublishBasic).Packet)
 		time.Sleep(time.Millisecond)
 		_ = w.Close()
 	}()
@@ -1840,7 +1840,7 @@ func TestPublishToSubscribersPkIgnore(t *testing.T) {
 	go func() {
 		pk := *packets.TPacketData[packets.Publish].Get(packets.TPublishBasic).Packet
 		pk.Ignore = true
-		s.PublishToSubscribers(pk)
+		s.publishToSubscribers(pk)
 		time.Sleep(time.Millisecond)
 		_ = w.Close()
 	}()
@@ -2071,7 +2071,7 @@ func TestPublishToSubscribersExhaustedSendQuota(t *testing.T) {
 	_ = r.Close()
 	pkx := *packets.TPacketData[packets.Publish].Get(packets.TPublishQos1).Packet
 	pkx.PacketID = 0
-	s.PublishToSubscribers(pkx)
+	s.publishToSubscribers(pkx)
 	time.Sleep(time.Millisecond)
 	_ = w.Close()
 }
@@ -2093,7 +2093,7 @@ func TestPublishToSubscribersExhaustedPacketIDs(t *testing.T) {
 	_ = r.Close()
 	pkx := *packets.TPacketData[packets.Publish].Get(packets.TPublishQos1).Packet
 	pkx.PacketID = 0
-	s.PublishToSubscribers(pkx)
+	s.publishToSubscribers(pkx)
 	time.Sleep(time.Millisecond)
 	_ = w.Close()
 }
@@ -2109,7 +2109,7 @@ func TestPublishToSubscribersNoConnection(t *testing.T) {
 	// coverage: subscriber publish errors are non-returnable
 	// can we hook into zerolog ?
 	_ = r.Close()
-	s.PublishToSubscribers(*packets.TPacketData[packets.Publish].Get(packets.TPublishBasic).Packet)
+	s.publishToSubscribers(*packets.TPacketData[packets.Publish].Get(packets.TPublishBasic).Packet)
 	time.Sleep(time.Millisecond)
 	_ = w.Close()
 }
@@ -2566,7 +2566,7 @@ func TestServerProcessOutboundQos2Flow(t *testing.T) {
 			}()
 
 			if i == 0 {
-				s.PublishToSubscribers(*tx.in.Packet)
+				s.publishToSubscribers(*tx.in.Packet)
 			} else {
 				err := s.processPacket(cl, *tx.in.Packet)
 				require.NoError(t, err)
@@ -3495,7 +3495,7 @@ func TestPublishToInlineSubscriber(t *testing.T) {
 
 	go func() {
 		pkx := *packets.TPacketData[packets.Publish].Get(packets.TPublishBasic).Packet
-		s.PublishToSubscribers(pkx)
+		s.publishToSubscribers(pkx)
 	}()
 
 	require.Equal(t, true, <-finishCh)
@@ -3528,10 +3528,10 @@ func TestPublishToInlineSubscribersDifferentFilter(t *testing.T) {
 
 	go func() {
 		pkx := *packets.TPacketData[packets.Publish].Get(packets.TPublishBasic).Packet
-		s.PublishToSubscribers(pkx)
+		s.publishToSubscribers(pkx)
 
 		pkx = *packets.TPacketData[packets.Publish].Get(packets.TPublishCopyBasic).Packet
-		s.PublishToSubscribers(pkx)
+		s.publishToSubscribers(pkx)
 	}()
 
 	for i := 0; i < subNumber; i++ {
@@ -3566,7 +3566,7 @@ func TestPublishToInlineSubscribersDifferentIdentifier(t *testing.T) {
 
 	go func() {
 		pkx := *packets.TPacketData[packets.Publish].Get(packets.TPublishBasic).Packet
-		s.PublishToSubscribers(pkx)
+		s.publishToSubscribers(pkx)
 	}()
 
 	for i := 0; i < subNumber; i++ {

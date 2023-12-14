@@ -483,7 +483,7 @@ func (a *Agent) processOutboundConnect(pk *packets.Packet) {
 // pickNodes pick nodes, if the filter is shared, select a node at random
 func (a *Agent) pickNodes(filter string, sharedFilters map[string]bool) (ns []string) {
 	tmpNs := a.raftPeer.Lookup(filter)
-	if len(tmpNs) == 0 {
+	if tmpNs == nil || len(tmpNs) == 0 {
 		return ns
 	}
 

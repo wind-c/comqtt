@@ -62,6 +62,7 @@ func (k *KV) Add(key, value string) (new bool) {
 }
 
 // Del return true if the array corresponding to key is deleted
+// If the value is "", the key-values pair is deleted
 func (k *KV) Del(key, value string) (empty bool) {
 	k.Lock()
 	defer k.Unlock()
@@ -74,7 +75,7 @@ func (k *KV) Del(key, value string) (empty bool) {
 			}
 		}
 
-		if value == "" || len(vs) == 0 {
+		if value == "" || len(k.data[key]) == 0 {
 			delete(k.data, key)
 			empty = true
 		}
@@ -82,20 +83,25 @@ func (k *KV) Del(key, value string) (empty bool) {
 	return
 }
 
+// DelByValue delete the specified value from the key-values array
+// and delete the key-value pair if the key-values array is empty
 func (k *KV) DelByValue(value string) int {
 	k.Lock()
 	defer k.Unlock()
 	c := 0
+	if value == "" {
+		return c
+	}
+
 	for f, vs := range k.data {
 		for i, v := range vs {
 			if v == value {
-				if len(vs) == 1 {
-					delete(k.data, f)
-				} else {
-					k.data[f] = append(vs[:i], vs[i+1:]...)
-				}
+				k.data[f] = append(vs[:i], vs[i+1:]...)
 				c++
 			}
+		}
+		if len(k.data[f]) == 0 {
+			delete(k.data, f)
 		}
 	}
 	return c
