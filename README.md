@@ -15,7 +15,7 @@ Comqtt is an embeddable high-performance MQTT broker server written in Go, and s
 
 :+1: Comqtt code is cleaner, easier to read, customize, and extend than other Mqtt Broker code! :heart_eyes:
 
-:+1: If you like or useful to you, please give a STAR, let more know and participate in maintenance together! :muscle:
+:+1: If you like this project or it's useful to you, please give it a STAR, let more people know about it, and contribute in it's maintenance together! :muscle:
 
 > #### 📦 💬 See Github Discussions for discussions about releases
 > Ongoing discussion about current and future releases can be found at https://github.com/wind-c/comqtt/discussions
