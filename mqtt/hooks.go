@@ -50,6 +50,7 @@ const (
 	OnWillSent
 	OnClientExpired
 	OnRetainedExpired
+	OnPublishedWithSharedFilters
 	StoredClients
 	StoredSubscriptions
 	StoredInflightMessages
@@ -106,6 +107,7 @@ type Hook interface {
 	OnWillSent(cl *Client, pk packets.Packet)
 	OnClientExpired(cl *Client)
 	OnRetainedExpired(filter string)
+	OnPublishedWithSharedFilters(pk packets.Packet, sharedFilters map[string]bool)
 	StoredClients() ([]storage.Client, error)
 	StoredSubscriptions() ([]storage.Subscription, error)
 	StoredInflightMessages() ([]storage.Message, error)
@@ -549,6 +551,15 @@ func (h *Hooks) OnRetainedExpired(filter string) {
 	}
 }
 
+// OnPublishedWithSharedFilters is called when a client has published a message to cluster.
+func (h *Hooks) OnPublishedWithSharedFilters(pk packets.Packet, sharedFilters map[string]bool) {
+	for _, hook := range h.GetAll() {
+		if hook.Provides(OnPublishedWithSharedFilters) {
+			hook.OnPublishedWithSharedFilters(pk, sharedFilters)
+		}
+	}
+}
+
 // StoredClients returns all clients, e.g. from a persistent store, is used to
 // populate the server clients list before start.
 func (h *Hooks) StoredClients() (v []storage.Client, err error) {
@@ -911,6 +922,9 @@ func (h *HookBase) OnClientExpired(cl *Client) {}
 
 // OnRetainedExpired is called when a retained message for a topic has expired.
 func (h *HookBase) OnRetainedExpired(topic string) {}
+
+// OnClusterPublish is called when a client has published a message to cluster.
+func (h *HookBase) OnClusterPublish(pk packets.Packet, sharedFilters map[string]bool) {}
 
 // StoredClients returns all clients from a store.
 func (h *HookBase) StoredClients() (v []storage.Client, err error) {

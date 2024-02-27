@@ -7,10 +7,12 @@ package cluster
 import (
 	"bytes"
 	"context"
+	"math/rand"
 	"net"
 	"path"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/panjf2000/ants/v2"
 	"github.com/wind-c/comqtt/v2/cluster/discovery"
@@ -156,18 +158,6 @@ func (a *Agent) initPool() error {
 	return nil
 }
 
-func (a *Agent) SubmitOutTask(pk *packets.Packet) {
-	a.OutPool.Submit(func() {
-		a.processOutboundPacket(pk)
-	})
-}
-
-func (a *Agent) SubmitRaftTask(msg *message.Message) {
-	a.raftPool.Submit(func() {
-		a.raftPropose(msg)
-	})
-}
-
 func (a *Agent) Stop() {
 	a.cancel()
 	a.OutPool.Release()
@@ -264,7 +254,6 @@ func (a *Agent) raftApplyListener() {
 			} else {
 				continue
 			}
-			log.Info("apply listening", "from", msg.NodeID, "filter", filter, "type", msg.Type)
 		case <-a.ctx.Done():
 			return
 		}
@@ -275,7 +264,7 @@ func (a *Agent) raftApplyListener() {
 func (a *Agent) raftPropose(msg *message.Message) {
 	if a.raftPeer.IsApplyRight() {
 		err := a.raftPeer.Propose(msg)
-		OnApplyLog(a.GetLocalName(), msg.NodeID, msg.Type, msg.Payload, "apply raft log", err)
+		OnApplyLog(a.GetLocalName(), msg.NodeID, msg.Type, msg.Payload, "raft apply log", err)
 	} else { //send to leader apply
 		_, leaderId := a.raftPeer.GetLeader()
 		if leaderId == "" {
@@ -284,14 +273,14 @@ func (a *Agent) raftPropose(msg *message.Message) {
 			} else {
 				a.membership.SendToOthers(msg.MsgpackBytes())
 			}
-			OnApplyLog("unknown", msg.NodeID, msg.Type, msg.Payload, "broadcast raft log", nil)
+			OnApplyLog("unknown", msg.NodeID, msg.Type, msg.Payload, "raft broadcast log", nil)
 		} else {
 			if a.Config.GrpcEnable {
 				a.grpcClientManager.RelayRaftApply(leaderId, msg)
 			} else {
 				a.membership.SendToNode(leaderId, msg.MsgpackBytes())
 			}
-			OnApplyLog(leaderId, msg.NodeID, msg.Type, msg.Payload, "forward raft log", nil)
+			OnApplyLog(leaderId, msg.NodeID, msg.Type, msg.Payload, "raft forward log", nil)
 		}
 	}
 }
@@ -319,23 +308,23 @@ func (a *Agent) processNodeEvent() {
 		select {
 		case event := <-a.membership.EventChan():
 			var err error
-			prompt := "raft joining"
+			prompt := "raft join"
 			nodeName := event.Name
 			addr := getRaftPeerAddr(&event.Member)
 			//addr := event.Addr
 			if event.Type == discovery.EventJoin {
 				if nodeName != a.GetLocalName() && a.raftPeer.IsApplyRight() {
 					err = a.raftPeer.Join(nodeName, addr)
-					prompt = "raft joined"
+					prompt = "raft join"
 				}
 			} else if event.Type == discovery.EventLeave {
 				err = a.raftPeer.Leave(nodeName)
 				if a.Config.GrpcEnable {
 					a.grpcClientManager.RemoveGrpcClient(nodeName)
 				}
-				prompt = "raft leaved"
+				prompt = "raft leave"
 			} else {
-				prompt = "raft updated"
+				prompt = "raft update"
 			}
 			OnJoinLog(nodeName, addr, prompt, err)
 			go a.genNodesFile()
@@ -362,7 +351,7 @@ func (a *Agent) processRelayMsg(msg *message.Message) {
 		}
 		offset := len(msg.Payload) - pk.FixedHeader.Remaining          // Unpack fixedheader.
 		if err := pk.PublishDecode(msg.Payload[offset:]); err == nil { // Unpack skips fixedheader
-			a.mqttServer.PublishToSubscribers(pk)
+			a.mqttServer.PublishToSubscribers(pk, false)
 			OnPublishPacketLog(DirectionInbound, msg.NodeID, msg.ClientID, pk.TopicName, pk.PacketID)
 		}
 	case packets.Connect:
@@ -413,59 +402,127 @@ func (a *Agent) processInboundMsg() {
 	}
 }
 
-// processOutboundPacket process outbound msg
-func (a *Agent) processOutboundPacket(pk *packets.Packet) {
+func (a *Agent) SubmitOutPublishTask(pk *packets.Packet, sharedFilters map[string]bool) {
+	a.OutPool.Submit(func() {
+		a.processOutboundPublish(pk, sharedFilters)
+	})
+}
+
+func (a *Agent) SubmitOutConnectTask(pk *packets.Packet) {
+	a.OutPool.Submit(func() {
+		a.processOutboundConnect(pk)
+	})
+}
+
+func (a *Agent) SubmitRaftTask(msg *message.Message) {
+	a.raftPool.Submit(func() {
+		a.raftPropose(msg)
+	})
+}
+
+// processOutboundPublish process outbound publish msg
+func (a *Agent) processOutboundPublish(pk *packets.Packet, sharedFilters map[string]bool) {
 	msg := message.Message{
 		NodeID:          a.Config.NodeName,
 		ClientID:        pk.Origin,
 		ProtocolVersion: pk.ProtocolVersion,
 	}
-	switch pk.FixedHeader.Type {
-	case packets.Publish:
-		var buf bytes.Buffer
-		pk.Mods.AllowResponseInfo = true
-		if err := pk.PublishEncode(&buf); err != nil {
-			return
+
+	var buf bytes.Buffer
+	pk.Mods.AllowResponseInfo = true
+	if err := pk.PublishEncode(&buf); err != nil {
+		return
+	}
+	msg.Type = packets.Publish
+	msg.Payload = buf.Bytes()
+	tmpFilters := a.subTree.Scan(pk.TopicName, make([]string, 0))
+	oldNodes := make([]string, 0)
+	filters := make([]string, 0)
+	for _, filter := range tmpFilters {
+		if !utils.Contains(filters, filter) {
+			filters = append(filters, filter)
 		}
-		msg.Type = packets.Publish
-		msg.Payload = buf.Bytes()
-		filters := a.subTree.Scan(pk.TopicName, make([]string, 0))
-		oldNodes := make([]string, 0)
-		for _, filter := range filters {
-			ns := a.raftPeer.Lookup(filter)
-			for _, node := range ns {
-				if node != a.GetLocalName() && !utils.Contains(oldNodes, node) {
-					if a.Config.GrpcEnable {
-						a.grpcClientManager.RelayPublishPacket(node, &msg)
-					} else {
-						bs := msg.MsgpackBytes()
-						a.membership.SendToNode(node, bs)
-					}
-					oldNodes = append(oldNodes, node)
-					OnPublishPacketLog(DirectionOutbound, node, pk.Origin, pk.TopicName, pk.PacketID)
+	}
+	for _, filter := range filters {
+		ns := a.pickNodes(filter, sharedFilters)
+		for _, node := range ns {
+			if node != a.GetLocalName() && !utils.Contains(oldNodes, node) {
+				if a.Config.GrpcEnable {
+					a.grpcClientManager.RelayPublishPacket(node, &msg)
+				} else {
+					bs := msg.MsgpackBytes()
+					a.membership.SendToNode(node, bs)
 				}
+				oldNodes = append(oldNodes, node)
+				OnPublishPacketLog(DirectionOutbound, node, pk.Origin, pk.TopicName, pk.PacketID)
 			}
 		}
-	case packets.Connect:
-		msg.Type = packets.Connect
-		if msg.ClientID == "" {
-			msg.ClientID = pk.Connect.ClientIdentifier
-		}
-		if a.Config.GrpcEnable {
-			a.grpcClientManager.ConnectNotifyToOthers(&msg)
-		} else {
-			a.membership.SendToOthers(msg.MsgpackBytes())
-		}
-		OnConnectPacketLog(DirectionOutbound, a.GetLocalName(), msg.ClientID)
 	}
 }
 
+// processOutboundConnect process outbound connect msg
+func (a *Agent) processOutboundConnect(pk *packets.Packet) {
+	msg := message.Message{
+		NodeID:          a.Config.NodeName,
+		ClientID:        pk.Origin,
+		ProtocolVersion: pk.ProtocolVersion,
+	}
+
+	msg.Type = packets.Connect
+	if msg.ClientID == "" {
+		msg.ClientID = pk.Connect.ClientIdentifier
+	}
+	if a.Config.GrpcEnable {
+		a.grpcClientManager.ConnectNotifyToOthers(&msg)
+	} else {
+		a.membership.SendToOthers(msg.MsgpackBytes())
+	}
+	OnConnectPacketLog(DirectionOutbound, a.GetLocalName(), msg.ClientID)
+}
+
+// pickNodes pick nodes, if the filter is shared, select a node at random
+func (a *Agent) pickNodes(filter string, sharedFilters map[string]bool) (ns []string) {
+	tmpNs := a.raftPeer.Lookup(filter)
+	if tmpNs == nil || len(tmpNs) == 0 {
+		return ns
+	}
+
+	if strings.HasPrefix(filter, topics.SharePrefix) {
+		if b, ok := sharedFilters[filter]; ok && b {
+			return ns
+		}
+
+		for _, n := range tmpNs {
+			// The shared subscription is local priority, indicating that it has been sent
+			if n == a.GetLocalName() {
+				return ns
+			}
+		}
+		// Share subscription Select a node at random
+		n := tmpNs[rand.Intn(len(tmpNs))]
+		ns = []string{n}
+		return ns
+	}
+
+	// Not shared subscriptions are returned as is
+	ns = tmpNs
+	return
+}
+
 func OnJoinLog(nodeId, addr, prompt string, err error) {
-	log.Info(prompt, "error", err, "addr", addr)
+	if err != nil {
+		log.Error(prompt, "error", err, "node", nodeId, "addr", addr)
+	} else {
+		log.Info(prompt, "node", nodeId, "addr", addr)
+	}
 }
 
 func OnApplyLog(leaderId, nodeId string, tp byte, filter []byte, prompt string, err error) {
-	log.Info(prompt, "error", err, "leader", leaderId, "from", nodeId, "type", tp, "filter", filter)
+	if err != nil {
+		log.Error(prompt, "error", err, "leader", leaderId, "from", nodeId, "type", tp, "filter", filter)
+	} else {
+		log.Info(prompt, "leader", leaderId, "from", nodeId, "type", tp, "filter", filter)
+	}
 }
 
 func OnPublishPacketLog(direction byte, nodeId, cid, topic string, pid uint16) {

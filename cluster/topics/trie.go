@@ -9,6 +9,10 @@ import (
 	"sync"
 )
 
+const (
+	SharePrefix = "$share/" // The lower prefix of the shared topic
+)
+
 // Subscriptions is a map of subscriptions keyed on client.
 type Subscriptions map[string]byte
 
@@ -33,10 +37,7 @@ func New() *Index {
 func (x *Index) Subscribe(filter string) bool {
 	x.mu.Lock()
 	defer x.mu.Unlock()
-
 	n := x.poperate(filter)
-	n.Filter = filter
-
 	return n.Count > 0
 }
 
@@ -48,6 +49,41 @@ func (x *Index) Unsubscribe(filter string) bool {
 	return x.unpoperate(filter)
 }
 
+// poperate iterates and populates through a filter path, instantiating
+// leaves as it goes and returning the final leaf in the branch.
+// poperate is a more enjoyable word than iterpop.
+func (x *Index) poperate(filter string) *Leaf {
+	var d int
+	var particle string
+	var hasNext = true
+	n := x.Root
+	group, filter := convertSharedFilter(filter)
+	for hasNext {
+		particle, hasNext = isolateParticle(filter, d)
+		d++
+
+		child, _ := n.Leaves[particle]
+		if child == nil {
+			child = &Leaf{
+				Key:          particle,
+				Parent:       n,
+				Leaves:       make(map[string]*Leaf),
+				Count:        0,
+				SharedGroups: make([]string, 0),
+			}
+			n.Leaves[particle] = child
+		}
+		n = child
+	}
+	n.Count++
+	n.Filter = filter
+	if group != "" {
+		n.SharedGroups = append(n.SharedGroups, group)
+	}
+
+	return n
+}
+
 // unpoperate steps backward through a trie sequence and removes any orphaned
 // nodes. If a client id is specified, it will unsubscribe a client. If message
 // is true, it will delete a retained message.
@@ -56,6 +92,7 @@ func (x *Index) unpoperate(filter string) bool {
 	var particle string
 	var hasNext = true
 	e := x.Root
+	group, filter := convertSharedFilter(filter)
 	for hasNext {
 		particle, hasNext = isolateParticle(filter, d)
 		d++
@@ -80,6 +117,14 @@ func (x *Index) unpoperate(filter string) bool {
 			if e.Count > 0 {
 				e.Count--
 			}
+			if group != "" {
+				for i, v := range e.SharedGroups {
+					if v == group {
+						e.SharedGroups = append(e.SharedGroups[:i], e.SharedGroups[i+1:]...)
+						break
+					}
+				}
+			}
 			end = false
 		}
 
@@ -98,35 +143,6 @@ func (x *Index) unpoperate(filter string) bool {
 	return true
 }
 
-// poperate iterates and populates through a topic/filter path, instantiating
-// leaves as it goes and returning the final leaf in the branch.
-// poperate is a more enjoyable word than iterpop.
-func (x *Index) poperate(topic string) *Leaf {
-	var d int
-	var particle string
-	var hasNext = true
-	n := x.Root
-	for hasNext {
-		particle, hasNext = isolateParticle(topic, d)
-		d++
-
-		child, _ := n.Leaves[particle]
-		if child == nil {
-			child = &Leaf{
-				Key:    particle,
-				Parent: n,
-				Leaves: make(map[string]*Leaf),
-				Count:  0,
-			}
-			n.Leaves[particle] = child
-		}
-		n = child
-	}
-	n.Count++
-
-	return n
-}
-
 // Scan returns true if a matching filter exists
 func (x *Index) Scan(topic string, filters []string) []string {
 	x.mu.RLock()
@@ -136,11 +152,12 @@ func (x *Index) Scan(topic string, filters []string) []string {
 
 // Leaf is a child node on the tree.
 type Leaf struct {
-	Key    string           // the key that was used to create the leaf.
-	Parent *Leaf            // a pointer to the parent node for the leaf.
-	Leaves map[string]*Leaf // a map of child nodes, keyed on particle id.
-	Filter string           // the path of the topic filter being matched.
-	Count  int
+	Key          string           // the key that was used to create the leaf.
+	Parent       *Leaf            // a pointer to the parent node for the leaf.
+	Leaves       map[string]*Leaf // a map of child nodes, keyed on particle id.
+	Filter       string           // the path of the topic filter being matched.
+	Count        int              // the number of nodes subscribed to the topic.
+	SharedGroups []string         // the shared topics of this leaf.
 }
 
 // scanSubscribers recursively steps through a branch of leaves finding clients who
@@ -167,14 +184,26 @@ func (l *Leaf) scan(topic string, d int, filters []string) []string {
 			if !hasNext || particle == "#" {
 				// matching the topic.
 				if child.Filter != "" {
-					filters = append(filters, child.Filter)
+					if child.Count > len(child.SharedGroups) {
+						filters = append(filters, child.Filter)
+					}
+					if len(child.SharedGroups) > 0 {
+						groups := restoreShareFilter(child.Filter, child.SharedGroups)
+						filters = append(filters, groups...)
+					}
 				}
 
 				// Make sure we also capture any client who are listening
 				// to this topic via path/#
 				if !hasNext {
 					if extra, ok := child.Leaves["#"]; ok {
-						filters = append(filters, extra.Filter)
+						if extra.Count > len(extra.SharedGroups) {
+							filters = append(filters, extra.Filter)
+						}
+						if len(extra.SharedGroups) > 0 {
+							groups := restoreShareFilter(extra.Filter, extra.SharedGroups)
+							filters = append(filters, groups...)
+						}
 					}
 				}
 			}
@@ -209,6 +238,28 @@ func isolateParticle(filter string, d int) (particle string, hasNext bool) {
 	}
 
 	return
+}
+
+// convertSharedFilter converts a shared filter to a regular filter and a group.
+func convertSharedFilter(srcFilter string) (group, destFilter string) {
+	if strings.HasPrefix(srcFilter, SharePrefix) {
+		prefixLen := len(SharePrefix)
+		end := strings.IndexRune(srcFilter[prefixLen:], '/')
+		group = srcFilter[prefixLen : end+prefixLen+1]
+		destFilter = srcFilter[end+prefixLen+1:]
+	} else {
+		destFilter = srcFilter
+	}
+	return
+}
+
+// restoreShareFilter restores a filter to a shared filters.
+func restoreShareFilter(filter string, sharedGroups []string) []string {
+	fs := make([]string, len(sharedGroups))
+	for i, v := range sharedGroups {
+		fs[i] = SharePrefix + v + filter
+	}
+	return fs
 }
 
 // ReLeaf is a dev function for showing the trie leafs.

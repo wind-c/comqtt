@@ -150,6 +150,17 @@ func (s *SharedSubscriptions) Get(group, id string) (val packets.Subscription, o
 	return val, ok
 }
 
+// SubsInGroupLen returns the number of subscriptions in a shared subscription group.
+func (s *SharedSubscriptions) SubsInGroupLen(group string) int {
+	s.RLock()
+	defer s.RUnlock()
+	n := 0
+	if m, ok := s.internal[group]; ok {
+		n = len(m)
+	}
+	return n
+}
+
 // GroupLen returns the number of groups subscribed to the filter.
 func (s *SharedSubscriptions) GroupLen() int {
 	s.RLock()
@@ -410,7 +421,7 @@ func (x *TopicsIndex) Subscribe(client string, subscription packets.Subscription
 		n := x.set(subscription.Filter, 2)
 		_, existed = n.shared.Get(group, client)
 		n.shared.Add(group, client, subscription)
-		count = n.shared.Len()
+		count = n.shared.SubsInGroupLen(group)
 	} else {
 		n := x.set(subscription.Filter, 0)
 		_, existed = n.subscriptions.Get(client)

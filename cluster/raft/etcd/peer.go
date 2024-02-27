@@ -173,8 +173,12 @@ func (p *Peer) Propose(msg *message.Message) error {
 }
 
 func (p *Peer) Lookup(key string) []string {
-	rs, _ := p.kvStore.Lookup(key)
+	rs := p.kvStore.Lookup(key)
 	return rs
+}
+
+func (p *Peer) DelByNode(node string) int {
+	return p.kvStore.DelByNode(node)
 }
 
 func getZapLogger() *zap.Logger {

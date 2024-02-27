@@ -36,17 +36,17 @@ func genEvent(tp int, node *memberlist.Node) *discovery.Event {
 
 func (n *NodeEvents) NotifyJoin(node *memberlist.Node) {
 	n.ech <- genEvent(discovery.EventJoin, node)
-	onLog(node, "notify join")
+	onLog(node, "member join")
 }
 
 func (n *NodeEvents) NotifyLeave(node *memberlist.Node) {
 	n.ech <- genEvent(discovery.EventLeave, node)
-	onLog(node, "notify leave")
+	onLog(node, "member leave")
 }
 
 func (n *NodeEvents) NotifyUpdate(node *memberlist.Node) {
 	n.ech <- genEvent(discovery.EventUpdate, node)
-	onLog(node, "notify update")
+	onLog(node, "member update")
 }
 
 func onLog(node *memberlist.Node, prompt string) {

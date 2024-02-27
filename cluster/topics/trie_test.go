@@ -313,3 +313,21 @@ func BenchmarkIsolateParticle(b *testing.B) {
 		isolateParticle("path/to/my/mqtt", 3)
 	}
 }
+
+func TestConvertSharedFilter(t *testing.T) {
+	srcFilter := "$share/group1/filter/1"
+
+	group, destFilter := convertSharedFilter(srcFilter)
+	require.Equal(t, "group1/", group)
+	require.Equal(t, "filter/1", destFilter)
+}
+
+func TestRestoreShareFilter(t *testing.T) {
+	filter := "filter"
+	sharedGroups := []string{"Group1/", "Group2/", "Group3/"}
+
+	result := restoreShareFilter(filter, sharedGroups)
+	expectedResult := []string{"$share/Group1/filter", "$share/Group2/filter", "$share/Group3/filter"}
+
+	require.EqualValues(t, expectedResult, result)
+}

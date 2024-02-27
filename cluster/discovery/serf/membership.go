@@ -150,7 +150,7 @@ func (m *Membership) eventLoop() {
 					continue
 				}
 				m.eventCh <- genEvent(mb.EventLeave, &member)
-				onLog(&member, "notify leave")
+				onLog(&member, "member leave")
 			}
 		case serf.EventMemberJoin:
 			for _, member := range e.(serf.MemberEvent).Members {
@@ -158,7 +158,7 @@ func (m *Membership) eventLoop() {
 					continue
 				}
 				m.eventCh <- genEvent(mb.EventJoin, &member)
-				onLog(&member, "notify join")
+				onLog(&member, "member join")
 			}
 		case serf.EventMemberUpdate:
 			for _, member := range e.(serf.MemberEvent).Members {
@@ -166,7 +166,7 @@ func (m *Membership) eventLoop() {
 					continue
 				}
 				m.eventCh <- genEvent(mb.EventUpdate, &member)
-				onLog(&member, "notify update")
+				onLog(&member, "member update")
 			}
 		case serf.EventMemberReap:
 			for _, member := range e.(serf.MemberEvent).Members {
@@ -174,7 +174,7 @@ func (m *Membership) eventLoop() {
 					continue
 				}
 				m.eventCh <- genEvent(mb.EventReap, &member)
-				onLog(&member, "notify reap")
+				onLog(&member, "member reap")
 			}
 		case serf.EventUser:
 			ue := e.(serf.UserEvent)
@@ -221,7 +221,7 @@ func (m *Membership) Broadcast(msg []byte) {
 }
 
 func onLog(node *serf.Member, prompt string) {
-	log.Info(prompt, "node", node.Name, "addr", node.Addr.String())
+	log.Info(prompt, "node", node.Name, "addr", node.Addr.String(), "port", node.Port)
 }
 
 func (m *Membership) isLocal(member serf.Member) bool {

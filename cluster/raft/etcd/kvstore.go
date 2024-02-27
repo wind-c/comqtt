@@ -7,19 +7,18 @@ package etcd
 import (
 	"bytes"
 	"encoding/gob"
-	"sync"
-
 	"github.com/wind-c/comqtt/v2/cluster/log"
 	"github.com/wind-c/comqtt/v2/cluster/message"
+	base "github.com/wind-c/comqtt/v2/cluster/raft"
 	"github.com/wind-c/comqtt/v2/mqtt/packets"
 	"go.etcd.io/etcd/raft/v3/raftpb"
 	"go.etcd.io/etcd/server/v3/etcdserver/api/snap"
+	"strings"
 )
 
 // KVStore is a key-value store backed by raft
 type KVStore struct {
-	mu          sync.RWMutex
-	data        map[string][]string // current committed key-value pairs
+	*base.KV
 	snapshotter *snap.Snapshotter
 	commitC     <-chan *commit
 	errorC      <-chan error
@@ -28,7 +27,7 @@ type KVStore struct {
 
 func newKVStore(snapshotter *snap.Snapshotter, commitC <-chan *commit, errorC <-chan error, notifyCh chan<- *message.Message) *KVStore {
 	s := &KVStore{
-		data:        make(map[string][]string),
+		KV:          base.NewKV(),
 		snapshotter: snapshotter,
 		commitC:     commitC,
 		errorC:      errorC,
@@ -49,62 +48,12 @@ func newKVStore(snapshotter *snap.Snapshotter, commitC <-chan *commit, errorC <-
 	return s
 }
 
-func (s *KVStore) Lookup(key string) ([]string, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	v, ok := s.data[key]
-	return v, ok
+func (s *KVStore) Lookup(key string) []string {
+	return s.Get(key)
 }
 
-func (s *KVStore) Del(key, value string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if vs, ok := s.data[key]; ok {
-		if value == "" || len(vs) == 1 {
-			delete(s.data, key)
-			return
-		}
-
-		for i, item := range vs {
-			if item == value {
-				s.data[key] = append(vs[:i], vs[i+1:]...)
-			}
-		}
-	}
-}
-
-func (d *KVStore) DelByValue(value string) int {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	c := 0
-	for k, vs := range d.data {
-		for i, v := range vs {
-			if v == value {
-				if len(vs) == 1 {
-					delete(d.data, k)
-				} else {
-					d.data[k] = append(vs[:i], vs[i+1:]...)
-				}
-				c++
-			}
-		}
-	}
-	return c
-}
-
-func (s *KVStore) Add(key, value string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if vs, ok := s.data[key]; ok {
-		for _, item := range vs {
-			if item == value {
-				return
-			}
-		}
-		s.data[key] = append(vs, value)
-	} else {
-		s.data[key] = []string{value}
-	}
+func (s *KVStore) DelByNode(node string) int {
+	return s.DelByValue(node)
 }
 
 func (s *KVStore) GetErrorC(key, value string) <-chan error {
@@ -133,15 +82,19 @@ func (s *KVStore) readCommits() {
 			if err := msg.MsgpackLoad(data); err != nil {
 				continue
 			}
+			filter := string(msg.Payload)
+			deliverable := false
 			if msg.Type == packets.Subscribe {
-				s.Add(string(msg.Payload), msg.NodeID)
+				deliverable = s.Add(filter, msg.NodeID)
 			} else if msg.Type == packets.Unsubscribe {
-				s.Del(string(msg.Payload), msg.NodeID)
+				deliverable = s.Del(filter, msg.NodeID)
 			} else {
 				continue
 			}
-
-			s.notifyCh <- &msg
+			log.Info("raft apply", "from", msg.NodeID, "filter", filter, "type", msg.Type)
+			if s.notifyCh != nil && deliverable {
+				s.notifyCh <- &msg
+			}
 		}
 		close(commit.applyDoneC)
 	}
@@ -151,10 +104,8 @@ func (s *KVStore) readCommits() {
 }
 
 func (s *KVStore) getSnapshot() ([]byte, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
 	var buffer bytes.Buffer
-	if err := gob.NewEncoder(&buffer).Encode(s.data); err != nil {
+	if err := gob.NewEncoder(&buffer).Encode(s.GetAll()); err != nil {
 		return nil, err
 	}
 	return buffer.Bytes(), nil
@@ -173,10 +124,8 @@ func (s *KVStore) loadSnapshot() (*raftpb.Snapshot, error) {
 }
 
 func (s *KVStore) recoverFromSnapshot(snapshot []byte) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	buffer := bytes.NewBuffer(snapshot)
-	if err := gob.NewDecoder(buffer).Decode(&s.data); err != nil {
+	if err := gob.NewDecoder(buffer).Decode(s.GetAll()); err != nil {
 		return err
 	}
 	s.notifyReplay()
@@ -184,14 +133,13 @@ func (s *KVStore) recoverFromSnapshot(snapshot []byte) error {
 }
 
 func (s *KVStore) notifyReplay() {
-	for filter, ns := range s.data {
-		for _, nodeId := range ns {
-			msg := message.Message{
-				Type:    packets.Subscribe,
-				NodeID:  nodeId,
-				Payload: []byte(filter),
-			}
-			s.notifyCh <- &msg
+	for filter, ns := range *s.GetAll() {
+		msg := message.Message{
+			Type:    packets.Subscribe,
+			NodeID:  strings.Join(ns, ","),
+			Payload: []byte(filter),
 		}
+		s.notifyCh <- &msg
+		log.Info("raft replay", "from", msg.NodeID, "filter", filter, "type", msg.Type)
 	}
 }

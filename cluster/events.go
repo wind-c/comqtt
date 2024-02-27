@@ -30,7 +30,7 @@ func (h *MqttEventHook) Provides(b byte) bool {
 		mqtt.OnSessionEstablished,
 		mqtt.OnSubscribed,
 		mqtt.OnUnsubscribed,
-		mqtt.OnPublished,
+		mqtt.OnPublishedWithSharedFilters,
 		mqtt.OnWillSent,
 	}, []byte{b})
 }
@@ -54,15 +54,26 @@ func (h *MqttEventHook) OnSessionEstablished(cl *mqtt.Client, pk packets.Packet)
 	if cl.InheritWay != mqtt.InheritWayRemote {
 		return
 	}
-	h.agent.SubmitOutTask(&pk)
+	if pk.Connect.ClientIdentifier == "" && cl != nil {
+		pk.Connect.ClientIdentifier = cl.ID
+	}
+	h.agent.SubmitOutConnectTask(&pk)
 }
 
 // OnPublished is called when a client has published a message to subscribers.
-func (h *MqttEventHook) OnPublished(cl *mqtt.Client, pk packets.Packet) {
+//func (h *MqttEventHook) OnPublished(cl *mqtt.Client, pk packets.Packet) {
+//	if pk.Connect.ClientIdentifier == "" && cl != nil {
+//		pk.Connect.ClientIdentifier = cl.ID
+//	}
+//	h.agent.SubmitOutTask(&pk)
+//}
+
+// OnPublishedWithSharedFilters is called when a client has published a message to cluster.
+func (h *MqttEventHook) OnPublishedWithSharedFilters(pk packets.Packet, sharedFilters map[string]bool) {
 	if pk.Connect.ClientIdentifier == "" {
-		pk.Connect.ClientIdentifier = cl.ID
+		pk.Connect.ClientIdentifier = pk.Origin
 	}
-	h.agent.SubmitOutTask(&pk)
+	h.agent.SubmitOutPublishTask(&pk, sharedFilters)
 }
 
 // OnWillSent is called when an LWT message has been issued from a disconnecting client.
@@ -70,7 +81,7 @@ func (h *MqttEventHook) OnWillSent(cl *mqtt.Client, pk packets.Packet) {
 	if pk.Connect.ClientIdentifier == "" {
 		pk.Connect.ClientIdentifier = cl.ID
 	}
-	h.agent.SubmitOutTask(&pk)
+	h.agent.SubmitOutPublishTask(&pk, nil)
 }
 
 // OnSubscribed is called when a client subscribes to one or more filters.
