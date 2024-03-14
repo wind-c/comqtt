@@ -76,13 +76,13 @@ func Setup(conf *config.Cluster, notifyCh chan<- *message.Message) (*Peer, error
 	config.LocalID = raft.ServerID(conf.NodeName)
 	config.LogLevel = "ERROR"
 	config.LogOutput = log.Writer()
-	config.ShutdownOnRemove = false            // Disable shutdown on removal
-	config.SnapshotInterval = 30 * time.Second // Check every 5 seconds to see if there are enough new entries for a snapshot, can be overridden
-	config.SnapshotThreshold = 16384           // Snapshots are created every 16384 entries by default, can be overridden
-	// config.HeartbeatTimeout = 1000 * time.Millisecond
-	// config.electionTimeout = 1000 * time.Millisecond
-	// config.CommitTimeout = 500 * time.Millisecond
-	// config.LeaderLeaseTimeout = 1000 * time.Millisecond
+	//config.ShutdownOnRemove = true             // Enable shutdown on removal
+	//config.SnapshotInterval = 30 * time.Second // Check every 30 seconds to see if there are enough new entries for a snapshot, can be overridden
+	//config.SnapshotThreshold = 16384           // Snapshots are created every 16384 entries by default, can be overridden
+	//config.HeartbeatTimeout = 1000 * time.Millisecond
+	//config.electionTimeout = 1000 * time.Millisecond
+	//config.CommitTimeout = 500 * time.Millisecond
+	//config.LeaderLeaseTimeout = 1000 * time.Millisecond
 
 	var transport raft.Transport
 	raftAddr := net.JoinHostPort(conf.BindAddr, strconv.Itoa(conf.RaftPort))

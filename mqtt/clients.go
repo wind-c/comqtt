@@ -104,13 +104,14 @@ func (cl *Clients) GetByListener(id string) []*Client {
 
 // Client contains information about a client known by the broker.
 type Client struct {
-	Properties   ClientProperties // client properties
-	State        ClientState      // the operational state of the client.
-	Net          ClientConnection // network connection state of the client
-	ID           string           // the client id.
-	ops          *ops             // ops provides a reference to server ops.
-	sync.RWMutex                  // mutex
-	InheritWay   int              // session inheritance way
+	Properties   ClientProperties       // client properties
+	State        ClientState            // the operational state of the client.
+	Net          ClientConnection       // network connection state of the client
+	ID           string                 // the client id.
+	ops          *ops                   // ops provides a reference to server ops.
+	sync.RWMutex                        // mutex
+	InheritWay   int                    // session inheritance way
+	Ext          map[string]interface{} // client extension.
 }
 
 // ClientConnection contains the connection transport and metadata for the client.
@@ -178,6 +179,7 @@ func newClient(c net.Conn, o *ops) *Client {
 			ProtocolVersion: defaultClientProtocolVersion, // default protocol version
 		},
 		ops: o,
+		Ext: make(map[string]interface{}),
 	}
 
 	if c != nil {
