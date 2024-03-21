@@ -36,7 +36,7 @@ Unless it's a critical issue, new releases typically go out over the weekend. At
 - Packets are bridged to kafka according to the configured rule.
 - Single-machine mode supports local storage BBolt, Badger and Redis.
 - Hook design pattern makes it easy to develop plugins for Auth, Bridge, and Storage.
-- Cluster support is based on Gossip and Raft, [Click to Cluster README](cmd/cluster/README.md).
+- Cluster support is based on Gossip and Raft, [Click to Cluster README](cluster/README.md).
 
 #### Roadmap
 - Dashboard.
@@ -51,8 +51,8 @@ Comqtt can be used as a standalone broker. Simply checkout this repository and r
 
 ### Build
 ```
-cd cmd/single
-go build -o comqtt cmd/single/main.go
+cd cmd
+go build -o comqtt ./single/main.go
 ```
 ### Start
 ```

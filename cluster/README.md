@@ -25,7 +25,8 @@ Of course, due to my busy work and lack of more production environment verificat
 ## Build
 
 ```shell
-go build -o comqtt cmd/cluster/main.go
+cd cmd
+go build -o comqtt cluster/main.go
 ```
 
 ## Usage
@@ -35,7 +36,7 @@ go build -o comqtt cmd/cluster/main.go
 Usage of ./comqtt:
   -conf string
         read the program parameters from the config file
-
+        
   -storage-way uint
         storage way options:0 memory, 1 bolt, 2 badger, 3 redis (default 3)
   -auth-ds uint
@@ -90,13 +91,13 @@ Usage of ./comqtt:
 
 The startup supports two modes: command parameters and configuration file. 
 
-It is recommended that you use the configuration file mode for more detailed configuration.[Click to config example](../config/node1.yml).
+It is recommended that you use the configuration file mode for more detailed configuration.[Click to config example](../cmd/config/node1.yml).
 
-All configuration file examples are in the cmd/config directory. [Click to config examples](../config)
+All configuration file examples are in the cmd/config directory. [Click to config examples](../cmd/config)
 
 ### Configure Redis
 
-Start redis and configure redis addr, [click to config example](../config/node1.yml).
+Start redis and configure redis addr, [click to config example](../cmd/config/node1.yml).
 
 ### Create Cluster
 

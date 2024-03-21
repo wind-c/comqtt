@@ -1,13 +1,13 @@
 storage-way: 3  #Storage way optional items:0 memory、1 bolt、2 badger、3 redis;Only redis can be used in cluster mode.
-bridge-way: 0  #Bridge way optional items:0 disable、1 kafka
-bridge-path: ./cmd/config/bridge-kafka.yml  #The bridge config file path
+bridge-way: 1  #Bridge way optional items:0 disable、1 kafka
+bridge-path: ./config/bridge-kafka.yml  #The bridge config file path
 pprof-enable: false #Whether to enable the performance analysis tool http://ip:6060
 
 auth:
   way: 0  #Authentication way: 0 anonymous, 1 username and password, 2 clientid
   datasource: 1  #Optional items:0 free、1 redis、2 mysql、3 postgresql、4 http ...
-  conf-path: ./cmd/config/auth-redis.yml  #The config file path should correspond to the auth-datasource
-  blacklist-path: ./cmd/config/blacklist.yml  #Special rules outside the usual rules (black and white list)，this configuration is invalid for anonymous authentication
+  conf-path: ./config/auth-redis.yml  #The config file path should correspond to the auth-datasource
+  blacklist-path: ./config/blacklist.yml  #Special rules outside the usual rules (black and white list)，this configuration is invalid for anonymous authentication
 
 cluster:
   discovery-way: 0 #The node discovery way in the cluster: 0 serf、1 memberlist、2 mDNS
