@@ -1,6 +1,6 @@
 module github.com/wind-c/comqtt/v2
 
-go 1.22
+go 1.21
 
 require (
 	github.com/alicebob/miniredis/v2 v2.32.1
