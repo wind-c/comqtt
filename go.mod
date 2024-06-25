@@ -6,7 +6,6 @@ require (
 	github.com/alicebob/miniredis/v2 v2.32.1
 	github.com/asdine/storm v2.1.2+incompatible
 	github.com/asdine/storm/v3 v3.2.1
-	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-sql-driver/mysql v1.8.1
 	github.com/golang/protobuf v1.5.4
 	github.com/gorilla/websocket v1.5.1
@@ -14,13 +13,14 @@ require (
 	github.com/hashicorp/go-sockaddr v1.0.6
 	github.com/hashicorp/logutils v1.0.0
 	github.com/hashicorp/memberlist v0.5.1
-	github.com/hashicorp/raft v1.6.1
+	github.com/hashicorp/raft v1.7.0
 	github.com/hashicorp/raft-boltdb/v2 v2.3.0
 	github.com/hashicorp/serf v0.10.1
 	github.com/jinzhu/copier v0.4.0
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/lib/pq v1.10.9
 	github.com/panjf2000/ants/v2 v2.9.1
+	github.com/redis/go-redis/v9 v9.5.2
 	github.com/rs/xid v1.5.0
 	github.com/satori/go.uuid v1.2.0
 	github.com/segmentio/kafka-go v0.4.47

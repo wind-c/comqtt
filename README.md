@@ -281,7 +281,7 @@ See [examples/auth/encoded/main.go](mqtt/examples/auth/encoded/main.go) for more
 
 ### Persistent Storage
 #### Redis
-A basic Redis storage hook is available which provides persistence for the broker. It can be added to the server in the same fashion as any other hook, with several options. It uses github.com/go-redis/redis/v8 under the hook, and is completely configurable through the Options value.
+A basic Redis storage hook is available which provides persistence for the broker. It can be added to the server in the same fashion as any other hook, with several options. It uses github.com/redis/go-redis/v9 under the hook, and is completely configurable through the Options value.
 ```go
 err := server.AddHook(new(redis.Hook), &redis.Options{
   Options: &rv8.Options{

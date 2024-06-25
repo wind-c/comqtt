@@ -10,7 +10,7 @@ import (
 	"errors"
 	"fmt"
 
-	redis "github.com/go-redis/redis/v8"
+	redis "github.com/redis/go-redis/v9"
 	"github.com/wind-c/comqtt/v2/cluster/utils"
 	"github.com/wind-c/comqtt/v2/mqtt"
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/storage"

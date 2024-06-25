@@ -19,7 +19,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
 	cs "github.com/wind-c/comqtt/v2/cluster"
 	"github.com/wind-c/comqtt/v2/cluster/log"
 	coredis "github.com/wind-c/comqtt/v2/cluster/storage/redis"

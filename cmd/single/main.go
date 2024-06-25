@@ -14,7 +14,7 @@ import (
 	"syscall"
 	"time"
 
-	rv8 "github.com/go-redis/redis/v8"
+	rv8 "github.com/redis/go-redis/v9"
 	"github.com/wind-c/comqtt/v2/cluster/log"
 	"github.com/wind-c/comqtt/v2/config"
 	"github.com/wind-c/comqtt/v2/mqtt"
