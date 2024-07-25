@@ -179,7 +179,7 @@ func Setup(conf *config.Cluster, notifyCh chan<- *message.Message) (*Peer, error
 
 	peer := &Peer{config, rf, fm, store, transport}
 	if id, err := peer.waitForLeader(peer.electionTimeout() * 3); err != nil {
-		log.Warn("timeout waiting for raft leader", "leader", "unknow")
+		log.Warn("timeout waiting for raft leader", "leader", "unknown")
 	} else {
 		log.Info("found raft leader", "leader", id)
 	}
