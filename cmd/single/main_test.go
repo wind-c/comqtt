@@ -2,20 +2,25 @@ package main
 
 import (
 	"context"
-	"go.uber.org/goleak"
 	"sync"
 	"testing"
 	"time"
+
+	"go.uber.org/goleak"
 )
 
 func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
+	goleak.VerifyTestMain(m,
+		goleak.IgnoreTopFunction("github.com/golang/glog.(*fileSink).flushDaemon"),
+	)
 }
 
 // TestLeaks tests that there are no goroutine leaks after starting and stopping the server.
 // We should likely do some more operations here, but this is a start.
 func TestLeaks(t *testing.T) {
-	defer goleak.VerifyNone(t)
+	defer goleak.VerifyNone(t,
+		goleak.IgnoreTopFunction("github.com/golang/glog.(*fileSink).flushDaemon"),
+	)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	wg := sync.WaitGroup{}
