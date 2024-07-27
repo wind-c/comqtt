@@ -38,7 +38,7 @@ var (
 	pkc = packets.Packet{Connect: packets.ConnectParams{Password: []byte("123456")}}
 )
 
-func teardown(a *Auth, t *testing.T) {
+func teardown(a *Auth) {
 	if a.db != nil {
 		a.Stop()
 	}
@@ -106,7 +106,7 @@ func TestOnConnectAuthenticate(t *testing.T) {
 		t.SkipNow()
 	}
 	a := newAuth(t)
-	defer teardown(a, t)
+	defer teardown(a)
 	result := a.OnConnectAuthenticate(client, pkc)
 	require.Equal(t, true, result)
 }
@@ -116,7 +116,7 @@ func TestOnACLCheck(t *testing.T) {
 		t.SkipNow()
 	}
 	a := newAuth(t)
-	defer teardown(a, t)
+	defer teardown(a)
 	topic := "topictest/1"
 	topic2 := "topictest/2"
 	result := a.OnACLCheck(client, topic, true) //publish

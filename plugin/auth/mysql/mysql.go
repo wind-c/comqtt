@@ -96,8 +96,16 @@ func (a *Auth) Init(config any) error {
 		a.config.Auth.PasswordColumn, a.config.Auth.AllowColumn, a.config.Auth.Table, a.config.Auth.UserColumn)
 	aclSql := fmt.Sprintf("select %s, %s from %s where %s=?",
 		a.config.Acl.TopicColumn, a.config.Acl.AccessColumn, a.config.Acl.Table, a.config.Acl.UserColumn)
-	a.authStmt, _ = sqlxDB.Preparex(authSql)
-	a.aclStmt, _ = sqlxDB.Preparex(aclSql)
+	a.authStmt, err = sqlxDB.Preparex(authSql)
+	if err != nil {
+		a.Log.Error("Unable to create prepared statement for auth-sql", "authSql", authSql)
+		return err
+	}
+	a.aclStmt, err = sqlxDB.Preparex(aclSql)
+	if err != nil {
+		a.Log.Error("Unable to create prepared statement for acl-sql", "aclStmt", aclSql)
+		return err
+	}
 	a.db = sqlxDB
 	return nil
 }
