@@ -207,6 +207,30 @@ if err != nil {
 }
 println("Password hash for MQTT client: ", hashed)
 ```
+### MySQL
+
+The schema required is as follows:
+```sql
+BEGIN;
+CREATE TABLE auth (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(255) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    allow SMALLINT DEFAULT 1 NOT NULL,
+    created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated TIMESTAMP NULL
+);
+CREATE TABLE acl (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(255) NOT NULL,
+    topic VARCHAR(255) NOT NULL,
+    access SMALLINT DEFAULT 3 NOT NULL,
+    created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated TIMESTAMP NULL
+);
+CREATE INDEX acl_username_idx ON acl(username);
+COMMIT;
+```
 ### Access Control
 #### Allow Hook
 By default, Comqtt uses a DENY-ALL access control rule. To allow connections, this must overwritten using an Access Control hook. The simplest of these hooks is the `auth.AllowAll` hook, which provides ALLOW-ALL rules to all connections, subscriptions, and publishing. It's also the simplest hook to use:

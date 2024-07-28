@@ -17,5 +17,14 @@ jobs:
       - name: Build
         run: go build ./...
 
+      - name: Docker compose up
+        run: |
+          docker compose up -d
+
+          until docker exec mysql mysqladmin ping -h "127.0.0.1" --silent; do
+            echo 'waiting for mysql...'
+            sleep 3
+          done
+
       - name: Test
-        run: go test ./...
+        run: go test -v ./...
