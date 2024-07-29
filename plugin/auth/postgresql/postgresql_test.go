@@ -13,7 +13,7 @@ import (
 	"github.com/wind-c/comqtt/v2/plugin"
 )
 
-const path = "./conf.yml"
+const path = "./testdata/conf.yml"
 
 var (
 	// Currently, the input is directed to /dev/null. If you need to

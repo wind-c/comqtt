@@ -10,3 +10,15 @@ services:
     command: --character-set-server=utf8 --collation-server=utf8_general_ci
     volumes:
       - ./plugin/auth/mysql/testdata/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  postgresql:
+    image: postgres:16
+    container_name: postgresql
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 12345678
+      POSTGRES_DB: comqtt
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./plugin/auth/postgresql/testdata/init:/docker-entrypoint-initdb.d
