@@ -241,7 +241,7 @@ func (p *Peer) GetLeader() (addr, id string) {
 	leaderAddr, leaderId := p.raft.LeaderWithID()
 	addr = string(leaderAddr)
 	id = string(leaderId)
-	return
+	return addr, id
 }
 
 func (p *Peer) Status() ([]byte, error) {
