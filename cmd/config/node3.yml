@@ -10,7 +10,7 @@ auth:
   blacklist-path: ./config/blacklist.yml  #Special rules outside the usual rules (black and white list)，this configuration is invalid for anonymous authentication
 
 cluster:
-  discovery-way: 0 #The node discovery way in the cluster: 0 serf、1 memberlist、2 mDNS
+  discovery-way: 0 #The node discovery way in the cluster: 0 serf、1 memberlist
   node-name: c03  #For versatility, use pure numbers. The name of node must be unique in the cluster.
   bind-addr: 127.0.0.1 #Configuration related to what address to bind to and ports to listen on.
   bind-port: 7948 #The port is used for both UDP and TCP gossip. Used for member discovery and join.

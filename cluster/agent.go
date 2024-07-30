@@ -225,20 +225,6 @@ func (a *Agent) Stat() map[string]int64 {
 	return a.membership.Stat()
 }
 
-func (a *Agent) notifyNewRaftPeer() {
-	addr := net.JoinHostPort(a.Config.BindAddr, strconv.Itoa(a.Config.RaftPort))
-	joinMsg := message.Message{
-		Type:    message.RaftJoin,
-		NodeID:  a.Config.NodeName,
-		Payload: []byte(addr)}
-
-	if a.Config.GrpcEnable {
-		a.grpcClientManager.RaftJoinToOthers()
-	} else {
-		a.membership.SendToOthers(joinMsg.MsgpackBytes())
-	}
-}
-
 func (a *Agent) raftApplyListener() {
 	for {
 		select {
