@@ -134,15 +134,6 @@ func (s *RpcService) RaftJoin(ctx context.Context, req *crpc.JoinRequest) (*crpc
 	return &crpc.Response{Ok: true}, nil
 }
 
-func genApplyCmd(req *crpc.ApplyRequest) []byte {
-	msg := message.Message{
-		Type:    byte(req.Action),
-		NodeID:  req.NodeId,
-		Payload: req.Filter,
-	}
-	return msg.MsgpackBytes()
-}
-
 type ClientManager struct {
 	agent *Agent
 	cs    map[string]*client

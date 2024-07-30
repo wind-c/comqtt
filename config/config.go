@@ -18,8 +18,6 @@ import (
 const (
 	DiscoveryWaySerf uint = iota
 	DiscoveryWayMemberlist
-	DiscoveryWayMDNS
-	DiscoveryWayStatic
 )
 
 const (
