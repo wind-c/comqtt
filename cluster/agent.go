@@ -73,11 +73,8 @@ func NewAgent(conf *config.Cluster) *Agent {
 
 func (a *Agent) Start() (err error) {
 	// setup raft
-	if a.Config.DiscoveryWay == config.DiscoveryWayMemberlist {
+	if a.Config.RaftPort == 0 || a.Config.DiscoveryWay == config.DiscoveryWayMemberlist {
 		a.Config.RaftPort = mlist.GetRaftPortFromBindPort(a.Config.BindPort)
-	}
-	if a.Config.RaftPort == 0 {
-		a.Config.RaftPort = 8946
 	}
 	if a.Config.RaftDir == "" {
 		a.Config.RaftDir = path.Join("data", a.Config.NodeName)
