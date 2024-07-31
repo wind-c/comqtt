@@ -101,7 +101,7 @@ func Setup(conf *config.Cluster, notifyCh chan<- *message.Message) (*Peer, error
 		id:               uint64(id),
 		peers:            genPeers(conf),
 		walDir:           fmt.Sprintf("%v-%d", conf.RaftDir, id),
-		snapDir:          fmt.Sprintf("%v-snaoshot%d", conf.RaftDir, id),
+		snapDir:          fmt.Sprintf("%v-snapshot%d", conf.RaftDir, id),
 		confState:        raftpb.ConfState{},
 		snapshotterReady: make(chan *snap.Snapshotter, 1),
 		snapCount:        defaultSnapshotCount,
