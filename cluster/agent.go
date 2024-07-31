@@ -73,8 +73,8 @@ func NewAgent(conf *config.Cluster) *Agent {
 
 func (a *Agent) Start() (err error) {
 	// setup raft
-	if a.Config.RaftPort == 0 {
-		a.Config.RaftPort = 8946
+	if a.Config.RaftPort == 0 || a.Config.DiscoveryWay == config.DiscoveryWayMemberlist {
+		a.Config.RaftPort = mlist.GetRaftPortFromBindPort(a.Config.BindPort)
 	}
 	if a.Config.RaftDir == "" {
 		a.Config.RaftDir = path.Join("data", a.Config.NodeName)
@@ -208,7 +208,7 @@ func getRaftPeerAddr(member *discovery.Member) string {
 	}
 
 	// using memberlist
-	return net.JoinHostPort(member.Addr, strconv.Itoa(member.Port+1000))
+	return net.JoinHostPort(member.Addr, strconv.Itoa(mlist.GetRaftPortFromBindPort(member.Port)))
 }
 
 func getGrpcAddr(member *discovery.Member) string {
@@ -218,7 +218,7 @@ func getGrpcAddr(member *discovery.Member) string {
 	}
 
 	// using memberlist
-	return net.JoinHostPort(member.Addr, strconv.Itoa(member.Port+10000))
+	return net.JoinHostPort(member.Addr, strconv.Itoa(mlist.GetGRPCPortFromBindPort(member.Port)))
 }
 
 func (a *Agent) Stat() map[string]int64 {
