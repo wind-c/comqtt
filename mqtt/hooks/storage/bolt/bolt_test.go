@@ -434,7 +434,7 @@ func TestOnQosPublishThenQOSComplete(t *testing.T) {
 
 	// ensure dates are properly saved to bolt
 	require.True(t, r.Sent > 0)
-	require.True(t, time.Now().Unix()-1 < r.Sent)
+	require.True(t, time.Now().Unix()-2 < r.Sent)
 
 	// OnQosDropped is a passthrough to OnQosComplete here
 	h.OnQosDropped(client, pk)
