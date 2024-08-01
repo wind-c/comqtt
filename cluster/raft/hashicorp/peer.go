@@ -74,7 +74,10 @@ type peerEntry struct {
 func Setup(conf *config.Cluster, notifyCh chan<- *message.Message) (*Peer, error) {
 	config := raft.DefaultConfig()
 	config.LocalID = raft.ServerID(conf.NodeName)
-	config.LogLevel = "ERROR"
+	if conf.RaftLogLevel == "" {
+		conf.RaftLogLevel = "ERROR"
+	}
+	config.LogLevel = conf.RaftLogLevel
 	config.LogOutput = log.Writer()
 	//config.ShutdownOnRemove = true             // Enable shutdown on removal
 	//config.SnapshotInterval = 30 * time.Second // Check every 30 seconds to see if there are enough new entries for a snapshot, can be overridden
@@ -231,12 +234,6 @@ func (p *Peer) IsApplyRight() bool {
 	return p.raft.State() == raft.Leader
 }
 
-// leaderLastContact returns the time of last contact by a leader.
-// This only makes sense if we are currently a follower.
-func (p *Peer) leaderLastContact() time.Time {
-	return p.raft.LastContact()
-}
-
 func (p *Peer) GetLeader() (addr, id string) {
 	leaderAddr, leaderId := p.raft.LeaderWithID()
 	addr = string(leaderAddr)
@@ -375,36 +372,4 @@ func (p *Peer) waitForLeader(timeout time.Duration) (string, error) {
 			return "", fmt.Errorf("wait for leader timed out")
 		}
 	}
-}
-
-// waitForAppliedIndex blocks until a given log index has been applied,
-// or the timeout expires.
-func (p *Peer) waitForAppliedIndex(idx uint64, timeout time.Duration) error {
-	tck := time.NewTicker(appliedWaitDelay)
-	defer tck.Stop()
-	tmr := time.NewTimer(timeout)
-	defer tmr.Stop()
-
-	for {
-		select {
-		case <-tck.C:
-			if p.raft.AppliedIndex() >= idx {
-				return nil
-			}
-		case <-tmr.C:
-			return fmt.Errorf("timeout expired")
-		}
-	}
-}
-
-// waitForApplied waits for all Raft log entries to to be applied to the
-// underlying database.
-func (p *Peer) waitForApplied(timeout time.Duration) error {
-	if timeout == 0 {
-		return nil
-	}
-	if err := p.waitForAppliedIndex(p.raft.LastIndex(), timeout); err != nil {
-		return errors.New("timeout waiting for initial logs application")
-	}
-	return nil
 }

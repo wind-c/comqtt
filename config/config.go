@@ -141,6 +141,7 @@ type Cluster struct {
 	RaftPort             int               `yaml:"raft-port" json:"raft-port"`
 	RaftDir              string            `yaml:"raft-dir" json:"raft-dir"`
 	RaftBootstrap        bool              `yaml:"raft-bootstrap" json:"raft-bootstrap"`
+	RaftLogLevel         string            `yaml:"raft-log-level" json:"raft-log-level"`
 	GrpcEnable           bool              `yaml:"grpc-enable" json:"grpc-enable"`
 	GrpcPort             int               `yaml:"grpc-port" json:"grpc-port"`
 	InboundPoolSize      int               `yaml:"inbound-pool-size" json:"inbound-pool-size"`
