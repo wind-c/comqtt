@@ -78,6 +78,7 @@ func realMain(ctx context.Context) error {
 	flag.IntVar(&cfg.Redis.Options.DB, "redis-db", 0, "redis db for cluster mode")
 	flag.BoolVar(&cfg.Log.Enable, "log-enable", true, "log enabled or not")
 	flag.StringVar(&cfg.Log.Filename, "log-file", "./logs/comqtt.log", "log filename")
+	flag.StringVar(&cfg.Cluster.NodesFileDir, "nodes-file-dir", "", "directory holds nodes.json assisting node discovery for cluster")
 	//parse arguments
 	flag.Parse()
 	//load config file

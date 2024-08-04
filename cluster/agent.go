@@ -272,6 +272,9 @@ func (a *Agent) raftPropose(msg *message.Message) {
 }
 
 func (a *Agent) getNodesFile() string {
+	if a.Config.NodesFileDir != "" {
+		return filepath.Join(a.Config.NodesFileDir, a.Config.NodeName+"-"+NodesFile)
+	}
 	return a.Config.NodeName + "-" + NodesFile
 }
 
