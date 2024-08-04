@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/wind-c/comqtt/v2/cluster/log"
@@ -108,7 +109,7 @@ func Setup(conf *config.Cluster, notifyCh chan<- *message.Message) (*Peer, error
 		stopC:            make(chan struct{}),
 		httpStopC:        make(chan struct{}),
 		httpDoneC:        make(chan struct{}),
-		logger:           getZapLogger(),
+		logger:           getZapLogger(conf.RaftLogLevel),
 	}
 
 	go peer.startRaft()
@@ -181,7 +182,23 @@ func (p *Peer) DelByNode(node string) int {
 	return p.kvStore.DelByNode(node)
 }
 
-func getZapLogger() *zap.Logger {
+func mapRaftLogLevelToZap(raftLogLevel string) zapcore.Level {
+	raftLogLevel = strings.ToLower(raftLogLevel)
+	switch raftLogLevel {
+	case "debug":
+		return zapcore.DebugLevel
+	case "info":
+		return zapcore.InfoLevel
+	case "warn":
+		return zapcore.WarnLevel
+	case "error":
+		return zapcore.ErrorLevel
+	default:
+		return zapcore.ErrorLevel
+	}
+}
+
+func getZapLogger(raftLogLevel string) *zap.Logger {
 	encoderCfg := zapcore.EncoderConfig{
 		MessageKey:     "msg",
 		LevelKey:       "level",
@@ -190,7 +207,7 @@ func getZapLogger() *zap.Logger {
 		EncodeTime:     zapcore.ISO8601TimeEncoder,
 		EncodeDuration: zapcore.StringDurationEncoder,
 	}
-	core := zapcore.NewCore(zapcore.NewJSONEncoder(encoderCfg), zapcore.AddSync(log.Writer()), zapcore.ErrorLevel)
+	core := zapcore.NewCore(zapcore.NewJSONEncoder(encoderCfg), zapcore.AddSync(log.Writer()), mapRaftLogLevelToZap(raftLogLevel))
 	return zap.New(core)
 }
 
