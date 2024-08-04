@@ -2,10 +2,11 @@ package log
 
 import (
 	"context"
-	"gopkg.in/natefinch/lumberjack.v2"
 	"io"
 	"log/slog"
 	"os"
+
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 // Constants for log formats
@@ -70,6 +71,7 @@ type Options struct {
 // Options defines configuration options for the logger.
 func DefaultOptions() *Options {
 	return &Options{
+		Enable:     true,
 		MaxSize:    100,
 		MaxAge:     30,
 		MaxBackups: 1,
