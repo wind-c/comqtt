@@ -12,20 +12,11 @@ RUN go mod download
 COPY . ./
 
 RUN go build -o /app/comqtt ./cmd/single
-
+RUN go build -o /app/comqtt-cluster ./cmd/cluster
 
 FROM alpine
 
 WORKDIR /
-COPY --from=builder /app/comqtt .
-
-# tcp
-EXPOSE 1883
-
-# websockets
-EXPOSE 1882
-
-# dashboard
-EXPOSE 8080
+COPY --from=builder /app/comqtt /app/comqtt-cluster ./
 
 ENTRYPOINT [ "/comqtt" ]
