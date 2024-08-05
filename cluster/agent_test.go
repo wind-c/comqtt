@@ -51,9 +51,11 @@ func TestCluster(t *testing.T) {
 		BindPort:      bindPort1,
 		RaftPort:      raftPort1,
 		RaftBootstrap: true,
+		RaftDir:       t.TempDir(),
 		GrpcEnable:    false,
 		Members:       members,
 		DiscoveryWay:  config.DiscoveryWaySerf,
+		NodesFileDir:  t.TempDir(),
 	}
 	agent1 := NewAgent(conf1)
 	err = agent1.Start()
@@ -66,9 +68,11 @@ func TestCluster(t *testing.T) {
 		BindPort:      bindPort2,
 		RaftPort:      raftPort2,
 		RaftBootstrap: false,
+		RaftDir:       t.TempDir(),
 		GrpcEnable:    false,
 		Members:       members,
 		DiscoveryWay:  config.DiscoveryWaySerf,
+		NodesFileDir:  t.TempDir(),
 	}
 	agent2 := NewAgent(conf2)
 	err = agent2.Start()
@@ -82,9 +86,11 @@ func TestCluster(t *testing.T) {
 		BindPort:      bindPort3,
 		RaftPort:      raftPort3,
 		RaftBootstrap: false,
+		RaftDir:       t.TempDir(),
 		GrpcEnable:    false,
 		Members:       members,
 		DiscoveryWay:  config.DiscoveryWaySerf,
+		NodesFileDir:  t.TempDir(),
 	}
 	agent3 := NewAgent(conf3)
 	err = agent3.Start()
