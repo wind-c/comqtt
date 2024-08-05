@@ -197,7 +197,7 @@ func (p *Peer) Stop() {
 	}
 
 	// snapshot
-	if err := p.snapshot().Error(); err != "" {
+	if err := p.snapshot(); err != nil {
 		log.Warn("failed to create snapshot!")
 	}
 
