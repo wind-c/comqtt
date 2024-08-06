@@ -35,8 +35,6 @@ import (
 
 var (
 	ErrInvalidID = errors.New("node name must be a number")
-
-	appliedWaitDelay = 100 * time.Millisecond
 )
 
 type commit struct {
@@ -285,7 +283,6 @@ func (p *Peer) serveRaft() {
 	default:
 		log.Fatal("[raft] failed to serve rafthttp", "error", err)
 	}
-	close(p.httpStopC)
 }
 
 func (p *Peer) serveChannels() {
@@ -622,7 +619,7 @@ func (p *Peer) IsApplyRight() bool {
 }
 
 func (p *Peer) GetLeader() (addr, id string) {
-	return
+	return "", strconv.FormatUint(p.node.Status().SoftState.Lead, 10)
 }
 
 func (p *Peer) GenPeersFile(file string) error {
