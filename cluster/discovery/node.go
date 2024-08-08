@@ -6,10 +6,11 @@ package discovery
 
 import (
 	"encoding/json"
-	"github.com/wind-c/comqtt/v2/mqtt"
 	"net"
 	"os"
 	"strconv"
+
+	"github.com/wind-c/comqtt/v2/mqtt"
 )
 
 const (
@@ -31,7 +32,6 @@ type Node interface {
 	BindMqttServer(server *mqtt.Server)
 	LocalAddr() string
 	LocalName() string
-	NumMembers() int
 	Members() []Member
 	EventChan() <-chan *Event
 	SendToNode(nodeName string, msg []byte) error
