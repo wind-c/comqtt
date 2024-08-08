@@ -1,41 +1,32 @@
 package cluster
 
 import (
-	"net"
 	"strconv"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/wind-c/comqtt/v2/cluster/log"
+	"github.com/wind-c/comqtt/v2/cluster/utils"
 	"github.com/wind-c/comqtt/v2/config"
 )
-
-func getFreePort() (int, error) {
-	listener, err := net.Listen("tcp", ":0")
-	if err != nil {
-		return 0, err
-	}
-	defer listener.Close()
-	return listener.Addr().(*net.TCPAddr).Port, nil
-}
 
 func TestCluster(t *testing.T) {
 	log.Init(log.DefaultOptions())
 
-	bindPort1, err := getFreePort()
+	bindPort1, err := utils.GetFreePort()
 	require.NoError(t, err, "Failed to get free port for node1")
-	raftPort1, err := getFreePort()
+	raftPort1, err := utils.GetFreePort()
 	require.NoError(t, err, "Failed to get free port for node1 Raft")
 
-	bindPort2, err := getFreePort()
+	bindPort2, err := utils.GetFreePort()
 	require.NoError(t, err, "Failed to get free port for node2")
-	raftPort2, err := getFreePort()
+	raftPort2, err := utils.GetFreePort()
 	require.NoError(t, err, "Failed to get free port for node2 Raft")
 
-	bindPort3, err := getFreePort()
+	bindPort3, err := utils.GetFreePort()
 	require.NoError(t, err, "Failed to get free port for node3")
-	raftPort3, err := getFreePort()
+	raftPort3, err := utils.GetFreePort()
 	require.NoError(t, err, "Failed to get free port for node3 Raft")
 
 	members := []string{

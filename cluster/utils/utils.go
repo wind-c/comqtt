@@ -6,14 +6,15 @@ package utils
 
 import (
 	"fmt"
-	"github.com/hashicorp/go-sockaddr"
 	"net"
 	"os"
 	"reflect"
 	"strings"
 	"testing"
 
-	"github.com/satori/go.uuid"
+	"github.com/hashicorp/go-sockaddr"
+
+	uuid "github.com/satori/go.uuid"
 )
 
 func InArray(val interface{}, array interface{}) bool {
@@ -150,4 +151,13 @@ func PathExists(path string) bool {
 		return false
 	}
 	return true
+}
+
+func GetFreePort() (int, error) {
+	listener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		return 0, err
+	}
+	defer listener.Close()
+	return listener.Addr().(*net.TCPAddr).Port, nil
 }

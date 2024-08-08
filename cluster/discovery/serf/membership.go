@@ -8,7 +8,6 @@ import (
 	"strconv"
 
 	"github.com/hashicorp/logutils"
-	"github.com/hashicorp/memberlist"
 	"github.com/hashicorp/serf/serf"
 	mb "github.com/wind-c/comqtt/v2/cluster/discovery"
 	"github.com/wind-c/comqtt/v2/cluster/log"
@@ -99,8 +98,8 @@ func (m *Membership) EventChan() <-chan *mb.Event {
 	return m.eventCh
 }
 
-func (m *Membership) NumMembers() int {
-	return m.serf.NumNodes()
+func (m *Membership) numMembers() int {
+	return len(m.aliveMembers())
 }
 
 func (m *Membership) LocalName() string {
@@ -193,10 +192,6 @@ func (m *Membership) eventLoop() {
 			panic("unknown serf event type")
 		}
 	}
-}
-
-func (m *Membership) send(to memberlist.Address, msg []byte) error {
-	return m.serf.Memberlist().SendToAddress(to, msg)
 }
 
 // SendToOthers send message to all nodes except yourself
