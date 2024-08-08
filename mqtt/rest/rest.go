@@ -16,6 +16,7 @@ const (
 	MqttAddBlacklistPath   = "/api/v1/mqtt/blacklist/{id}"
 	MqttDelBlacklistPath   = "/api/v1/mqtt/blacklist/{id}"
 	MqttPublishMessagePath = "/api/v1/mqtt/message"
+	MqttGetConfigPath      = "/api/v1/mqtt/config"
 )
 
 type Handler = func(http.ResponseWriter, *http.Request)
@@ -32,6 +33,7 @@ func New(server *mqtt.Server) *Rest {
 
 func (s *Rest) GenHandlers() map[string]Handler {
 	return map[string]Handler{
+		"GET " + MqttGetConfigPath:       s.viewConfig,
 		"GET " + MqttGetOverallPath:      s.getOverallInfo,
 		"GET " + MqttGetOnlinePath:       s.getOnlineCount,
 		"GET " + MqttGetClientPath:       s.getClient,
