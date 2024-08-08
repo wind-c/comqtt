@@ -20,12 +20,12 @@ import (
 // HTTPStats is a listener for presenting the server $SYS stats on a JSON http endpoint.
 type HTTPStats struct {
 	sync.RWMutex
-	id      string       // the internal id of the listener
-	address string       // the network address to bind to
-	config  *Config      // configuration values for the listener
-	listen  *http.Server // the http server
-	sysInfo *system.Info // pointers to the server data
-	end     uint32       // ensure the close methods are only called once
+	id       string       // the internal id of the listener
+	address  string       // the network address to bind to
+	config   *Config      // configuration values for the listener
+	listen   *http.Server // the http server
+	sysInfo  *system.Info // pointers to the server data
+	end      uint32       // ensure the close methods are only called once
 	handlers Handlers
 }
 
@@ -79,6 +79,9 @@ func (l *HTTPStats) Protocol() string {
 // Init initializes the listener.
 func (l *HTTPStats) Init(_ *slog.Logger) error {
 	mux := http.NewServeMux()
+	for path, handler := range l.handlers {
+		mux.HandleFunc(path, handler)
+	}
 	mux.HandleFunc("/", l.jsonHandler)
 	l.listen = &http.Server{
 		ReadTimeout:  5 * time.Second,
