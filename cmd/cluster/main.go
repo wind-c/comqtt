@@ -6,10 +6,10 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
+	csRt "github.com/wind-c/comqtt/v2/cluster/rest"
+	"maps"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
@@ -27,6 +27,7 @@ import (
 	mqtt "github.com/wind-c/comqtt/v2/mqtt"
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/auth"
 	"github.com/wind-c/comqtt/v2/mqtt/listeners"
+	mqttRt "github.com/wind-c/comqtt/v2/mqtt/rest"
 	"github.com/wind-c/comqtt/v2/plugin"
 	hauth "github.com/wind-c/comqtt/v2/plugin/auth/http"
 	mauth "github.com/wind-c/comqtt/v2/plugin/auth/mysql"
@@ -139,11 +140,10 @@ func realMain(ctx context.Context) error {
 	onError(server.AddListener(ws), "add websocket listener")
 
 	// add http listener
-	handles := make(map[string]func(http.ResponseWriter, *http.Request), 1)
-	handles["/cluster/conf"] = ConfHandler
-	handles["/cluster/ms"] = MsHandler
-	handles["/cluster/peer/"] = PeerHandler //for test peer join and leave
-	http := listeners.NewHTTP("stats", cfg.Mqtt.HTTP, nil, server.Info, handles)
+	csHls := csRt.New(agent).GenHandlers()
+	mqHls := mqttRt.New(server).GenHandlers()
+	maps.Copy(csHls, mqHls)
+	http := listeners.NewHTTP("stats", cfg.Mqtt.HTTP, nil, csHls)
 	onError(server.AddListener(http), "add http listener")
 
 	errCh := make(chan error, 1)
@@ -246,81 +246,5 @@ func onError(err error, msg string) {
 	if err != nil {
 		log.Error(msg, "error", err)
 		os.Exit(1)
-	}
-}
-
-func ConfHandler(w http.ResponseWriter, req *http.Request) {
-	body, err := json.MarshalIndent(agent.Config, "", "\t")
-	if err != nil {
-		io.WriteString(w, err.Error())
-		return
-	}
-
-	w.Write(body)
-}
-
-func MsHandler(w http.ResponseWriter, r *http.Request) {
-	body, err := json.MarshalIndent(agent.GetMemberList(), "", "\t")
-	if err != nil {
-		io.WriteString(w, err.Error())
-		return
-	}
-
-	w.Write(body)
-}
-
-func PeerHandler(w http.ResponseWriter, r *http.Request) {
-	key := strings.SplitN(r.RequestURI, "/", 4)[3]
-	defer r.Body.Close()
-	switch r.Method {
-	case http.MethodPut:
-		//val, err := io.ReadAll(r.Body)
-		//if err != nil {
-		//	//logger.Errorf("[http] failed to read on PUT: %v", err)
-		//	http.Error(w, "Failed to PUT", http.StatusBadRequest)
-		//	return
-		//}
-
-		//agent.Propose(key, string(val))
-		w.WriteHeader(http.StatusNoContent)
-	case http.MethodGet:
-		if val := agent.GetValue(key); len(val) > 0 {
-			w.Write([]byte(strings.Join(val, ",")))
-		} else {
-			http.Error(w, "Failed to GET", http.StatusNotFound)
-		}
-	case http.MethodPost:
-		addr, err := io.ReadAll(r.Body)
-		if err != nil {
-			//logger.Errorf("[http] failed to read on POST: %v", err)
-			http.Error(w, "Failed to POST", http.StatusBadRequest)
-			return
-		}
-
-		nodeId, err := strconv.ParseUint(key, 0, 64)
-		if err != nil {
-			//logger.Errorf("[http] failed to convert ID for conf change: %v", err)
-			http.Error(w, "Failed to POST", http.StatusBadRequest)
-			return
-		}
-
-		agent.AddRaftPeer(fmt.Sprint(nodeId), string(addr))
-		w.WriteHeader(http.StatusNoContent)
-	case http.MethodDelete:
-		nodeId, err := strconv.ParseUint(key, 0, 64)
-		if err != nil {
-			//logger.Errorf("[http] failed to convert ID for conf change: %v", err)
-			http.Error(w, "Failed to POST", http.StatusBadRequest)
-			return
-		}
-
-		agent.RemoveRaftPeer(fmt.Sprint(nodeId))
-		w.WriteHeader(http.StatusNoContent)
-	default:
-		w.Header().Add("Allow", http.MethodPut)
-		w.Header().Add("Allow", http.MethodGet)
-		w.Header().Add("Allow", http.MethodPost)
-		w.Header().Add("Allow", http.MethodDelete)
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
 }

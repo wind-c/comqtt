@@ -20,25 +20,24 @@ import (
 // HTTPStats is a listener for presenting the server $SYS stats on a JSON http endpoint.
 type HTTPStats struct {
 	sync.RWMutex
-	id      string       // the internal id of the listener
-	address string       // the network address to bind to
-	config  *Config      // configuration values for the listener
-	listen  *http.Server // the http server
-	sysInfo *system.Info // pointers to the server data
-	end     uint32       // ensure the close methods are only called once
-	handlers Handlers
+	id       string       // the internal id of the listener
+	address  string       // the network address to bind to
+	config   *Config      // configuration values for the listener
+	listen   *http.Server // the http server
+	sysInfo  *system.Info // pointers to the server data
+	end      uint32       // ensure the close methods are only called once
+	handlers map[string]Handler
 }
 
-type Handlers map[string]func(http.ResponseWriter, *http.Request)
+type Handler = func(http.ResponseWriter, *http.Request)
 
-func NewHTTP(id, address string, config *Config, sysInfo *system.Info, handlers Handlers) *HTTPStats {
+func NewHTTP(id, address string, config *Config, handlers map[string]Handler) *HTTPStats {
 	if config == nil {
 		config = new(Config)
 	}
 	return &HTTPStats{
 		id:       id,
 		address:  address,
-		sysInfo:  sysInfo,
 		config:   config,
 		handlers: handlers,
 	}
@@ -79,7 +78,14 @@ func (l *HTTPStats) Protocol() string {
 // Init initializes the listener.
 func (l *HTTPStats) Init(_ *slog.Logger) error {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", l.jsonHandler)
+	if len(l.handlers) > 0 {
+		for path, handler := range l.handlers {
+			mux.HandleFunc(path, handler)
+		}
+	} else {
+		mux.HandleFunc("/", l.jsonHandler)
+	}
+
 	l.listen = &http.Server{
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 5 * time.Second,

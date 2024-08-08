@@ -23,6 +23,7 @@ import (
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/storage/bolt"
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/storage/redis"
 	"github.com/wind-c/comqtt/v2/mqtt/listeners"
+	"github.com/wind-c/comqtt/v2/mqtt/rest"
 	"github.com/wind-c/comqtt/v2/plugin"
 	hauth "github.com/wind-c/comqtt/v2/plugin/auth/http"
 	mauth "github.com/wind-c/comqtt/v2/plugin/auth/mysql"
@@ -107,7 +108,7 @@ func realMain(ctx context.Context) error {
 	onError(server.AddListener(ws), "add websocket listener")
 
 	// add http listener
-	http := listeners.NewHTTPStats("stats", cfg.Mqtt.HTTP, nil, server.Info)
+	http := listeners.NewHTTP("stats", cfg.Mqtt.HTTP, nil, rest.New(server).GenHandlers())
 	onError(server.AddListener(http), "add http listener")
 
 	errCh := make(chan error, 1)

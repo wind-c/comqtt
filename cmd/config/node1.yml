@@ -1,5 +1,5 @@
 storage-way: 3  #Storage way optional items:0 memory、1 bolt、2 badger、3 redis;Only redis can be used in cluster mode.
-bridge-way: 1  #Bridge way optional items:0 disable、1 kafka
+bridge-way: 0  #Bridge way optional items:0 disable、1 kafka
 bridge-path: ./config/bridge-kafka.yml  #The bridge config file path
 pprof-enable: false #Whether to enable the performance analysis tool http://ip:6060
 
@@ -40,7 +40,7 @@ mqtt:
     client-write-buffer-size: 1024 #It is the number of individual workers and queues to initialize.
     client-read-buffer-size: 1024  #It is the size of the queue per worker.
     sys-topic-resend-interval: 1 #It specifies the interval between $SYS topic updates in seconds.
-    inline-client: false #Whether to enable the inline client.
+    inline-client: true #Whether to enable the inline client.
     capabilities:
       compatibilities:
         obscure-not-authorized: false #Return unspecified errors instead of not authorized

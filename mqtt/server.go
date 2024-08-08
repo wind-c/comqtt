@@ -12,6 +12,7 @@ import (
 	"net"
 	"os"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -127,6 +128,7 @@ type Server struct {
 	Log          *slog.Logger         // minimal no-alloc logger
 	hooks        *Hooks               // hooks contains hooks for extra functionality such as auth and persistent storage
 	inlineClient *Client              // inlineClient is a special client used for inline subscriptions and inline Publish
+	Blacklist    []string             // blacklist of client id
 }
 
 // loop contains interval tickers for the system events loop.
@@ -337,6 +339,10 @@ func (s *Server) attachClient(cl *Client, listener string) error {
 	}
 
 	cl.ParseConnect(listener, pk)
+	if slices.Contains(s.Blacklist, cl.ID) {
+		return fmt.Errorf("blacklisted client: %s", cl.ID)
+	}
+
 	code := s.validateConnect(cl, pk) // [MQTT-3.1.4-1] [MQTT-3.1.4-2]
 	if code != packets.CodeSuccess {
 		if err := s.SendConnack(cl, code, false, nil); err != nil {
