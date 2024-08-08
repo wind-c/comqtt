@@ -104,7 +104,7 @@ func (m *Membership) LocalAddr() string {
 	return m.list.LocalNode().Addr.String()
 }
 
-func (m *Membership) NumMembers() int {
+func (m *Membership) numMembers() int {
 	return m.list.NumMembers()
 }
 

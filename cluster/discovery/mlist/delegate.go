@@ -50,13 +50,14 @@ func NewDelegate(inboundMsgCh chan<- []byte) *Delegate {
 	d := &Delegate{
 		msgCh: inboundMsgCh,
 		State: make(map[string]int64, 2),
+		stop:  make(chan struct{}),
 	}
 	go d.handleQueueDepth()
 	return d
 }
 
 func (d *Delegate) Stop() {
-	d.stop <- struct{}{}
+	close(d.stop)
 	close(d.msgCh)
 }
 
