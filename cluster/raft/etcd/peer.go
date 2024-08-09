@@ -368,7 +368,6 @@ func (p *Peer) serveChannels() {
 			return
 
 		case <-p.stopC:
-			p.Stop()
 			return
 		}
 	}
@@ -603,6 +602,8 @@ func (p *Peer) writeError(err error) {
 
 func (p *Peer) Stop() {
 	p.stopHTTP()
+	close(p.proposeC)
+	close(p.confChangeC)
 	close(p.commitC)
 	close(p.errorC)
 	p.node.Stop()
