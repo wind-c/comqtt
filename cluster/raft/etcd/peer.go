@@ -368,6 +368,7 @@ func (p *Peer) serveChannels() {
 			return
 
 		case <-p.stopC:
+			//p.Stop()
 			return
 		}
 	}
