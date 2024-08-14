@@ -28,9 +28,9 @@ require (
 	github.com/timshannon/badgerhold v1.0.0
 	github.com/tinylib/msgp v1.1.9
 	go.etcd.io/bbolt v1.3.9
-	go.etcd.io/etcd/client/pkg/v3 v3.5.13
-	go.etcd.io/etcd/raft/v3 v3.5.13
-	go.etcd.io/etcd/server/v3 v3.5.13
+	go.etcd.io/etcd/client/pkg/v3 v3.6.0-alpha.0
+	go.etcd.io/etcd/raft/v3 v3.6.0-alpha.0
+	go.etcd.io/etcd/server/v3 v3.6.0-alpha.0
 	go.uber.org/goleak v1.3.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.25.0
@@ -82,8 +82,8 @@ require (
 	github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529 // indirect
 	github.com/xiang90/probing v0.0.0-20221125231312-a49e3df8f510 // indirect
 	github.com/yuin/gopher-lua v1.1.1 // indirect
-	go.etcd.io/etcd/api/v3 v3.5.13 // indirect
-	go.etcd.io/etcd/pkg/v3 v3.5.13 // indirect
+	go.etcd.io/etcd/api/v3 v3.6.0-alpha.0 // indirect
+	go.etcd.io/etcd/pkg/v3 v3.6.0-alpha.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/mod v0.19.0 // indirect
 	golang.org/x/net v0.27.0 // indirect
@@ -92,6 +92,8 @@ require (
 	golang.org/x/text v0.16.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/tools v0.23.0 // indirect
+	google.golang.org/genproto v0.0.0-20240227224415-6ceb2ff114de // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20240227224415-6ceb2ff114de // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240401170217-c3f982113cda // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
 )
