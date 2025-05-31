@@ -11,8 +11,8 @@ import (
 	"github.com/wind-c/comqtt/v2/cluster/message"
 	base "github.com/wind-c/comqtt/v2/cluster/raft"
 	"github.com/wind-c/comqtt/v2/mqtt/packets"
-	"go.etcd.io/etcd/raft/v3/raftpb"
 	"go.etcd.io/etcd/server/v3/etcdserver/api/snap"
+	"go.etcd.io/raft/v3/raftpb"
 	"strings"
 )
 
