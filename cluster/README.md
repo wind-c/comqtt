@@ -15,13 +15,6 @@ Of course, due to my busy work and lack of more production environment verificat
 - Horizontal scaling is supported. When adding new nodes, you only need to specify any node in the cluster as the seed node.
 - Simple metrics viewing, such as mqtt statistics and cluster statistics.
 
-
-## Simple metrics
-
-- Mqtt stats:  http://127.0.0.1:8080/mqtt/stats
-- Cluster config: http://127.0.0.1:8080/cluster/conf
-- Cluster nodes: http://127.0.0.1:8080/cluster/ms
-
 ## Build
 
 ```shell

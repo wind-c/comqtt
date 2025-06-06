@@ -45,6 +45,26 @@ Unless it's a critical issue, new releases typically go out over the weekend. At
 - Enhanced Metrics support.
 - CoAP.
 
+#### Restful API
+- GET /api/v1/mqtt/config : [single] get configuration parameters of mqtt server
+- GET /api/v1/mqtt/stat/overall : [single] get mqtt server info
+- GET /api/v1/mqtt/stat/online : [single] get online number
+- GET /api/v1/mqtt/clients/{id} : [single] get a client info
+- GET /api/v1/mqtt/blacklist : [single/cluster] get blacklist, each node in the cluster has the same blacklist
+- POST /api/v1/mqtt/blacklist/{id} : [single] disconnect the client and add it to the blacklist
+- DELETE api/v1/mqtt/blacklist/{id} : [single] remove from the blacklist
+- POST /api/v1/mqtt/message : [single/cluster] publish message to subscribers in the cluster, body {"topic_name": "xxx", "payload": "xxx", "retain": true/false, "qos": 1}
+- GET /api/v1/node/config : [cluster] get configuration parameters of node
+- DELETE /api/v1/node/{name} : [cluster] leave local node gracefully exits the cluster.Call this API on the node to be deleted, exiting the cluster actively can prevent other nodes from constantly attempting to connect to that node.
+- GET /api/v1/cluster/nodes : [cluster] get all nodes in the cluster
+- POST /api/v1/cluster/nodes : [cluster] add a node to the cluster, body {"name": "xx", "addr": "ip:port"}.If the configuration file sets "members: [ip:port]", then the node will automatically join the cluster upon startup and there is no need to call this API.
+- GET /api/v1/cluster/stat/online : [cluster] online number from all nodes in the cluster
+- GET /api/v1/cluster/clients/{id} : [cluster] get a client information, search from all nodes in the cluster
+- POST /api/v1/cluster/blacklist/{id} : [cluster] add clientId to the blacklist on all nodes in the cluster
+- DELETE /api/v1/cluster/blacklist/{id} : [cluster] remove from the blacklist on all nodes in the cluster
+<!-- POST /api/v1/cluster/peers : [cluster] add peer to raft cluster, body {"name": "xx", "addr": "ip:port"} -->
+<!-- DELETE /api/v1/cluster/peers/{name} : [cluster] remove peer from raft cluster -->
+
 ## Quick Start
 ### Running the Broker with Go
 Comqtt can be used as a standalone broker. Simply checkout this repository and run the [cmd/single/main.go](cmd/single/main.go) entrypoint in the [cmd](cmd) folder which will expose tcp (:1883), websocket (:1882), and dashboard (:8080) listeners.
