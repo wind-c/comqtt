@@ -54,7 +54,7 @@ func (a *Auth) Provides(b byte) bool {
 }
 
 func (a *Auth) Init(config any) error {
-	if _, ok := config.(*Options); config == nil || (!ok && config != nil) {
+	if _, ok := config.(*Options); !ok || config == nil {
 		return mqtt.ErrInvalidConfigType
 	}
 

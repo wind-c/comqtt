@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"fmt"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
 	"github.com/wind-c/comqtt/v2/mqtt"
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/auth"
 	"github.com/wind-c/comqtt/v2/mqtt/packets"
@@ -72,7 +72,7 @@ func (a *Auth) Provides(b byte) bool {
 }
 
 func (a *Auth) Init(config any) error {
-	if _, ok := config.(*Options); config == nil || (!ok && config != nil) {
+	if _, ok := config.(*Options); !ok || config == nil {
 		return mqtt.ErrInvalidConfigType
 	}
 
