@@ -10,9 +10,21 @@ auth:
   conf-path: ./config/auth-redis.yml  #The config file path should correspond to the auth-datasource
 
 mqtt:
-  tcp: :1883
-  ws: :1882
-  http: :8080
+  TCPListeners:
+    - name: "TCP TLS Listener"
+      port: ":1883"
+      tls: true    #Use TLS if configured, otherwise fall back to an unencrypted connection.
+  WSListeners:
+    - name: "Websocket TLS Listener"
+      port: ":1882"
+      tls: true
+    - name: "Websocket Insecure Listener"
+      port: ":1884"
+      tls: false    #Don't attempt to use TLS
+  HTTPListeners:
+    - name: "HTTP TLS Listener"
+      port: ":8080"
+      tls: true
   tls:
     ca-cert:   #CA root certificate file path. Not empty enable bidirectional authentication.
     server-cert:   #Server certificate file path

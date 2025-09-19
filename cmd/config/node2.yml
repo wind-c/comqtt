@@ -29,9 +29,18 @@ cluster:
   inout-pool-nonblocking: false #Pool size is unlimited, when inout-pool-nonblocking is true, inbound-pool-size and outbound-pool-size is inoperative.
 
 mqtt:
-  tcp: :1885
-  ws: :1886
-  http: :8081
+  TCPListeners:
+    - name: "TCP TLS Listener"
+      port: ":1885"
+      tls: true
+  WSListeners:
+    - name: "Websocket TLS Listener"
+      port: ":1886"
+      tls: true
+  HTTPListeners:
+    - name: "HTTPS Listener"
+      port: ":8081"
+      tls: true
   tls:
     ca-cert:   #CA root certificate file path. Not empty enable bidirectional authentication.
     server-cert:   #Server certificate file path

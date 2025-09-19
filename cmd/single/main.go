@@ -33,6 +33,12 @@ import (
 	"go.etcd.io/bbolt"
 )
 
+type mqttCmd struct {
+    TCP     string
+    HTTP    string
+    WS      string
+}
+
 func pprof() {
 	go func() {
 		log.Info("listen pprof", "error", http.ListenAndServe(":6060", nil))
@@ -49,16 +55,20 @@ func main() {
 func realMain(ctx context.Context) error {
 	var err error
 	var confFile string
+    var WSList      []*listeners.Websocket
+    var TCPList     []*listeners.TCP
+    var HTTPList    []*listeners.HTTPStats
 	cfg := config.New()
+    cmd := mqttCmd{}
 
 	flag.StringVar(&confFile, "conf", "", "read the program parameters from the config file")
 	flag.UintVar(&cfg.StorageWay, "storage-way", 1, "storage way optional items:0 memory, 1 bolt, 2 badger, 3 redis")
 	flag.UintVar(&cfg.Auth.Way, "auth-way", 0, "authentication way optional items:0 anonymous, 1 username and password, 2 clientid")
 	flag.UintVar(&cfg.Auth.Datasource, "auth-ds", 0, "authentication datasource optional items:0 free, 1 redis, 2 mysql, 3 postgresql, 4 http")
 	flag.StringVar(&cfg.Auth.ConfPath, "auth-path", "", "config file path should correspond to the auth-datasource")
-	flag.StringVar(&cfg.Mqtt.TCP, "tcp", ":1883", "network address for Mqtt TCP listener")
-	flag.StringVar(&cfg.Mqtt.WS, "ws", ":1882", "network address for Mqtt Websocket listener")
-	flag.StringVar(&cfg.Mqtt.HTTP, "http", ":8080", "network address for web info dashboard listener")
+	flag.StringVar(&cmd.TCP, "tcp", ":0", "network address for Mqtt TCP listener")
+	flag.StringVar(&cmd.WS, "ws", ":0", "network address for Mqtt Websocket listener")
+	flag.StringVar(&cmd.HTTP, "http", ":0", "network address for web info dashboard listener")
 	flag.BoolVar(&cfg.Log.Enable, "log-enable", true, "log enabled or not")
 	flag.StringVar(&cfg.Log.Filename, "log-file", "./logs/comqtt.log", "log filename")
 	//parse arguments
@@ -90,26 +100,69 @@ func realMain(ctx context.Context) error {
 	initBridge(server, cfg)
 
 	// gen tls config
-	var listenerConfig *listeners.Config
+	var listenerTLSConfig *listeners.Config
+    var listenerConfig *listeners.Config
+
 	if tlsConfig, err := config.GenTlsConfig(cfg); err != nil {
 		onError(err, "")
 	} else {
 		if tlsConfig != nil {
-			listenerConfig = &listeners.Config{TLSConfig: tlsConfig}
-		}
+			listenerTLSConfig = &listeners.Config{TLSConfig: tlsConfig}
+		} else {
+            log.Info("TLS is not configured, all listeners will use unencrypted connections.")
+        }
 	}
 
-	// add tcp listener
-	tcp := listeners.NewTCP("tcp", cfg.Mqtt.TCP, listenerConfig)
-	onError(server.AddListener(tcp), "add tcp listener")
+	// add cli tcp listener
+    if cmd.TCP != ":0" {
+    	tcp := listeners.NewTCP("tcp", cmd.TCP, listenerTLSConfig)
+	    onError(server.AddListener(tcp), "add tcp listener")
+    }
 
-	// add websocket listener
-	ws := listeners.NewWebsocket("ws", cfg.Mqtt.WS, listenerConfig)
-	onError(server.AddListener(ws), "add websocket listener")
+    // TCP Listeners from config file
+    TCPList = make([]*listeners.TCP, len(cfg.Mqtt.TCPListeners))
+    for i := 0; i < len(cfg.Mqtt.TCPListeners); i++ {
+        if cfg.Mqtt.TCPListeners[i].Tls {
+            TCPList[i] = listeners.NewTCP(cfg.Mqtt.TCPListeners[i].Name, cfg.Mqtt.TCPListeners[i].Port, listenerTLSConfig)
+        } else {
+            TCPList[i] = listeners.NewTCP(cfg.Mqtt.TCPListeners[i].Name, cfg.Mqtt.TCPListeners[i].Port, listenerConfig)
+        }
+        onError(server.AddListener(TCPList[i]), "add tcp listener: " + cfg.Mqtt.TCPListeners[i].Name)
+    }
 
-	// add http listener
-	http := listeners.NewHTTP("stats", cfg.Mqtt.HTTP, nil, rest.New(server).GenHandlers())
-	onError(server.AddListener(http), "add http listener")
+	// add cli websocket listener
+    if cmd.WS != ":0" {
+    	ws := listeners.NewWebsocket("ws", cmd.WS, listenerTLSConfig)
+	    onError(server.AddListener(ws), "add websocket listener")
+    }
+
+    // WS Listeners from config file
+    WSList = make([]*listeners.Websocket, len(cfg.Mqtt.WSListeners))
+    for i := 0; i < len(cfg.Mqtt.WSListeners); i++ {
+        if cfg.Mqtt.WSListeners[i].Tls {
+            WSList[i] = listeners.NewWebsocket(cfg.Mqtt.WSListeners[i].Name, cfg.Mqtt.WSListeners[i].Port, listenerTLSConfig)
+        } else {
+            WSList[i] = listeners.NewWebsocket(cfg.Mqtt.WSListeners[i].Name, cfg.Mqtt.WSListeners[i].Port, listenerConfig)
+        }
+        onError(server.AddListener(WSList[i]), "add websocket listener: " + cfg.Mqtt.WSListeners[i].Name)
+    }
+
+	// add cli http listener
+    if cmd.HTTP != ":0" {
+    	http := listeners.NewHTTP("stats", cmd.HTTP, nil, rest.New(server).GenHandlers())
+	    onError(server.AddListener(http), "add http listener")
+    }
+
+    // HTTP Listeners from config file
+    HTTPList = make([]*listeners.HTTPStats, len(cfg.Mqtt.HTTPListeners))
+    for i := 0; i < len(cfg.Mqtt.HTTPListeners); i++ {
+        if cfg.Mqtt.HTTPListeners[i].Tls {
+            HTTPList[i] = listeners.NewHTTP(cfg.Mqtt.HTTPListeners[i].Name, cfg.Mqtt.HTTPListeners[i].Port, listenerTLSConfig, rest.New(server).GenHandlers())
+        } else {
+            HTTPList[i] = listeners.NewHTTP(cfg.Mqtt.HTTPListeners[i].Name, cfg.Mqtt.HTTPListeners[i].Port, listenerConfig, rest.New(server).GenHandlers())
+        }
+        onError(server.AddListener(HTTPList[i]), "add http listener: " + cfg.Mqtt.HTTPListeners[i].Name)
+    }
 
 	errCh := make(chan error, 1)
 	// start server
