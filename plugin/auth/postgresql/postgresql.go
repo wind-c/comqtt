@@ -85,7 +85,7 @@ func (a *Auth) Init(config any) error {
 
 	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 		a.config.Dsn.Host, a.config.Dsn.Port, a.config.Dsn.LoginName, a.config.Dsn.LoginPassword, a.config.Dsn.Schema, a.config.Dsn.SslMode)
-	sqlxDB, err := sqlx.Connect("postgres", dsn)
+	sqlxDB, err := sqlx.Connect("pgx", dsn)
 	if err != nil {
 		return err
 	}
