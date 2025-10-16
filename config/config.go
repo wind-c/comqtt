@@ -102,11 +102,17 @@ type auth struct {
 }
 
 type mqtt struct {
-	TCP     string         `yaml:"tcp"`
-	WS      string         `yaml:"ws"`
-	HTTP    string         `yaml:"http"`
-	Tls     tls            `yaml:"tls"`
-	Options comqtt.Options `yaml:"options"`
+    TCPListeners    []listenerOptions   `yaml:"TCPListeners"`
+    WSListeners     []listenerOptions   `yaml:"WSListeners"`
+    HTTPListeners   []listenerOptions   `yaml:"HTTPListeners"`
+	Tls         tls                     `yaml:"tls"`
+	Options     comqtt.Options          `yaml:"options"`
+}
+
+type listenerOptions struct {
+    Name    string  `yaml:"name"`
+    Port    string  `yaml:"port"`
+    Tls     bool    `yaml:"tls"`
 }
 
 type tls struct {
