@@ -479,6 +479,36 @@ func (s *Storage) StoredRetainedMessageByTopic(topic string) (v storage.Message,
 	return v, nil
 }
 
+// StoredRetainedMessages returns all stored retained messages from the store.
+func (s *Storage) StoredRetainedMessages() (v []storage.Message, err error) {
+	if s.db == nil {
+		s.Log.Error("", "error", storage.ErrDBFileNotOpen)
+		return
+	}
+
+	rows, err := s.db.HGetAll(s.ctx, s.hKey(storage.RetainedKey)).Result()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		s.Log.Error("failed to HGetAll retained message data", "error", err)
+		return v, err
+	}
+
+	for topic, row := range rows {
+		var d storage.Message
+		if unmarshalErr := d.UnmarshalBinary([]byte(row)); unmarshalErr != nil {
+			s.Log.Error("failed to unmarshal retained message data", "error", unmarshalErr, "data", row)
+			continue
+		}
+
+		if d.TopicName == "" {
+			d.TopicName = topic
+		}
+
+		v = append(v, d)
+	}
+
+	return v, nil
+}
+
 // StoredInflightMessagesByCid returns all stored inflight messages of client from the store.
 func (s *Storage) StoredInflightMessagesByCid(cid string) (v []storage.Message, err error) {
 	if s.db == nil {

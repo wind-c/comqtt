@@ -5,6 +5,7 @@
 package redis
 
 import (
+	"fmt"
 	"io"
 	"sort"
 	"testing"
@@ -744,4 +745,187 @@ func TestStoredSysInfoClosedDB(t *testing.T) {
 	v, err := s.StoredSysInfo()
 	require.Empty(t, v)
 	require.Error(t, err)
+}
+
+// TestStoredRetainedMessages tests retrieving all retained messages from Redis
+func TestStoredRetainedMessages(t *testing.T) {
+	m := miniredis.RunT(t)
+	defer m.Close()
+	s := newHook(t, m.Addr())
+	defer teardown(t, s)
+
+	// Create test retained messages
+	msg1 := &storage.Message{
+		ID:          "test/topic1",
+		T:           storage.RetainedKey,
+		TopicName:   "test/topic1",
+		Payload:     []byte("message1"),
+		FixedHeader: packets.FixedHeader{Type: packets.Publish, Retain: true},
+	}
+
+	msg2 := &storage.Message{
+		ID:          "test/topic2",
+		T:           storage.RetainedKey,
+		TopicName:   "test/topic2",
+		Payload:     []byte("message2"),
+		FixedHeader: packets.FixedHeader{Type: packets.Publish, Retain: true},
+	}
+
+	// Store messages in Redis
+	data1, err := msg1.MarshalBinary()
+	require.NoError(t, err)
+	err = s.db.HSet(s.ctx, s.hKey(storage.RetainedKey), "test/topic1", data1).Err()
+	require.NoError(t, err)
+
+	data2, err := msg2.MarshalBinary()
+	require.NoError(t, err)
+	err = s.db.HSet(s.ctx, s.hKey(storage.RetainedKey), "test/topic2", data2).Err()
+	require.NoError(t, err)
+
+	// Retrieve all retained messages
+	messages, err := s.StoredRetainedMessages()
+	require.NoError(t, err)
+	require.Len(t, messages, 2)
+
+	// Verify messages
+	topicMap := make(map[string]storage.Message)
+	for _, msg := range messages {
+		topicMap[msg.TopicName] = msg
+	}
+
+	require.Contains(t, topicMap, "test/topic1")
+	require.Contains(t, topicMap, "test/topic2")
+	require.Equal(t, "message1", string(topicMap["test/topic1"].Payload))
+	require.Equal(t, "message2", string(topicMap["test/topic2"].Payload))
+}
+
+// TestStoredRetainedMessagesEmpty tests retrieving when no retained messages exist
+func TestStoredRetainedMessagesEmpty(t *testing.T) {
+	m := miniredis.RunT(t)
+	defer m.Close()
+	s := newHook(t, m.Addr())
+	defer teardown(t, s)
+
+	messages, err := s.StoredRetainedMessages()
+	require.NoError(t, err)
+	require.Empty(t, messages)
+}
+
+// TestStoredRetainedMessagesNoDB tests behavior when database is nil
+func TestStoredRetainedMessagesNoDB(t *testing.T) {
+	m := miniredis.RunT(t)
+	defer m.Close()
+	s := newHook(t, m.Addr())
+	s.db = nil
+
+	messages, err := s.StoredRetainedMessages()
+	require.Empty(t, messages)
+	require.NoError(t, err)
+}
+
+// TestStoredRetainedMessagesClosedDB tests behavior when database is closed
+func TestStoredRetainedMessagesClosedDB(t *testing.T) {
+	m := miniredis.RunT(t)
+	defer m.Close()
+	s := newHook(t, m.Addr())
+	teardown(t, s)
+
+	messages, err := s.StoredRetainedMessages()
+	require.Empty(t, messages)
+	require.Error(t, err)
+}
+
+// TestStoredRetainedMessagesWithMissingTopicName tests messages where TopicName is set from Redis key
+func TestStoredRetainedMessagesWithMissingTopicName(t *testing.T) {
+	m := miniredis.RunT(t)
+	defer m.Close()
+	s := newHook(t, m.Addr())
+	defer teardown(t, s)
+
+	// Create message without TopicName (will be set from Redis key)
+	msg := &storage.Message{
+		ID:          "test/topic",
+		T:           storage.RetainedKey,
+		Payload:     []byte("message"),
+		FixedHeader: packets.FixedHeader{Type: packets.Publish, Retain: true},
+	}
+
+	data, err := msg.MarshalBinary()
+	require.NoError(t, err)
+	err = s.db.HSet(s.ctx, s.hKey(storage.RetainedKey), "test/topic", data).Err()
+	require.NoError(t, err)
+
+	messages, err := s.StoredRetainedMessages()
+	require.NoError(t, err)
+	require.Len(t, messages, 1)
+	require.Equal(t, "test/topic", messages[0].TopicName)
+}
+
+// TestStoredRetainedMessagesMalformedData tests handling of malformed data
+func TestStoredRetainedMessagesMalformedData(t *testing.T) {
+	m := miniredis.RunT(t)
+	defer m.Close()
+	s := newHook(t, m.Addr())
+	defer teardown(t, s)
+
+	// Store valid message
+	msg1 := &storage.Message{
+		ID:          "test/topic1",
+		T:           storage.RetainedKey,
+		TopicName:   "test/topic1",
+		Payload:     []byte("message1"),
+		FixedHeader: packets.FixedHeader{Type: packets.Publish, Retain: true},
+	}
+	data1, err := msg1.MarshalBinary()
+	require.NoError(t, err)
+	err = s.db.HSet(s.ctx, s.hKey(storage.RetainedKey), "test/topic1", data1).Err()
+	require.NoError(t, err)
+
+	// Store invalid/malformed data
+	err = s.db.HSet(s.ctx, s.hKey(storage.RetainedKey), "test/topic2", "invalid data").Err()
+	require.NoError(t, err)
+
+	// Should return valid messages and skip malformed ones
+	messages, err := s.StoredRetainedMessages()
+	require.NoError(t, err)
+	require.Len(t, messages, 1)
+	require.Equal(t, "test/topic1", messages[0].TopicName)
+}
+
+// TestStoredRetainedMessagesMultipleTopics tests with many retained messages
+func TestStoredRetainedMessagesMultipleTopics(t *testing.T) {
+	m := miniredis.RunT(t)
+	defer m.Close()
+	s := newHook(t, m.Addr())
+	defer teardown(t, s)
+
+	// Store multiple messages
+	expectedCount := 10
+	for i := 0; i < expectedCount; i++ {
+		msg := &storage.Message{
+			ID:          fmt.Sprintf("test/topic%d", i),
+			T:           storage.RetainedKey,
+			TopicName:   fmt.Sprintf("test/topic%d", i),
+			Payload:     []byte(fmt.Sprintf("message%d", i)),
+			FixedHeader: packets.FixedHeader{Type: packets.Publish, Retain: true},
+		}
+		data, err := msg.MarshalBinary()
+		require.NoError(t, err)
+		err = s.db.HSet(s.ctx, s.hKey(storage.RetainedKey), fmt.Sprintf("test/topic%d", i), data).Err()
+		require.NoError(t, err)
+	}
+
+	messages, err := s.StoredRetainedMessages()
+	require.NoError(t, err)
+	require.Len(t, messages, expectedCount)
+
+	// Verify all messages are present
+	topicMap := make(map[string]bool)
+	for _, msg := range messages {
+		topicMap[msg.TopicName] = true
+	}
+
+	for i := 0; i < expectedCount; i++ {
+		require.True(t, topicMap[fmt.Sprintf("test/topic%d", i)], "Missing topic test/topic%d", i)
+	}
 }

@@ -1075,17 +1075,131 @@ func (s *Server) publishToClient(cl *Client, sub packets.Subscription, pk packet
 	return out, nil
 }
 
-func (s *Server) publishRetainedToClient(cl *Client, sub packets.Subscription, existed bool) {
-	if IsSharedFilter(sub.Filter) {
-		return // 4.8.2 Non-normative - Shared Subscriptions - No Retained Messages are sent to the Session when it first subscribes.
+func (s *Server) topicMatchesFilter(topic string, filter string) bool {
+	// System topics (starting with '$') must not match filters that don't start with '$'.
+	// This aligns with MQTT semantics for system topics.
+	if len(topic) > 0 && topic[0] == '$' && (len(filter) == 0 || filter[0] != '$') {
+		return false
+	}
+	if filter == topic {
+		return true
 	}
 
-	if sub.RetainHandling == 1 && existed || sub.RetainHandling == 2 { // [MQTT-3.3.1-10] [MQTT-3.3.1-11]
+	if filter == "#" {
+
+		if len(topic) > 0 && topic[0] == '$' {
+			return false
+		}
+		return true
+	}
+
+	filterParts := strings.Split(filter, "/")
+	topicParts := strings.Split(topic, "/")
+
+	if s.hasMultiLevelWildcard(filterParts) {
+		return s.matchesMultiLevelWildcard(filterParts, topicParts)
+	}
+
+	return s.matchesSingleLevelWildcard(filterParts, topicParts)
+}
+
+func (s *Server) hasMultiLevelWildcard(filterParts []string) bool {
+	return len(filterParts) > 0 && filterParts[len(filterParts)-1] == "#"
+}
+
+func (s *Server) matchesMultiLevelWildcard(filterParts, topicParts []string) bool {
+	// Accept both forms: with or without the trailing '#' already removed.
+	if len(filterParts) > 0 && filterParts[len(filterParts)-1] == "#" {
+		filterParts = filterParts[:len(filterParts)-1]
+	}
+	// Now filterParts is the base prefix before '#'.
+	if len(filterParts) == 0 {
+		return true
+	}
+	if len(topicParts) < len(filterParts) {
+		return false
+	}
+	for i := 0; i < len(filterParts); i++ {
+		if filterParts[i] != "+" && filterParts[i] != topicParts[i] {
+			return false
+		}
+	}
+	return true
+}
+func (s *Server) matchesSingleLevelWildcard(filterParts, topicParts []string) bool {
+	if len(filterParts) != len(topicParts) {
+		return false
+	}
+	for i := 0; i < len(filterParts); i++ {
+		if filterParts[i] != "+" && filterParts[i] != topicParts[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func (s *Server) publishRetainedToClient(cl *Client, sub packets.Subscription, existed bool) {
+	if s.shouldSkipRetainedMessage(sub, existed) {
 		return
 	}
 
 	sub.FwdRetainedFlag = true
-	for _, pkv := range s.Topics.Messages(sub.Filter) { // [MQTT-3.8.4-4]
+	localMessages := s.Topics.Messages(sub.Filter)
+
+	if s.hooks.Provides(StoredRetainedMessages) {
+		localMessages = s.mergeRetainedMessagesFromRedis(localMessages, sub.Filter)
+	}
+
+	s.sendRetainedMessagesToClient(cl, sub, localMessages)
+}
+
+func (s *Server) shouldSkipRetainedMessage(sub packets.Subscription, existed bool) bool {
+	return IsSharedFilter(sub.Filter) || (sub.RetainHandling == 1 && existed) || sub.RetainHandling == 2
+}
+
+func (s *Server) mergeRetainedMessagesFromRedis(localMessages []packets.Packet, filter string) []packets.Packet {
+	storedMsgs, err := s.hooks.StoredRetainedMessages()
+	if err != nil {
+		return localMessages
+	}
+
+	messageMap := s.buildMessageMapFromLocal(localMessages)
+	messageMap = s.mergeRedisMessages(messageMap, storedMsgs, filter)
+	return s.convertMessageMapToSlice(messageMap)
+}
+
+func (s *Server) buildMessageMapFromLocal(localMessages []packets.Packet) map[string]packets.Packet {
+	messageMap := make(map[string]packets.Packet)
+	for _, pk := range localMessages {
+		messageMap[pk.TopicName] = pk
+	}
+	return messageMap
+}
+
+func (s *Server) mergeRedisMessages(messageMap map[string]packets.Packet, storedMsgs []storage.Message, filter string) map[string]packets.Packet {
+	// Redis stored messages are merged with local messages. Redis messages represent the
+	// cluster-wide retained state and should overwrite local messages to ensure all nodes
+	// serve the same globally latest retained message to new subscribers.
+	for _, msg := range storedMsgs {
+		if msg.TopicName == "" || !s.topicMatchesFilter(msg.TopicName, filter) {
+			continue
+		}
+		pk := msg.ToPacket()
+		messageMap[pk.TopicName] = pk
+	}
+	return messageMap
+}
+
+func (s *Server) convertMessageMapToSlice(messageMap map[string]packets.Packet) []packets.Packet {
+	result := make([]packets.Packet, 0, len(messageMap))
+	for _, pk := range messageMap {
+		result = append(result, pk)
+	}
+	return result
+}
+
+func (s *Server) sendRetainedMessagesToClient(cl *Client, sub packets.Subscription, messages []packets.Packet) {
+	for _, pkv := range messages {
 		_, err := s.publishToClient(cl, sub, pkv)
 		if err != nil {
 			s.Log.Debug("failed to publish retained message", "error", err, "client", cl.ID, "listener", cl.Net.Listener, "packet", pkv)

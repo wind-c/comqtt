@@ -3661,3 +3661,398 @@ func TestServerSubscribeWithRetainDifferentIdentifier(t *testing.T) {
 		require.Equal(t, true, <-finishCh)
 	}
 }
+
+// TestTopicMatchesFilter tests the topicMatchesFilter function with various scenarios
+func TestTopicMatchesFilter(t *testing.T) {
+	s := newServer()
+
+	tests := []struct {
+		name     string
+		topic    string
+		filter   string
+		expected bool
+	}{
+		{"exact match", "test", "test", true},
+		{"exact match with path", "test/sub1", "test/sub1", true},
+		{"wildcard # matches everything", "any/topic/path", "#", true},
+		{"wildcard # matches single level", "test", "#", true},
+		{"wildcard # at end matches prefix", "test/sub1", "test/#", true},
+		{"wildcard # at end matches multi-level", "test/sub1/sub2", "test/#", true},
+		{"wildcard # at end matches empty after prefix", "test", "test/#", true},
+		{"wildcard + matches single level", "test/sub1", "test/+", true},
+		{"wildcard + matches any single level", "test/anything", "test/+", true},
+		{"wildcard + does not match multi-level", "test/sub1/sub2", "test/+", false},
+		{"multiple + wildcards", "test/sub1/sub2", "test/+/+", true},
+		{"mixed wildcards", "test/sub1/sub2", "test/+/#", true},
+		{"no match different topic", "test1", "test2", false},
+		{"no match different path", "test/sub1", "test/sub2", false},
+		{"no match longer filter", "test", "test/sub1", false},
+		{"no match shorter filter", "test/sub1", "test", false},
+		{"empty topic", "", "test", false},
+		{"empty filter", "test", "", false},
+		{"system topic with #", "$SYS/info", "#", false},
+		{"system topic with $SYS/#", "$SYS/info", "$SYS/#", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := s.topicMatchesFilter(tt.topic, tt.filter)
+			require.Equal(t, tt.expected, result, "topic: %s, filter: %s", tt.topic, tt.filter)
+		})
+	}
+}
+
+// TestHasMultiLevelWildcard tests the hasMultiLevelWildcard helper function
+func TestHasMultiLevelWildcard(t *testing.T) {
+	s := newServer()
+
+	tests := []struct {
+		name        string
+		filterParts []string
+		expected    bool
+	}{
+		{"has # at end", []string{"test", "#"}, true},
+		{"has # in middle", []string{"test", "#", "sub"}, false},
+		{"no #", []string{"test", "sub"}, false},
+		{"only #", []string{"#"}, true},
+		{"empty parts", []string{}, false},
+		{"# with path", []string{"a", "b", "#"}, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := s.hasMultiLevelWildcard(tt.filterParts)
+			require.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestMatchesMultiLevelWildcard tests the matchesMultiLevelWildcard helper function
+// TestMatchesMultiLevelWildcard tests the matchesMultiLevelWildcard helper function
+func TestMatchesMultiLevelWildcard(t *testing.T) {
+	s := newServer()
+
+	tests := []struct {
+		name        string
+		filterParts []string
+		topicParts  []string
+		expected    bool
+	}{
+		{"exact match", []string{"test", "#"}, []string{"test"}, true},
+		{"prefix match", []string{"test", "#"}, []string{"test", "sub"}, true},
+		{"prefix match multi-level", []string{"test", "#"}, []string{"test", "sub", "sub2"}, true},
+		{"with + wildcard", []string{"test", "+", "#"}, []string{"test", "sub"}, true},
+		{"with + wildcard multi-level", []string{"test", "+", "#"}, []string{"test", "sub", "sub2"}, true},
+		{"shorter topic", []string{"test", "sub", "#"}, []string{"test"}, false},
+		{"no match", []string{"test", "#"}, []string{"other"}, false},
+		{"empty filter after #", []string{"#"}, []string{"test"}, true},
+		{"empty filter after # matches everything", []string{"#"}, []string{"any", "topic", "path"}, true},
+		{"empty topic", []string{"test", "#"}, []string{}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Remove # before calling (as matchesMultiLevelWildcard expects)
+			filterPartsWithoutHash := tt.filterParts
+			if len(filterPartsWithoutHash) > 0 && filterPartsWithoutHash[len(filterPartsWithoutHash)-1] == "#" {
+				filterPartsWithoutHash = filterPartsWithoutHash[:len(filterPartsWithoutHash)-1]
+			}
+			result := s.matchesMultiLevelWildcard(filterPartsWithoutHash, tt.topicParts)
+			require.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestMatchesSingleLevelWildcard tests the matchesSingleLevelWildcard helper function
+func TestMatchesSingleLevelWildcard(t *testing.T) {
+	s := newServer()
+
+	tests := []struct {
+		name        string
+		filterParts []string
+		topicParts  []string
+		expected    bool
+	}{
+		{"exact match", []string{"test"}, []string{"test"}, true},
+		{"exact match multi-level", []string{"test", "sub"}, []string{"test", "sub"}, true},
+		{"+ wildcard single level", []string{"test", "+"}, []string{"test", "sub"}, true},
+		{"+ wildcard multi-level", []string{"test", "+", "+"}, []string{"test", "sub", "sub2"}, true},
+		{"different lengths", []string{"test"}, []string{"test", "sub"}, false},
+		{"no match", []string{"test"}, []string{"other"}, false},
+		{"+ matches anything", []string{"+"}, []string{"anything"}, true},
+		{"empty both", []string{}, []string{}, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := s.matchesSingleLevelWildcard(tt.filterParts, tt.topicParts)
+			require.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// MockStorageHook provides StoredRetainedMessages for testing
+type MockStorageHook struct {
+	HookBase
+	retainedMessages []storage.Message
+	shouldError      bool
+}
+
+func (h *MockStorageHook) ID() string {
+	return "mock-storage"
+}
+
+func (h *MockStorageHook) Provides(b byte) bool {
+	return b == StoredRetainedMessages
+}
+
+func (h *MockStorageHook) StoredRetainedMessages() ([]storage.Message, error) {
+	if h.shouldError {
+		return nil, io.ErrUnexpectedEOF
+	}
+	return h.retainedMessages, nil
+}
+
+// TestPublishRetainedToClientWithRedis tests publishRetainedToClient with Redis storage
+func TestPublishRetainedToClientWithRedis(t *testing.T) {
+	s := newServer()
+	cl, r, w := newTestClient()
+	s.Clients.Add(cl)
+
+	// Add local retained message
+	localPk := *packets.TPacketData[packets.Publish].Get(packets.TPublishRetain).Packet
+	localPk.TopicName = "test/local"
+	localPk.Payload = []byte("local message")
+	s.Topics.RetainMessage(localPk)
+
+	// Setup Redis retained messages via mock hook
+	redisMsg := storage.Message{
+		TopicName: "test/redis",
+		Payload:   []byte("redis message"),
+		FixedHeader: packets.FixedHeader{
+			Type:   packets.Publish,
+			Retain: true,
+		},
+	}
+	mockHook := &MockStorageHook{
+		retainedMessages: []storage.Message{redisMsg},
+		shouldError:      false,
+	}
+	_ = s.AddHook(mockHook, nil)
+
+	// Subscribe to wildcard filter
+	subbed, count := s.Topics.Subscribe(cl.ID, packets.Subscription{Filter: "test/#", Qos: 0})
+	require.True(t, subbed)
+	require.Equal(t, 1, count)
+
+	go func() {
+		s.publishRetainedToClient(cl, packets.Subscription{Filter: "test/#"}, false)
+		time.Sleep(time.Millisecond)
+		_ = w.Close()
+	}()
+
+	buf, err := io.ReadAll(r)
+	require.NoError(t, err)
+	require.NotEmpty(t, buf)
+}
+
+// TestPublishRetainedToClientRedisOverwritesLocal tests that Redis messages overwrite local ones
+func TestPublishRetainedToClientRedisOverwritesLocal(t *testing.T) {
+	s := newServer()
+	cl, r, w := newTestClient()
+	s.Clients.Add(cl)
+
+	// Add local retained message
+	localPk := *packets.TPacketData[packets.Publish].Get(packets.TPublishRetain).Packet
+	localPk.TopicName = "test/topic"
+	localPk.Payload = []byte("local message")
+	s.Topics.RetainMessage(localPk)
+
+	// Setup Redis retained message with same topic (should overwrite)
+	redisMsg := storage.Message{
+		TopicName: "test/topic",
+		Payload:   []byte("redis message"),
+		FixedHeader: packets.FixedHeader{
+			Type:   packets.Publish,
+			Retain: true,
+		},
+	}
+	mockHook := &MockStorageHook{
+		retainedMessages: []storage.Message{redisMsg},
+		shouldError:      false,
+	}
+	_ = s.AddHook(mockHook, nil)
+
+	subbed, _ := s.Topics.Subscribe(cl.ID, packets.Subscription{Filter: "test/topic", Qos: 0})
+	require.True(t, subbed)
+
+	go func() {
+		s.publishRetainedToClient(cl, packets.Subscription{Filter: "test/topic"}, false)
+		time.Sleep(time.Millisecond)
+		_ = w.Close()
+	}()
+
+	buf, err := io.ReadAll(r)
+	require.NoError(t, err)
+	require.NotEmpty(t, buf)
+}
+
+// TestPublishRetainedToClientRedisErrorFallback tests fallback to local when Redis fails
+func TestPublishRetainedToClientRedisErrorFallback(t *testing.T) {
+	s := newServer()
+	cl, r, w := newTestClient()
+	s.Clients.Add(cl)
+
+	// Add local retained message
+	localPk := *packets.TPacketData[packets.Publish].Get(packets.TPublishRetain).Packet
+	localPk.TopicName = "test/topic"
+	localPk.Payload = []byte("local message")
+	s.Topics.RetainMessage(localPk)
+
+	// Setup mock hook that returns error
+	mockHook := &MockStorageHook{
+		retainedMessages: nil,
+		shouldError:      true,
+	}
+	_ = s.AddHook(mockHook, nil)
+
+	subbed, _ := s.Topics.Subscribe(cl.ID, packets.Subscription{Filter: "test/topic", Qos: 0})
+	require.True(t, subbed)
+
+	go func() {
+		s.publishRetainedToClient(cl, packets.Subscription{Filter: "test/topic"}, false)
+		time.Sleep(time.Millisecond)
+		_ = w.Close()
+	}()
+
+	buf, err := io.ReadAll(r)
+	require.NoError(t, err)
+	require.NotEmpty(t, buf)
+}
+
+// TestShouldSkipRetainedMessage tests the shouldSkipRetainedMessage helper function
+func TestShouldSkipRetainedMessage(t *testing.T) {
+	s := newServer()
+
+	tests := []struct {
+		name     string
+		sub      packets.Subscription
+		existed  bool
+		expected bool
+	}{
+		{"shared filter", packets.Subscription{Filter: "$SHARE/group/test"}, false, true},
+		{"retain handling 1 with existed", packets.Subscription{RetainHandling: 1}, true, true},
+		{"retain handling 1 without existed", packets.Subscription{RetainHandling: 1}, false, false},
+		{"retain handling 2", packets.Subscription{RetainHandling: 2}, false, true},
+		{"normal subscription", packets.Subscription{Filter: "test"}, false, false},
+		{"retain handling 0", packets.Subscription{RetainHandling: 0}, false, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := s.shouldSkipRetainedMessage(tt.sub, tt.existed)
+			require.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestMergeRetainedMessagesFromRedis tests the mergeRetainedMessagesFromRedis function
+func TestMergeRetainedMessagesFromRedis(t *testing.T) {
+	s := newServer()
+
+	localPk := packets.Packet{
+		TopicName: "test/local",
+		Payload:   []byte("local"),
+		FixedHeader: packets.FixedHeader{
+			Type:   packets.Publish,
+			Retain: true,
+		},
+	}
+	localMessages := []packets.Packet{localPk}
+
+	redisMsg := storage.Message{
+		TopicName: "test/redis",
+		Payload:   []byte("redis"),
+		FixedHeader: packets.FixedHeader{
+			Type:   packets.Publish,
+			Retain: true,
+		},
+	}
+	mockHook := &MockStorageHook{
+		retainedMessages: []storage.Message{redisMsg},
+		shouldError:      false,
+	}
+	_ = s.AddHook(mockHook, nil)
+
+	result := s.mergeRetainedMessagesFromRedis(localMessages, "test/#")
+	require.Len(t, result, 2)
+}
+
+// TestBuildMessageMapFromLocal tests the buildMessageMapFromLocal helper function
+func TestBuildMessageMapFromLocal(t *testing.T) {
+	s := newServer()
+
+	messages := []packets.Packet{
+		{TopicName: "test/1", Payload: []byte("msg1")},
+		{TopicName: "test/2", Payload: []byte("msg2")},
+	}
+
+	result := s.buildMessageMapFromLocal(messages)
+	require.Len(t, result, 2)
+	require.Equal(t, "msg1", string(result["test/1"].Payload))
+	require.Equal(t, "msg2", string(result["test/2"].Payload))
+}
+
+// TestMergeRedisMessages tests the mergeRedisMessages helper function
+func TestMergeRedisMessages(t *testing.T) {
+	s := newServer()
+
+	messageMap := map[string]packets.Packet{
+		"test/local": {TopicName: "test/local", Payload: []byte("local")},
+	}
+
+	redisMsgs := []storage.Message{
+		{TopicName: "test/redis", Payload: []byte("redis")},
+		{TopicName: "test/local", Payload: []byte("redis overwrite")},
+	}
+
+	result := s.mergeRedisMessages(messageMap, redisMsgs, "test/#")
+	require.Len(t, result, 2)
+	require.Equal(t, "redis overwrite", string(result["test/local"].Payload))
+	require.Equal(t, "redis", string(result["test/redis"].Payload))
+}
+
+// TestConvertMessageMapToSlice tests the convertMessageMapToSlice helper function
+func TestConvertMessageMapToSlice(t *testing.T) {
+	s := newServer()
+
+	messageMap := map[string]packets.Packet{
+		"test/1": {TopicName: "test/1"},
+		"test/2": {TopicName: "test/2"},
+		"test/3": {TopicName: "test/3"},
+	}
+
+	result := s.convertMessageMapToSlice(messageMap)
+	require.Len(t, result, 3)
+}
+
+// TestSendRetainedMessagesToClient tests the sendRetainedMessagesToClient helper function
+func TestSendRetainedMessagesToClient(t *testing.T) {
+	s := newServer()
+	cl, r, w := newTestClient()
+	s.Clients.Add(cl)
+
+	messages := []packets.Packet{
+		*packets.TPacketData[packets.Publish].Get(packets.TPublishRetain).Packet,
+	}
+
+	go func() {
+		s.sendRetainedMessagesToClient(cl, packets.Subscription{Filter: "a/b/c"}, messages)
+		time.Sleep(time.Millisecond)
+		_ = w.Close()
+	}()
+
+	buf, err := io.ReadAll(r)
+	require.NoError(t, err)
+	require.NotEmpty(t, buf)
+}
