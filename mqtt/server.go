@@ -516,8 +516,15 @@ func (s *Server) inheritClientSession(pk packets.Packet, cl *Client) bool {
 		return true // [MQTT-3.2.2-3]
 	}
 
-	if atomic.LoadInt64(&s.Info.ClientsConnected) > atomic.LoadInt64(&s.Info.ClientsMaximum) {
-		atomic.AddInt64(&s.Info.ClientsMaximum, 1)
+	for {
+		currentMax := atomic.LoadInt64(&s.Info.ClientsMaximum)
+		currentConn := atomic.LoadInt64(&s.Info.ClientsConnected)
+		if currentConn <= currentMax {
+			break
+		}
+		if atomic.CompareAndSwapInt64(&s.Info.ClientsMaximum, currentMax, currentConn) {
+			break
+		}
 	}
 
 	if pk.Connect.Clean {
