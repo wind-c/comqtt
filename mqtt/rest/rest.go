@@ -44,7 +44,12 @@ func (s *Rest) GenHandlers() map[string]Handler {
 		"POST " + MqttAddBlacklistPath:   s.kickClient,
 		"DELETE " + MqttDelBlacklistPath: s.blanchClient,
 		"POST " + MqttPublishMessagePath: s.publishMessage,
-		"GET " + PrometheusMetrics:       promhttp.Handler().ServeHTTP,
+		"GET " + PrometheusMetrics: promhttp.HandlerFor(
+			s.server.Options.PrometheusRegistry,
+			promhttp.HandlerOpts{
+				// disable default metrics
+				EnableOpenMetrics: false,
+			}).ServeHTTP,
 	}
 }
 

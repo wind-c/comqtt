@@ -19,7 +19,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/wind-c/comqtt/v2/cluster/log"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/storage"
 	"github.com/wind-c/comqtt/v2/mqtt/listeners"
 	"github.com/wind-c/comqtt/v2/mqtt/packets"
@@ -114,6 +114,9 @@ type Options struct {
 	// Enable Inline client to allow direct subscribing and publishing from the parent codebase,
 	// with negligible performance difference (disabled by default to prevent confusion in statistics).
 	InlineClient bool `yaml:"inline-client"`
+
+	// PrometheusRegistry to store metrics
+	PrometheusRegistry *prometheus.Registry
 }
 
 // Server is an MQTT broker server. It should be created with server.New()
@@ -182,11 +185,8 @@ func New(opts *Options) *Server {
 			Log: opts.Logger,
 		},
 	}
-	if err := s.Info.RegisterPrometheus(); err != nil {
-		log.Info("Failed to register prometheus metrics...")
-	} else {
-		log.Info("Registered prometheus metrics...")
-	}
+	reg := s.Info.RegisterPrometheus()
+	opts.PrometheusRegistry = reg
 
 	if s.Options.InlineClient {
 		s.inlineClient = s.NewClient(nil, LocalListener, InlineClientId, true)
