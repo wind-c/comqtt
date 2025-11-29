@@ -19,6 +19,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/wind-c/comqtt/v2/cluster/log"
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/storage"
 	"github.com/wind-c/comqtt/v2/mqtt/listeners"
 	"github.com/wind-c/comqtt/v2/mqtt/packets"
@@ -180,6 +181,11 @@ func New(opts *Options) *Server {
 		hooks: &Hooks{
 			Log: opts.Logger,
 		},
+	}
+	if err := s.Info.RegisterPrometheus(); err != nil {
+		log.Info("Failed to register prometheus metrics...")
+	} else {
+		log.Info("Registered prometheus metrics...")
 	}
 
 	if s.Options.InlineClient {
