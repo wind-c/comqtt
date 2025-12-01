@@ -2,10 +2,12 @@ package rest
 
 import (
 	"encoding/json"
-	"github.com/wind-c/comqtt/v2/mqtt"
-	"github.com/wind-c/comqtt/v2/mqtt/packets"
 	"net/http"
 	"slices"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/wind-c/comqtt/v2/mqtt"
+	"github.com/wind-c/comqtt/v2/mqtt/packets"
 )
 
 const (
@@ -17,6 +19,7 @@ const (
 	MqttDelBlacklistPath   = "/api/v1/mqtt/blacklist/{id}"
 	MqttPublishMessagePath = "/api/v1/mqtt/message"
 	MqttGetConfigPath      = "/api/v1/mqtt/config"
+	PrometheusMetrics      = "/metrics"
 )
 
 type Handler = func(http.ResponseWriter, *http.Request)
@@ -41,6 +44,12 @@ func (s *Rest) GenHandlers() map[string]Handler {
 		"POST " + MqttAddBlacklistPath:   s.kickClient,
 		"DELETE " + MqttDelBlacklistPath: s.blanchClient,
 		"POST " + MqttPublishMessagePath: s.publishMessage,
+		"GET " + PrometheusMetrics: promhttp.HandlerFor(
+			s.server.Options.PrometheusRegistry,
+			promhttp.HandlerOpts{
+				// disable default metrics
+				EnableOpenMetrics: false,
+			}).ServeHTTP,
 	}
 }
 
