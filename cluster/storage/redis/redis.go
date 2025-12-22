@@ -9,13 +9,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	redis "github.com/redis/go-redis/v9"
+	"github.com/wind-c/comqtt/v2/cluster/log"
 	"github.com/wind-c/comqtt/v2/cluster/utils"
 	"github.com/wind-c/comqtt/v2/mqtt"
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/storage"
 	"github.com/wind-c/comqtt/v2/mqtt/packets"
 	"github.com/wind-c/comqtt/v2/mqtt/system"
+
+	redsync "github.com/go-redsync/redsync/v4"
+	goredis "github.com/go-redsync/redsync/v4/redis/goredis/v9"
 )
 
 // defaultAddr is the default address to the redis service.
@@ -24,7 +29,21 @@ const defaultAddr = "localhost:6379"
 // defaultHPrefix is a prefix to better identify hsets created by mochi mqtt.
 const defaultHPrefix = "comqtt"
 
-var localIP = "127.0.0.1"
+var (
+	localIP = "127.0.0.1"
+	rclient *redis.Client
+	rdsync  *redsync.Redsync
+)
+
+// export clients
+// used in dynamic membership operations
+// so that we don't have to create new connections
+func Client() *redis.Client {
+	return rclient
+}
+func Sync() *redsync.Redsync {
+	return rdsync
+}
 
 // clientKey returns a primary key for a client.
 func clientKey(cl *mqtt.Client) string {
@@ -132,6 +151,10 @@ func (s *Storage) Init(config any) error {
 	if err != nil {
 		return fmt.Errorf("failed to ping service: %w", err)
 	}
+
+	rclient = s.db
+	pool := goredis.NewPool(s.db)
+	rdsync = redsync.New(pool)
 
 	s.Log.Info("connected to redis service")
 
@@ -532,4 +555,36 @@ func (s *Storage) StoredInflightMessagesByCid(cid string) (v []storage.Message, 
 	}
 
 	return v, nil
+}
+
+func Lock(key string, attempts uint, attempt_interval uint, wait bool) (mutex *redsync.Mutex, err error) {
+	if rdsync == nil {
+		err = errors.New("redis sync is not available")
+		return
+	}
+	mutex = rdsync.NewMutex(key)
+	iter := attempts
+	for {
+		if err = mutex.Lock(); err != nil {
+			if !wait {
+				return
+			}
+			if iter <= 0 {
+				return
+			}
+			iter--
+			time.Sleep(time.Second * time.Duration(attempt_interval))
+			continue
+		}
+		break
+	}
+	return
+}
+
+func Unlock(mutex *redsync.Mutex) error {
+	if ok, err := mutex.Unlock(); !ok || err != nil {
+		log.Error(err.Error())
+		return err
+	}
+	return nil
 }
