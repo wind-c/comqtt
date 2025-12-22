@@ -18,6 +18,7 @@ import (
 	"github.com/wind-c/comqtt/v2/cluster/discovery"
 	"github.com/wind-c/comqtt/v2/cluster/discovery/mlist"
 	"github.com/wind-c/comqtt/v2/cluster/discovery/serf"
+	"github.com/wind-c/comqtt/v2/cluster/dynamic"
 	"github.com/wind-c/comqtt/v2/cluster/log"
 	"github.com/wind-c/comqtt/v2/cluster/message"
 	"github.com/wind-c/comqtt/v2/cluster/raft"
@@ -42,6 +43,7 @@ const (
 
 type Agent struct {
 	membership        discovery.Node
+	dynamicRegistry   *dynamic.DynamicMembershipRegistry
 	ctx               context.Context
 	cancel            context.CancelFunc
 	Config            *config.Cluster
@@ -61,17 +63,27 @@ type Agent struct {
 func NewAgent(conf *config.Cluster) *Agent {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Agent{
-		ctx:          ctx,
-		cancel:       cancel,
-		Config:       conf,
-		subTree:      topics.New(),
-		raftNotifyCh: make(chan *message.Message, 1024),
-		inboundMsgCh: make(chan []byte, 10240),
-		grpcMsgCh:    make(chan *message.Message, 10240),
+		ctx:             ctx,
+		cancel:          cancel,
+		Config:          conf,
+		subTree:         topics.New(),
+		raftNotifyCh:    make(chan *message.Message, 1024),
+		inboundMsgCh:    make(chan []byte, 10240),
+		grpcMsgCh:       make(chan *message.Message, 10240),
+		dynamicRegistry: dynamic.NewDynamicMembershipRegistry(),
 	}
 }
 
 func (a *Agent) Start() (err error) {
+
+	// init dynamic membership after redis connection, but before we serf
+	// if disabled, skips and moves on
+	// if enabled, blocks until a NodeName can be claimed
+	err = a.dynamicRegistry.Init(a.Config, context.Background())
+	if err != nil {
+		return
+	}
+
 	// setup raft
 	if a.Config.RaftPort == 0 || a.Config.DiscoveryWay == config.DiscoveryWayMemberlist {
 		a.Config.RaftPort = mlist.GetRaftPortFromBindPort(a.Config.BindPort)
@@ -92,6 +104,7 @@ func (a *Agent) Start() (err error) {
 			return
 		}
 	}
+
 	raftAddr := net.JoinHostPort(a.Config.BindAddr, strconv.Itoa(a.Config.RaftPort))
 	OnJoinLog(a.Config.NodeName, raftAddr, "setup raft", nil)
 
@@ -159,6 +172,14 @@ func (a *Agent) initPool() error {
 }
 
 func (a *Agent) Stop() {
+
+	// cancel dynamic membership registry
+	// skips if disabled
+	err := a.dynamicRegistry.Stop()
+	if err != nil {
+		log.Error(err.Error())
+	}
+
 	a.cancel()
 	a.OutPool.Release()
 	a.raftPool.Release()
@@ -472,7 +493,7 @@ func (a *Agent) processOutboundConnect(pk *packets.Packet) {
 // pickNodes pick nodes, if the filter is shared, select a node at random
 func (a *Agent) pickNodes(filter string, sharedFilters map[string]bool) (ns []string) {
 	tmpNs := a.raftPeer.Lookup(filter)
-	if tmpNs == nil || len(tmpNs) == 0 {
+	if len(tmpNs) == 0 {
 		return ns
 	}
 
