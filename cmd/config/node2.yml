@@ -27,6 +27,16 @@ cluster:
   inbound-pool-size: 40960 #The maximum number of goroutine to process incoming messages.
   outbound-pool-size: 40960 #The maximum number of goroutine to process outgoing messages.
   inout-pool-nonblocking: false #Pool size is unlimited, when inout-pool-nonblocking is true, inbound-pool-size and outbound-pool-size is inoperative.
+  dynamic-membership:
+    enable: false
+    node-name-prefix: co-
+    node-num-zero-pad: 3
+    event-loop-interval-sec: 10
+    redis-node-key-prefix: nodes
+    redis-node-key-exp: 30
+    redis-lock-key: node-reg-mutex
+    redis-lock-loop-interval-sec: 5
+    max-redis-lock-attempts: 30
 
 mqtt:
   tcp: :1885
