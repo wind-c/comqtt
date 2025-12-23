@@ -18,7 +18,6 @@ import (
 	"github.com/wind-c/comqtt/v2/cluster/discovery"
 	"github.com/wind-c/comqtt/v2/cluster/discovery/mlist"
 	"github.com/wind-c/comqtt/v2/cluster/discovery/serf"
-	"github.com/wind-c/comqtt/v2/cluster/dynamic"
 	"github.com/wind-c/comqtt/v2/cluster/log"
 	"github.com/wind-c/comqtt/v2/cluster/message"
 	"github.com/wind-c/comqtt/v2/cluster/raft"
@@ -43,7 +42,7 @@ const (
 
 type Agent struct {
 	membership        discovery.Node
-	dynamicRegistry   *dynamic.DynamicMembershipRegistry
+	dynamicRegistry   *discovery.DynamicRegistry
 	ctx               context.Context
 	cancel            context.CancelFunc
 	Config            *config.Cluster
@@ -70,7 +69,7 @@ func NewAgent(conf *config.Cluster) *Agent {
 		raftNotifyCh:    make(chan *message.Message, 1024),
 		inboundMsgCh:    make(chan []byte, 10240),
 		grpcMsgCh:       make(chan *message.Message, 10240),
-		dynamicRegistry: dynamic.NewDynamicMembershipRegistry(),
+		dynamicRegistry: discovery.NewDynamicRegistry(),
 	}
 }
 

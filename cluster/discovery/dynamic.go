@@ -1,4 +1,4 @@
-package dynamic
+package discovery
 
 import (
 	"context"
@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/go-redsync/redsync/v4"
-	"github.com/wind-c/comqtt/v2/cluster/discovery"
 	"github.com/wind-c/comqtt/v2/cluster/log"
 	"github.com/wind-c/comqtt/v2/cluster/storage/redis"
 	"github.com/wind-c/comqtt/v2/cluster/utils"
@@ -35,20 +34,20 @@ var (
 	ErrInvalidOutboundIP   = errors.New("invalid or missing outbound IP")
 )
 
-type DynamicMembershipRegistry struct {
+type DynamicRegistry struct {
 	NodeKey string
 	cfg     *config.Cluster
 	ctx     context.Context
 	term    chan bool
 }
 
-func NewDynamicMembershipRegistry() *DynamicMembershipRegistry {
-	return &DynamicMembershipRegistry{
+func NewDynamicRegistry() *DynamicRegistry {
+	return &DynamicRegistry{
 		term: make(chan bool, 1),
 	}
 }
 
-func (r *DynamicMembershipRegistry) Init(cfg *config.Cluster, ctx context.Context) (err error) {
+func (r *DynamicRegistry) Init(cfg *config.Cluster, ctx context.Context) (err error) {
 
 	// setup defaults
 
@@ -110,7 +109,7 @@ func (r *DynamicMembershipRegistry) Init(cfg *config.Cluster, ctx context.Contex
 	return
 }
 
-func (r *DynamicMembershipRegistry) Claim() (err error) {
+func (r *DynamicRegistry) Claim() (err error) {
 
 	ip, err := utils.GetOutBoundIP()
 	if err != nil {
@@ -136,7 +135,7 @@ func (r *DynamicMembershipRegistry) Claim() (err error) {
 	log.Info("dynamic: claim lock acquired")
 
 	var nodenum int = 0
-	var members []*discovery.Member
+	var members []*Member
 
 	defer func() {
 		if fErr := r.FinalizeClaim(ip, nodenum, members, lock); fErr != nil {
@@ -209,7 +208,7 @@ func (r *DynamicMembershipRegistry) Claim() (err error) {
 	return
 }
 
-func (r *DynamicMembershipRegistry) FinalizeClaim(ip string, nodenum int, members []*discovery.Member, lock *redsync.Mutex) (err error) {
+func (r *DynamicRegistry) FinalizeClaim(ip string, nodenum int, members []*Member, lock *redsync.Mutex) (err error) {
 
 	if len(ip) == 0 || nodenum <= 0 {
 		err = errors.New("unable to generate node number")
@@ -258,7 +257,7 @@ func (r *DynamicMembershipRegistry) FinalizeClaim(ip string, nodenum int, member
 	return
 }
 
-func (r *DynamicMembershipRegistry) GetInventory() (inventory []*discovery.Member, err error) {
+func (r *DynamicRegistry) GetInventory() (inventory []*Member, err error) {
 
 	if redis.Client() == nil {
 		err = ErrRedisNotAvail
@@ -278,13 +277,13 @@ func (r *DynamicMembershipRegistry) GetInventory() (inventory []*discovery.Membe
 		return
 	}
 
-	members := make([]*discovery.Member, 0)
+	members := make([]*Member, 0)
 	for _, key := range keys {
 		parts := strings.Split(key, ":")
 		if len(parts) != 3 {
 			return nil, fmt.Errorf("invalid key: %s", key)
 		}
-		members = append(members, &discovery.Member{
+		members = append(members, &Member{
 			Name: parts[1], // ensure we are only storing the number in redis, without the name prefix
 			Addr: parts[2],
 		})
@@ -293,7 +292,7 @@ func (r *DynamicMembershipRegistry) GetInventory() (inventory []*discovery.Membe
 	return members, nil
 }
 
-func (r *DynamicMembershipRegistry) SaveNode() (err error) {
+func (r *DynamicRegistry) SaveNode() (err error) {
 	if redis.Client() == nil {
 		err = ErrRedisNotAvail
 		return
@@ -310,7 +309,7 @@ func (r *DynamicMembershipRegistry) SaveNode() (err error) {
 	return
 }
 
-func (r *DynamicMembershipRegistry) RemoveNode() (err error) {
+func (r *DynamicRegistry) RemoveNode() (err error) {
 	if redis.Client() == nil {
 		err = ErrRedisNotAvail
 		return
@@ -322,7 +321,7 @@ func (r *DynamicMembershipRegistry) RemoveNode() (err error) {
 	return
 }
 
-func (r *DynamicMembershipRegistry) StartEventLoop() {
+func (r *DynamicRegistry) StartEventLoop() {
 	for {
 		select {
 		// stop
@@ -368,7 +367,7 @@ func (r *DynamicMembershipRegistry) StartEventLoop() {
 	}
 }
 
-func (r *DynamicMembershipRegistry) Stop() (err error) {
+func (r *DynamicRegistry) Stop() (err error) {
 
 	if !r.cfg.DynamicMembership.Enable {
 		return
