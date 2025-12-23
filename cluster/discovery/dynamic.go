@@ -49,6 +49,11 @@ func NewDynamicRegistry() *DynamicRegistry {
 
 func (r *DynamicRegistry) Init(cfg *config.Cluster, ctx context.Context) (err error) {
 
+	// dynamic membership disabled
+	if !cfg.DynamicMembership.Enable {
+		return
+	}
+
 	// setup defaults
 
 	if len(cfg.DynamicMembership.NodeNamePrefix) == 0 {
