@@ -238,7 +238,12 @@ func (m *Membership) Members() []mb.Member {
 	members := m.aliveMembers()
 	ms := make([]mb.Member, len(members))
 	for i, m := range members {
-		ms[i] = mb.Member{m.Name, m.Addr.String(), int(m.Port), m.Tags}
+		ms[i] = mb.Member{
+			Name: m.Name,
+			Addr: m.Addr.String(),
+			Port: int(m.Port),
+			Tags: m.Tags,
+		}
 	}
 	return ms
 }
