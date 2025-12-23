@@ -29,15 +29,15 @@ cluster:
   outbound-pool-size: 40960 #The maximum number of goroutine to process outgoing messages.
   inout-pool-nonblocking: false #Pool size is unlimited, when inout-pool-nonblocking is true, inbound-pool-size and outbound-pool-size is inoperative.
   dynamic-membership:
-    enable: false
-    node-name-prefix: co-
-    node-num-zero-pad: 3
-    event-loop-interval-sec: 10
-    redis-node-key-prefix: nodes
-    redis-node-key-exp: 30
-    redis-lock-key: node-reg-mutex
-    redis-lock-loop-interval-sec: 5
-    max-redis-lock-attempts: 30
+    enable: false #Dynamically register node members. Useful in an environment where you have dynamic IPs and nodes that come and go during rolling updates.
+    node-name-prefix: co- #Prefix for dynamically registered node names. Example co-001
+    node-num-zero-pad: 3 #Optionally provide zero-padding for the number/sequence segment of the nodename 
+    event-loop-interval-sec: 10 #Frequency of keeping the node up to date in the redis registry. Must be lower than redis-node-key-exp.
+    redis-node-key-prefix: nodes #Key prefix for registered nodes in the redis registry. Example key: nodes:1:<ip-address>
+    redis-node-key-exp: 30 #Expiration/TTL in seconds of the node in the redis registry. Must be greater than event-loop-interval-sec.
+    redis-lock-key: node-reg-mutex #Node registration requires a distributed lock to negotiate sequence assignment.
+    redis-lock-loop-interval-sec: 5 #Frequency of lock attempts during node sequence assignment.
+    max-redis-lock-attempts: 30 #Max attempts to acquire a lock before it quits.
 
 mqtt:
   tcp: :1883

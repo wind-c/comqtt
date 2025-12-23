@@ -73,7 +73,7 @@ func realMain(ctx context.Context) error {
 	flag.BoolVar(&cfg.Cluster.RaftBootstrap, "raft-bootstrap", false, "should be `true` for the first node of the cluster. It can elect a leader without any other nodes being present.")
 	flag.StringVar(&cfg.Cluster.RaftLogLevel, "raft-log-level", "error", "Raft log level, with supported values debug, info, warn, error.")
 	flag.StringVar(&members, "members", "", "seeds member list of cluster,such as 192.168.0.103:7946,192.168.0.104:7946")
-	flag.BoolVar(&cfg.Cluster.DynamicMembership.Enable, "dynamic-membership-enable", false, "dynamically register seed members when node names are unknown. requires serf discovery way.")
+	flag.BoolVar(&cfg.Cluster.DynamicMembership.Enable, "dynamic-membership-enable", false, "dynamically register members when node names and addresses are unknown. requires redis storage-way and serf discovery-way.")
 	flag.BoolVar(&cfg.Cluster.GrpcEnable, "grpc-enable", false, "grpc is used for raft transport and reliable communication between nodes")
 	flag.IntVar(&cfg.Cluster.GrpcPort, "grpc-port", 17946, "grpc communication port between nodes")
 	flag.StringVar(&cfg.Redis.Options.Addr, "redis", "127.0.0.1:6379", "redis address for cluster mode")
