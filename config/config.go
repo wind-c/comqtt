@@ -152,15 +152,16 @@ type Cluster struct {
 }
 
 type DynamicMembershipOptions struct {
-	Enable                   bool   `yaml:"enable" json:"enable"`
-	NodeNamePrefix           string `yaml:"node-name-prefix" json:"node-name-prefix"`
-	NodeNumZeroPad           uint   `yaml:"node-num-zero-pad" json:"node-num-zero-pad"`
-	EventLoopIntervalSec     uint   `yaml:"event-loop-interval-sec" json:"event-loop-interval-sec"`
-	RedisNodeKeyPrefix       string `yaml:"redis-node-key-prefix" json:"redis-node-key-prefix"`
-	RedisNodeKeyExp          uint   `yaml:"redis-node-key-exp" json:"redis-node-key-exp"`
-	RedisLockKey             string `yaml:"redis-lock-key" json:"redis-lock-key"`
-	RedisLockLoopIntervalSec uint   `yaml:"redis-lock-loop-interval-sec" json:"redis-lock-loop-interval-sec"`
-	MaxRedisLockAttempts     uint   `yaml:"max-redis-lock-attempts" json:"max-redis-lock-attempts"`
+	Enable               bool   `yaml:"enable" json:"enable"`
+	AddressWay           uint   `yaml:"address-way" json:"address-way"`
+	NodeNameWay          uint   `yaml:"node-name-way" json:"node-name-way"`
+	NodeNamePrefix       string `yaml:"node-name-prefix" json:"node-name-prefix"`
+	EventLoopIntervalSec int64  `yaml:"event-loop-interval-sec" json:"event-loop-interval-sec"`
+	NodesRegistryKey     string `yaml:"nodes-registry-key" json:"nodes-registry-key"`
+	NodeRegistryExp      int64  `yaml:"node-registry-exp" json:"node-registry-exp"`
+	LockKey              string `yaml:"lock-key" json:"lock-key"`
+	LockLoopIntervalSec  uint   `yaml:"lock-loop-interval-sec" json:"lock-loop-interval-sec"`
+	MaxLockAttempts      int    `yaml:"max-lock-attempts" json:"max-lock-attempts"`
 }
 
 func GenTlsConfig(conf *Config) (*tls2.Config, error) {

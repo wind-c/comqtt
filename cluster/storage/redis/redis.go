@@ -9,18 +9,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	redis "github.com/redis/go-redis/v9"
-	"github.com/wind-c/comqtt/v2/cluster/log"
 	"github.com/wind-c/comqtt/v2/cluster/utils"
 	"github.com/wind-c/comqtt/v2/mqtt"
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/storage"
 	"github.com/wind-c/comqtt/v2/mqtt/packets"
 	"github.com/wind-c/comqtt/v2/mqtt/system"
-
-	redsync "github.com/go-redsync/redsync/v4"
-	goredis "github.com/go-redsync/redsync/v4/redis/goredis/v9"
 )
 
 // defaultAddr is the default address to the redis service.
@@ -32,7 +27,6 @@ const defaultHPrefix = "comqtt"
 var (
 	localIP = "127.0.0.1"
 	rclient *redis.Client
-	rdsync  *redsync.Redsync
 )
 
 // export clients
@@ -40,9 +34,6 @@ var (
 // so that we don't have to create new connections
 func Client() *redis.Client {
 	return rclient
-}
-func Sync() *redsync.Redsync {
-	return rdsync
 }
 
 // clientKey returns a primary key for a client.
@@ -153,8 +144,6 @@ func (s *Storage) Init(config any) error {
 	}
 
 	rclient = s.db
-	pool := goredis.NewPool(s.db)
-	rdsync = redsync.New(pool)
 
 	s.Log.Info("connected to redis service")
 
@@ -555,36 +544,4 @@ func (s *Storage) StoredInflightMessagesByCid(cid string) (v []storage.Message, 
 	}
 
 	return v, nil
-}
-
-func Lock(key string, attempts uint, attempt_interval uint, wait bool) (mutex *redsync.Mutex, err error) {
-	if rdsync == nil {
-		err = errors.New("redis sync is not available")
-		return
-	}
-	mutex = rdsync.NewMutex(key)
-	iter := attempts
-	for {
-		if err = mutex.Lock(); err != nil {
-			if !wait {
-				return
-			}
-			if iter <= 0 {
-				return
-			}
-			iter--
-			time.Sleep(time.Second * time.Duration(attempt_interval))
-			continue
-		}
-		break
-	}
-	return
-}
-
-func Unlock(mutex *redsync.Mutex) error {
-	if ok, err := mutex.Unlock(); !ok || err != nil {
-		log.Error(err.Error())
-		return err
-	}
-	return nil
 }
