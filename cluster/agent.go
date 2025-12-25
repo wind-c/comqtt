@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2022 wind
+// SPDX-FileContributor: wind (573966@qq.com)
+
 package cluster
 
 import (
