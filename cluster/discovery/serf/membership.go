@@ -5,6 +5,7 @@
 package serf
 
 import (
+	l "log"
 	"strconv"
 
 	"github.com/hashicorp/logutils"
@@ -50,6 +51,7 @@ func wrapOptions(conf *config.Cluster, ech chan serf.Event) *serf.Config {
 	}
 	config.MemberlistConfig.LogOutput = filter
 	config.LogOutput = filter
+	config.Logger = l.New(filter, "", 0)
 
 	return config
 }
