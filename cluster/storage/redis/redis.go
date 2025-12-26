@@ -24,7 +24,17 @@ const defaultAddr = "localhost:6379"
 // defaultHPrefix is a prefix to better identify hsets created by mochi mqtt.
 const defaultHPrefix = "comqtt"
 
-var localIP = "127.0.0.1"
+var (
+	localIP = "127.0.0.1"
+	rclient *redis.Client
+)
+
+// export clients
+// used in dynamic membership operations
+// so that we don't have to create new connections
+func Client() *redis.Client {
+	return rclient
+}
 
 // clientKey returns a primary key for a client.
 func clientKey(cl *mqtt.Client) string {
@@ -132,6 +142,8 @@ func (s *Storage) Init(config any) error {
 	if err != nil {
 		return fmt.Errorf("failed to ping service: %w", err)
 	}
+
+	rclient = s.db
 
 	s.Log.Info("connected to redis service")
 

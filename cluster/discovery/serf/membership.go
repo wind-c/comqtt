@@ -5,6 +5,7 @@
 package serf
 
 import (
+	l "log"
 	"strconv"
 
 	"github.com/hashicorp/logutils"
@@ -44,10 +45,13 @@ func wrapOptions(conf *config.Cluster, ech chan serf.Event) *serf.Config {
 	filter := &logutils.LevelFilter{
 		Levels:   []logutils.LogLevel{LogLevelDebug, LogLevelWarn, LogLevelError, LogLevelInfo},
 		MinLevel: logutils.LogLevel(LogLevelError),
-		Writer:   log.Writer(),
+		Writer: &log.WrappedWriter{
+			Tag: "serf",
+		},
 	}
 	config.MemberlistConfig.LogOutput = filter
 	config.LogOutput = filter
+	config.Logger = l.New(filter, "", 0)
 
 	return config
 }
@@ -238,7 +242,12 @@ func (m *Membership) Members() []mb.Member {
 	members := m.aliveMembers()
 	ms := make([]mb.Member, len(members))
 	for i, m := range members {
-		ms[i] = mb.Member{m.Name, m.Addr.String(), int(m.Port), m.Tags}
+		ms[i] = mb.Member{
+			Name: m.Name,
+			Addr: m.Addr.String(),
+			Port: int(m.Port),
+			Tags: m.Tags,
+		}
 	}
 	return ms
 }

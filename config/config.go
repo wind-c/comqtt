@@ -128,26 +128,40 @@ type redis struct {
 }
 
 type Cluster struct {
-	DiscoveryWay         uint              `yaml:"discovery-way"  json:"discovery-way"`
-	NodeName             string            `yaml:"node-name" json:"node-name"`
-	BindAddr             string            `yaml:"bind-addr" json:"bind-addr"`
-	BindPort             int               `yaml:"bind-port" json:"bind-port"`
-	AdvertiseAddr        string            `yaml:"advertise-addr" json:"advertise-addr"`
-	AdvertisePort        int               `yaml:"advertise-port" json:"advertise-port"`
-	Members              []string          `yaml:"members" json:"members"`
-	QueueDepth           int               `yaml:"queue-depth" json:"queue-depth"`
-	Tags                 map[string]string `yaml:"tags" json:"tags"`
-	RaftImpl             uint              `yaml:"raft-impl" json:"raft-impl"`
-	RaftPort             int               `yaml:"raft-port" json:"raft-port"`
-	RaftDir              string            `yaml:"raft-dir" json:"raft-dir"`
-	RaftBootstrap        bool              `yaml:"raft-bootstrap" json:"raft-bootstrap"`
-	RaftLogLevel         string            `yaml:"raft-log-level" json:"raft-log-level"`
-	GrpcEnable           bool              `yaml:"grpc-enable" json:"grpc-enable"`
-	GrpcPort             int               `yaml:"grpc-port" json:"grpc-port"`
-	InboundPoolSize      int               `yaml:"inbound-pool-size" json:"inbound-pool-size"`
-	OutboundPoolSize     int               `yaml:"outbound-pool-size" json:"outbound-pool-size"`
-	InoutPoolNonblocking bool              `yaml:"inout-pool-nonblocking" json:"inout-pool-nonblocking"`
-	NodesFileDir         string            `yaml:"nodes-file-dir" json:"nodes-file-dir"`
+	DiscoveryWay         uint                     `yaml:"discovery-way"  json:"discovery-way"`
+	NodeName             string                   `yaml:"node-name" json:"node-name"`
+	BindAddr             string                   `yaml:"bind-addr" json:"bind-addr"`
+	BindPort             int                      `yaml:"bind-port" json:"bind-port"`
+	AdvertiseAddr        string                   `yaml:"advertise-addr" json:"advertise-addr"`
+	AdvertisePort        int                      `yaml:"advertise-port" json:"advertise-port"`
+	Members              []string                 `yaml:"members" json:"members"`
+	DynamicMembership    DynamicMembershipOptions `yaml:"dynamic-membership" json:"dynamic-membership"`
+	QueueDepth           int                      `yaml:"queue-depth" json:"queue-depth"`
+	Tags                 map[string]string        `yaml:"tags" json:"tags"`
+	RaftImpl             uint                     `yaml:"raft-impl" json:"raft-impl"`
+	RaftPort             int                      `yaml:"raft-port" json:"raft-port"`
+	RaftDir              string                   `yaml:"raft-dir" json:"raft-dir"`
+	RaftBootstrap        bool                     `yaml:"raft-bootstrap" json:"raft-bootstrap"`
+	RaftLogLevel         string                   `yaml:"raft-log-level" json:"raft-log-level"`
+	GrpcEnable           bool                     `yaml:"grpc-enable" json:"grpc-enable"`
+	GrpcPort             int                      `yaml:"grpc-port" json:"grpc-port"`
+	InboundPoolSize      int                      `yaml:"inbound-pool-size" json:"inbound-pool-size"`
+	OutboundPoolSize     int                      `yaml:"outbound-pool-size" json:"outbound-pool-size"`
+	InoutPoolNonblocking bool                     `yaml:"inout-pool-nonblocking" json:"inout-pool-nonblocking"`
+	NodesFileDir         string                   `yaml:"nodes-file-dir" json:"nodes-file-dir"`
+}
+
+type DynamicMembershipOptions struct {
+	Enable               bool   `yaml:"enable" json:"enable"`
+	AddressWay           uint   `yaml:"address-way" json:"address-way"`
+	NodeNameWay          uint   `yaml:"node-name-way" json:"node-name-way"`
+	NodeNamePrefix       string `yaml:"node-name-prefix" json:"node-name-prefix"`
+	EventLoopIntervalSec int64  `yaml:"event-loop-interval-sec" json:"event-loop-interval-sec"`
+	NodesRegistryKey     string `yaml:"nodes-registry-key" json:"nodes-registry-key"`
+	NodeRegistryExp      int64  `yaml:"node-registry-exp" json:"node-registry-exp"`
+	LockKey              string `yaml:"lock-key" json:"lock-key"`
+	LockLoopIntervalSec  uint   `yaml:"lock-loop-interval-sec" json:"lock-loop-interval-sec"`
+	MaxLockAttempts      int    `yaml:"max-lock-attempts" json:"max-lock-attempts"`
 }
 
 func GenTlsConfig(conf *Config) (*tls2.Config, error) {

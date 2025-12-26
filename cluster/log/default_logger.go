@@ -11,6 +11,18 @@ import (
 var defaultLogger *Logger // Singleton instance of the logger.
 var mu sync.Mutex         // Mutex for ensuring thread safety when initializing the logger.
 
+// use this in place of any non-slog io.Writer in submodules to run the output through our logger's format
+type WrappedWriter struct {
+	Tag string
+}
+
+func (w *WrappedWriter) Write(p []byte) (n int, err error) {
+	if defaultLogger != nil {
+		defaultLogger.Logger.Info(string(p), "tag", w.Tag)
+	}
+	return len(p), nil
+}
+
 // Init initializes the logger with the provided options.
 func Init(opt *Options) {
 	mu.Lock()

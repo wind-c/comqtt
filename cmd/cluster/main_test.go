@@ -2,12 +2,13 @@ package main
 
 import (
 	"context"
-	"go.uber.org/goleak"
 	"net"
 	"os"
 	"sync"
 	"testing"
 	"time"
+
+	"go.uber.org/goleak"
 )
 
 func TestMain(m *testing.M) {
@@ -46,7 +47,9 @@ func TestLeaks(t *testing.T) {
 	goleak.VerifyNone(t,
 		// ignore the ants cleanup goroutines
 		goleak.IgnoreTopFunction("github.com/panjf2000/ants/v2.(*Pool).purgeStaleWorkers"),
+		goleak.IgnoreTopFunction("github.com/panjf2000/ants/v2.(*poolCommon).purgeStaleWorkers"),
 		goleak.IgnoreTopFunction("github.com/panjf2000/ants/v2.(*Pool).ticktock"),
+		goleak.IgnoreTopFunction("github.com/panjf2000/ants/v2.(*poolCommon).ticktock"),
 		// ignore the pprof http server goroutine
 		goleak.IgnoreTopFunction("internal/poll.runtime_pollWait"))
 
