@@ -44,7 +44,9 @@ func wrapOptions(conf *config.Cluster, ech chan serf.Event) *serf.Config {
 	filter := &logutils.LevelFilter{
 		Levels:   []logutils.LogLevel{LogLevelDebug, LogLevelWarn, LogLevelError, LogLevelInfo},
 		MinLevel: logutils.LogLevel(LogLevelError),
-		Writer:   log.Writer(),
+		Writer: &log.WrappedWriter{
+			Tag: "serf",
+		},
 	}
 	config.MemberlistConfig.LogOutput = filter
 	config.LogOutput = filter
