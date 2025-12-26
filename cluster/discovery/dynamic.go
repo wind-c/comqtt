@@ -47,7 +47,8 @@ var (
 	ErrSerfRequired        = errors.New("discovery-way must be 0 for dynamic membership (serf)")
 	ErrKeyExpMustBeGreater = errors.New("redis-node-key-exp must be greater than event-loop-interval-sec")
 	ErrRedisNotAvail       = errors.New("redis not available")
-	ErrInvalidIP           = errors.New("invalid or missing ip address")
+	ErrInvalidAddress      = errors.New("invalid or missing address")
+	ErrInvalidNodeName     = errors.New("invalid or missing node name")
 )
 
 type DynamicRegistry struct {
@@ -177,41 +178,21 @@ func (r *DynamicRegistry) Claim() (err error) {
 	return
 }
 
-func (r *DynamicRegistry) GenerateNodeAddress() (name string, err error) {
-
+func (r *DynamicRegistry) GenerateNodeAddress() (address string, err error) {
 	switch r.cfg.DynamicMembership.AddressWay {
 	case AddressWayPrivateIP:
-		ip, ip_err := utils.GetPrivateIP()
-		if ip_err != nil {
-			err = ip_err
-			return
-		} else if len(ip) == 0 {
-			err = ErrInvalidIP
-			return
-		}
-		name = ip
-		return
+		address, err = utils.GetPrivateIP()
 	case AddressWayPublicIP:
-		ip, ip_err := utils.GetPublicIP()
-		if ip_err != nil {
-			err = ip_err
-			return
-		} else if len(ip) == 0 {
-			err = ErrInvalidIP
-			return
-		}
-		name = ip
+		address, err = utils.GetPublicIP()
 		return
 	case AddressWayHostname:
-		host_name, host_err := os.Hostname()
-		if host_err != nil {
-			err = host_err
-			return
-		}
-		name = host_name
+		address, err = os.Hostname()
 		return
 	default:
 		err = errors.New("invalid address-way")
+	}
+	if len(address) == 0 {
+		err = ErrInvalidAddress
 	}
 	return
 }
@@ -224,34 +205,13 @@ func (r *DynamicRegistry) GenerateNodeName() (name string, err error) {
 
 	switch r.cfg.DynamicMembership.NodeNameWay {
 	case NodeNameWayPrivateIP:
-		ip, ip_err := utils.GetPrivateIP()
-		if ip_err != nil {
-			err = ip_err
-			return
-		} else if len(ip) == 0 {
-			err = ErrInvalidIP
-			return
-		}
-		name = ip
+		name, err = utils.GetPrivateIP()
 		return
 	case NodeNameWayPublicIP:
-		ip, ip_err := utils.GetPublicIP()
-		if ip_err != nil {
-			err = ip_err
-			return
-		} else if len(ip) == 0 {
-			err = ErrInvalidIP
-			return
-		}
-		name = ip
+		name, err = utils.GetPublicIP()
 		return
 	case NodeNameWayHostname:
-		host_name, host_err := os.Hostname()
-		if host_err != nil {
-			err = host_err
-			return
-		}
-		name = host_name
+		name, err = os.Hostname()
 		return
 	case NodeNameWayUUID:
 		name = utils.GenerateUUID4()
@@ -259,7 +219,9 @@ func (r *DynamicRegistry) GenerateNodeName() (name string, err error) {
 	default:
 		err = errors.New("invalid node-name-way")
 	}
-
+	if len(name) == 0 {
+		err = ErrInvalidNodeName
+	}
 	return
 }
 
