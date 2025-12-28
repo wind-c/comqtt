@@ -22,6 +22,7 @@ require (
 	github.com/jinzhu/copier v0.4.0
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/panjf2000/ants/v2 v2.11.3
+	github.com/quic-go/quic-go v0.58.0
 	github.com/redis/go-redis/v9 v9.9.0
 	github.com/rs/xid v1.6.0
 	github.com/satori/go.uuid v1.2.0
