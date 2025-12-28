@@ -31,6 +31,7 @@ cluster:
 
 mqtt:
   tcp: :1883
+  quic: :2000
   ws: :1882
   http: :8080
   tls:
