@@ -30,8 +30,8 @@ cluster:
   inout-pool-nonblocking: false #Pool size is unlimited, when inout-pool-nonblocking is true, inbound-pool-size and outbound-pool-size is inoperative.
   dynamic-membership:
     enable: false #Dynamically register node members. Useful in an environment where you have dynamic IPs and nodes that come and go during rolling updates.
-    address-way: 0 #How the node address is derived: 0 private ip, 1 public ip, 2 hostname
-    node-name-way: 0 #How the node name is derived/generated: 0 private ip, 1 public ip, 2 hostname, 3 uuid
+    address-way: 0 #How the node address is derived: 0 use provided bind-addr, 1 private ip, 2 public ip, 3 hostname
+    node-name-way: 0 #How the node name is derived/generated: 0 use provided node-name, 1 private ip, 2 public ip, 3 hostname, 4 uuid
     node-name-prefix: node- #Node name prefix
     event-loop-interval-sec: 10 #Frequency of keeping the node up to date in the redis registry. Must be lower than redis-node-key-exp.
     nodes-registry-key: nodes #Key name for redis node registry hash table

@@ -31,13 +31,15 @@ const (
 )
 
 const (
-	AddressWayPrivateIP uint = iota
+	AddressWayBindAddr uint = iota
+	AddressWayPrivateIP
 	AddressWayPublicIP
 	AddressWayHostname
 )
 
 const (
-	NodeNameWayPrivateIP uint = iota
+	NodeNameWayNodeName uint = iota
+	NodeNameWayPrivateIP
 	NodeNameWayPublicIP
 	NodeNameWayHostname
 	NodeNameWayUUID
@@ -187,6 +189,8 @@ func (r *DynamicRegistry) Claim() (err error) {
 
 func (r *DynamicRegistry) GenerateNodeAddress() (address string, err error) {
 	switch r.cfg.DynamicMembership.AddressWay {
+	case AddressWayBindAddr:
+		address = r.cfg.BindAddr
 	case AddressWayPrivateIP:
 		address, err = utils.GetPrivateIP()
 	case AddressWayPublicIP:
@@ -211,6 +215,8 @@ func (r *DynamicRegistry) GenerateNodeName() (name string, err error) {
 	}()
 
 	switch r.cfg.DynamicMembership.NodeNameWay {
+	case NodeNameWayNodeName:
+		name = r.cfg.NodeName
 	case NodeNameWayPrivateIP:
 		name, err = utils.GetPrivateIP()
 		return
