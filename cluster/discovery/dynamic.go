@@ -234,8 +234,12 @@ func (r *DynamicRegistry) GenerateNodeName() (name string, err error) {
 
 func (r *DynamicRegistry) FinalizeClaim(address string, nodename string, lock *redsync.Mutex) (err error) {
 
-	if len(address) == 0 || len(nodename) == 0 {
-		err = errors.New("invalid node name")
+	if len(address) == 0 {
+		err = errors.New("empty address, check address-way is supported in your environment")
+		return
+	}
+	if len(nodename) == 0 {
+		err = errors.New("empty nodename, check node-name-way is supported in your environment")
 		return
 	}
 
