@@ -259,8 +259,10 @@ func (r *DynamicRegistry) FinalizeClaim(address string, nodename string, lock *r
 		return
 	}
 
-	// first node gets the bootstrap flag
-	if len(registry) == 0 {
+	// count == 0: first node gets the bootstrap flag
+	// count == 1: we've rebooted, check address to verify its ours
+	count := len(registry)
+	if count == 0 || (count == 1 && registry[0].Addr == address) {
 		r.cfg.RaftBootstrap = true
 		log.Info(fmt.Sprintf("%s assuming raft leader", address), logTag, "claim")
 	}
