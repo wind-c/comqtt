@@ -154,6 +154,8 @@ func (r *DynamicRegistry) Claim() (err error) {
 		return
 	}
 
+	log.Info(fmt.Sprintf("using address: %s", address), logTag, "claim")
+
 	var nodename string = ""
 
 	defer func() {
@@ -175,6 +177,11 @@ func (r *DynamicRegistry) Claim() (err error) {
 	}
 
 	nodename, err = r.GenerateNodeName()
+	if err != nil {
+		return
+	}
+
+	log.Info(fmt.Sprintf("using node name: %s", nodename), logTag, "claim")
 	return
 }
 
