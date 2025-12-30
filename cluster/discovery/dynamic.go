@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -60,6 +59,7 @@ type DynamicRegistry struct {
 	ctx       context.Context
 	term      chan bool
 	rsync     *redsync.Redsync
+	lock      *redsync.Mutex
 }
 
 func NewDynamicRegistry() *DynamicRegistry {
@@ -144,14 +144,15 @@ func (r *DynamicRegistry) Claim() (err error) {
 	// determine who is first to boot for RaftBootstrap
 	// use a distributed lock to wait until it's our turn to claim a name
 	log.Info("waiting to acquire claim lock", logTag, "claim")
-	lock, err := r.Lock()
+	err = r.Lock()
 	if err != nil {
-		return err
+		return
 	}
 
 	log.Info("claim lock acquired", logTag, "claim")
 
-	address, err := r.GenerateNodeAddress()
+	var address string
+	address, err = r.GenerateNodeAddress()
 	if err != nil {
 		return
 	}
@@ -161,7 +162,7 @@ func (r *DynamicRegistry) Claim() (err error) {
 	var nodename string = ""
 
 	defer func() {
-		if fErr := r.FinalizeClaim(address, nodename, lock); fErr != nil {
+		if fErr := r.FinalizeClaim(address, nodename); fErr != nil {
 			err = fErr
 		}
 	}()
@@ -238,7 +239,7 @@ func (r *DynamicRegistry) GenerateNodeName() (name string, err error) {
 	return
 }
 
-func (r *DynamicRegistry) FinalizeClaim(address string, nodename string, lock *redsync.Mutex) (err error) {
+func (r *DynamicRegistry) FinalizeClaim(address string, nodename string) (err error) {
 
 	if len(address) == 0 {
 		err = errors.New("empty address, check address-way is supported in your environment")
@@ -254,7 +255,8 @@ func (r *DynamicRegistry) FinalizeClaim(address string, nodename string, lock *r
 	r.NodeKey = fmt.Sprintf("%s:%s", address, nodename)
 
 	// get registry from redis
-	registry, err := r.GetRegistry()
+	var registry []*Member
+	registry, err = r.GetRegistry()
 	if err != nil {
 		return
 	}
@@ -280,18 +282,14 @@ func (r *DynamicRegistry) FinalizeClaim(address string, nodename string, lock *r
 	for _, member := range registry {
 		r.cfg.Members = append(r.cfg.Members, fmt.Sprintf("%s:%d", member.Addr, r.cfg.BindPort))
 	}
-	// add ourselves if we're new here
-	if !slices.Contains(r.cfg.Members, fmt.Sprintf("%s:%d", address, r.cfg.BindPort)) {
-		r.cfg.Members = append(r.cfg.Members, fmt.Sprintf("%s:%d", address, r.cfg.BindPort))
-	}
 
 	// keep node updated and run garbage collections
 	go r.StartEventLoop()
 
 	// release the lock to other nodes
-	err = r.Unlock(lock)
+	err = r.Unlock()
 	if err != nil {
-		return err
+		return
 	}
 
 	log.Info("claim lock released", logTag, "claim")
@@ -401,39 +399,18 @@ func (r *DynamicRegistry) StartEventLoop() {
 			log.Info("stopping event loop...", logTag, "registry")
 			return
 		default:
-			// if working properly, we should see join/leave events happening automatically in serf
-			// no need to log activity here
-
 			// bump node TTL
 			err := r.SaveNode()
 			if err != nil {
 				log.Error("r.SaveNode():", err.Error(), logTag, "registry")
 				return
 			}
-			nodes, err := r.GetRegistry()
+			// GetRegistry runs EXP on stale nodes
+			_, err = r.GetRegistry()
 			if err != nil {
 				log.Error("r.GetRegistry():", err.Error(), logTag, "registry")
 				return
 			}
-			// new members with new IPs
-			for _, node := range nodes {
-				membership := fmt.Sprintf("%s:%d", node.Addr, r.cfg.BindPort)
-				if !slices.Contains(r.cfg.Members, membership) {
-					log.Info(fmt.Sprintf("new membership: %s", membership), logTag, "registry")
-					r.cfg.Members = append(r.cfg.Members, membership)
-				}
-			}
-			// remove the ones that have gone away
-			keep := []string{}
-			for _, member := range r.cfg.Members {
-				for _, node := range nodes {
-					membership := fmt.Sprintf("%s:%d", node.Addr, r.cfg.BindPort)
-					if membership == member {
-						keep = append(keep, member)
-					}
-				}
-			}
-			r.cfg.Members = keep
 			time.Sleep(time.Second * time.Duration(r.cfg.DynamicMembership.EventLoopIntervalSec))
 		}
 	}
@@ -456,21 +433,21 @@ func (r *DynamicRegistry) Stop() (err error) {
 	return
 }
 
-func (r *DynamicRegistry) Lock() (mutex *redsync.Mutex, err error) {
+func (r *DynamicRegistry) Lock() (err error) {
 	if r.rsync == nil {
 		err = errors.New("redis sync is not available")
 		return
 	}
-	mutex = r.rsync.NewMutex(
+	r.lock = r.rsync.NewMutex(
 		r.cfg.DynamicMembership.LockKey,
 		redsync.WithRetryDelay(time.Duration(r.cfg.DynamicMembership.LockLoopIntervalSec)),
 		redsync.WithTries(r.cfg.DynamicMembership.MaxLockAttempts),
 	)
-	err = mutex.Lock()
+	err = r.lock.Lock()
 	return
 }
 
-func (r *DynamicRegistry) Unlock(mutex *redsync.Mutex) (err error) {
-	_, err = mutex.Unlock()
+func (r *DynamicRegistry) Unlock() (err error) {
+	_, err = r.lock.Unlock()
 	return
 }
