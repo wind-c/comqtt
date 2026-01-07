@@ -80,17 +80,21 @@ func (l *QUIC) handleConn(
 	conn *quic.Conn,
 	establish EstablishFn,
 ) {
-	stream, err := conn.AcceptStream(context.Background())
-	if err != nil {
-		return
-	}
+	for {
+		stream, err := conn.AcceptStream(context.Background())
+		if err != nil {
+			return
+		}
 
-	netConn := newQUICNet(conn, stream)
+		netConn := newQUICNet(conn, stream)
 
-	if atomic.LoadUint32(&l.end) == 0 {
-		if err := establish(l.id, netConn); err != nil {
-			l.log.Warn("", "error", err)
-			netConn.Close()
+		if atomic.LoadUint32(&l.end) == 0 {
+			go func() {
+				if err := establish(l.id, netConn); err != nil {
+					l.log.Warn("", "error", err)
+					netConn.Close()
+				}
+			}()
 		}
 	}
 }
