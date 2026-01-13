@@ -120,6 +120,7 @@ type tls struct {
 	CACert     string `yaml:"ca-cert"`
 	ServerCert string `yaml:"server-cert"`
 	ServerKey  string `yaml:"server-key"`
+	ZeroRTT    bool   `yaml:"zero-rtt"`
 }
 
 type redisOptions struct {

@@ -6,10 +6,9 @@ package listeners
 
 import (
 	"crypto/tls"
+	"log/slog"
 	"net"
 	"sync"
-
-	"log/slog"
 )
 
 // Config contains configuration values for a listener.
@@ -17,6 +16,8 @@ type Config struct {
 	// TLSConfig is a tls.Config configuration to be used with the listener.
 	// See examples folder for basic and mutual-tls use.
 	TLSConfig *tls.Config
+	// this flag is used to enable 0-RTT for only QUIC protocol
+	ZeroRTT bool
 }
 
 // EstablishFn is a callback function for establishing new clients.

@@ -103,11 +103,12 @@ func realMain(ctx context.Context) error {
 	// gen tls config
 	var listenerConfig *listeners.Config
 	var listenerQuicConfig *listeners.Config
+
 	if tlsConfig, err := config.GenTlsConfig(cfg); err != nil {
 		onError(err, "")
 	} else {
 		if tlsConfig != nil {
-			listenerConfig = &listeners.Config{TLSConfig: tlsConfig}
+			listenerConfig = &listeners.Config{TLSConfig: tlsConfig, ZeroRTT: cfg.Mqtt.Tls.ZeroRTT}
 			listenerQuicConfig = listenerConfig
 		}
 	}
@@ -122,7 +123,7 @@ func realMain(ctx context.Context) error {
 		if tlsConfig, err := config.GenerateSelfSignedCert(); err != nil {
 			onError(err, "")
 		} else {
-			listenerQuicConfig = &listeners.Config{TLSConfig: tlsConfig}
+			listenerQuicConfig = &listeners.Config{TLSConfig: tlsConfig, ZeroRTT: cfg.Mqtt.Tls.ZeroRTT}
 		}
 	}
 	// add quic listener

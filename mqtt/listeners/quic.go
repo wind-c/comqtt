@@ -3,22 +3,31 @@ package listeners
 import (
 	"context"
 	"log/slog"
+	"net"
 	"sync"
 	"sync/atomic"
 
 	quic "github.com/quic-go/quic-go"
 )
 
-// QUIC is a listener for establishing client connections on basic QUIC protocol.
-type QUIC struct { // [MQTT-4.2.0-1]
-	sync.RWMutex
-	id      string         // the internal id of the listener
-	address string         // the network address to bind to
-	listen  *quic.Listener // a quic.Listener which will listen for new clients
-	config  *Config        // configuration values for the listener
-	log     *slog.Logger   // server logger
-	end     uint32         // ensure the close methods are only called once
-}
+type (
+	QuicListener interface {
+		Accept(context.Context) (*quic.Conn, error)
+		Addr() net.Addr
+		Close() error
+	}
+
+	// QUIC is a listener for establishing client connections on basic QUIC protocol.
+	QUIC struct { // [MQTT-4.2.0-1]
+		sync.RWMutex
+		id      string       // the internal id of the listener
+		address string       // the network address to bind to
+		listen  QuicListener // a QuicListener which will listen for new clients
+		config  *Config      // configuration values for the listener
+		log     *slog.Logger // server logger
+		end     uint32       // ensure the close methods are only called once
+	}
+)
 
 // NewQUIC initialises and returns a new QUIC listener, listening on an address.
 func NewQUIC(id, address string, config *Config) *QUIC {
@@ -54,7 +63,11 @@ func (l *QUIC) Init(log *slog.Logger) error {
 
 	var err error
 
-	l.listen, err = quic.ListenAddr(l.address, l.config.TLSConfig, nil)
+	if l.config.ZeroRTT {
+		l.listen, err = quic.ListenAddrEarly(l.address, l.config.TLSConfig, nil)
+	} else {
+		l.listen, err = quic.ListenAddr(l.address, l.config.TLSConfig, nil)
+	}
 
 	return err
 }
