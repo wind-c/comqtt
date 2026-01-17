@@ -5,10 +5,16 @@
 package config
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
 	tls2 "crypto/tls"
 	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"errors"
+	"math/big"
 	"os"
+	"time"
 
 	"github.com/wind-c/comqtt/v2/cluster/log"
 	comqtt "github.com/wind-c/comqtt/v2/mqtt"
@@ -103,6 +109,7 @@ type auth struct {
 
 type mqtt struct {
 	TCP     string         `yaml:"tcp"`
+	QUIC    string         `yaml:"quic"`
 	WS      string         `yaml:"ws"`
 	HTTP    string         `yaml:"http"`
 	Tls     tls            `yaml:"tls"`
@@ -113,13 +120,14 @@ type tls struct {
 	CACert     string `yaml:"ca-cert"`
 	ServerCert string `yaml:"server-cert"`
 	ServerKey  string `yaml:"server-key"`
+	ZeroRTT    bool   `yaml:"zero-rtt"`
 }
 
 type redisOptions struct {
-	Addr     string `json:"addr" yaml:"addr"`
+	Addr     string `json:"addr"     yaml:"addr"`
 	Username string `json:"username" yaml:"username"`
 	Password string `json:"password" yaml:"password"`
-	DB       int    `json:"db" yaml:"db"`
+	DB       int    `json:"db"       yaml:"db"`
 }
 
 type redis struct {
@@ -128,26 +136,26 @@ type redis struct {
 }
 
 type Cluster struct {
-	DiscoveryWay         uint              `yaml:"discovery-way"  json:"discovery-way"`
-	NodeName             string            `yaml:"node-name" json:"node-name"`
-	BindAddr             string            `yaml:"bind-addr" json:"bind-addr"`
-	BindPort             int               `yaml:"bind-port" json:"bind-port"`
-	AdvertiseAddr        string            `yaml:"advertise-addr" json:"advertise-addr"`
-	AdvertisePort        int               `yaml:"advertise-port" json:"advertise-port"`
-	Members              []string          `yaml:"members" json:"members"`
-	QueueDepth           int               `yaml:"queue-depth" json:"queue-depth"`
-	Tags                 map[string]string `yaml:"tags" json:"tags"`
-	RaftImpl             uint              `yaml:"raft-impl" json:"raft-impl"`
-	RaftPort             int               `yaml:"raft-port" json:"raft-port"`
-	RaftDir              string            `yaml:"raft-dir" json:"raft-dir"`
-	RaftBootstrap        bool              `yaml:"raft-bootstrap" json:"raft-bootstrap"`
-	RaftLogLevel         string            `yaml:"raft-log-level" json:"raft-log-level"`
-	GrpcEnable           bool              `yaml:"grpc-enable" json:"grpc-enable"`
-	GrpcPort             int               `yaml:"grpc-port" json:"grpc-port"`
-	InboundPoolSize      int               `yaml:"inbound-pool-size" json:"inbound-pool-size"`
-	OutboundPoolSize     int               `yaml:"outbound-pool-size" json:"outbound-pool-size"`
+	DiscoveryWay         uint              `yaml:"discovery-way"          json:"discovery-way"`
+	NodeName             string            `yaml:"node-name"              json:"node-name"`
+	BindAddr             string            `yaml:"bind-addr"              json:"bind-addr"`
+	BindPort             int               `yaml:"bind-port"              json:"bind-port"`
+	AdvertiseAddr        string            `yaml:"advertise-addr"         json:"advertise-addr"`
+	AdvertisePort        int               `yaml:"advertise-port"         json:"advertise-port"`
+	Members              []string          `yaml:"members"                json:"members"`
+	QueueDepth           int               `yaml:"queue-depth"            json:"queue-depth"`
+	Tags                 map[string]string `yaml:"tags"                   json:"tags"`
+	RaftImpl             uint              `yaml:"raft-impl"              json:"raft-impl"`
+	RaftPort             int               `yaml:"raft-port"              json:"raft-port"`
+	RaftDir              string            `yaml:"raft-dir"               json:"raft-dir"`
+	RaftBootstrap        bool              `yaml:"raft-bootstrap"         json:"raft-bootstrap"`
+	RaftLogLevel         string            `yaml:"raft-log-level"         json:"raft-log-level"`
+	GrpcEnable           bool              `yaml:"grpc-enable"            json:"grpc-enable"`
+	GrpcPort             int               `yaml:"grpc-port"              json:"grpc-port"`
+	InboundPoolSize      int               `yaml:"inbound-pool-size"      json:"inbound-pool-size"`
+	OutboundPoolSize     int               `yaml:"outbound-pool-size"     json:"outbound-pool-size"`
 	InoutPoolNonblocking bool              `yaml:"inout-pool-nonblocking" json:"inout-pool-nonblocking"`
-	NodesFileDir         string            `yaml:"nodes-file-dir" json:"nodes-file-dir"`
+	NodesFileDir         string            `yaml:"nodes-file-dir"         json:"nodes-file-dir"`
 }
 
 func GenTlsConfig(conf *Config) (*tls2.Config, error) {
@@ -182,6 +190,71 @@ func GenTlsConfig(conf *Config) (*tls2.Config, error) {
 		tlsConfig.RootCAs = pool
 		tlsConfig.ClientCAs = pool
 		tlsConfig.ClientAuth = tls2.RequireAndVerifyClientCert
+	}
+
+	return tlsConfig, nil
+}
+
+func GenerateSelfSignedCert() (*tls2.Config, error) {
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return nil, err
+	}
+
+	serial, err := rand.Int(rand.Reader, big.NewInt(1<<62))
+	if err != nil {
+		return nil, err
+	}
+
+	template := x509.Certificate{
+		SerialNumber: serial,
+		Subject: pkix.Name{
+			Organization: []string{"MQTT Auto Generated"},
+		},
+		NotBefore: time.Now().Add(-time.Hour),
+		NotAfter:  time.Now().Add(365 * 24 * time.Hour),
+
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+
+		DNSNames: []string{"localhost"},
+	}
+
+	derBytes, err := x509.CreateCertificate(
+		rand.Reader,
+		&template,
+		&template,
+		priv.Public(),
+		priv,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	certPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: derBytes,
+	})
+
+	keyBytes, err := x509.MarshalPKCS8PrivateKey(priv)
+	if err != nil {
+		return nil, err
+	}
+
+	keyPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "PRIVATE KEY",
+		Bytes: keyBytes,
+	})
+
+	cert, err := tls2.X509KeyPair(certPEM, keyPEM)
+	if err != nil {
+		return nil, err
+	}
+	tlsConfig := &tls2.Config{
+		MinVersion:   tls2.VersionTLS13,
+		Certificates: []tls2.Certificate{cert},
+		NextProtos:   []string{"mqtt"},
 	}
 
 	return tlsConfig, nil

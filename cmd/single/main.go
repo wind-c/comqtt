@@ -53,29 +53,40 @@ func realMain(ctx context.Context) error {
 
 	flag.StringVar(&confFile, "conf", "", "read the program parameters from the config file")
 	flag.UintVar(&cfg.StorageWay, "storage-way", 1, "storage way optional items:0 memory, 1 bolt, 2 badger, 3 redis")
-	flag.UintVar(&cfg.Auth.Way, "auth-way", 0, "authentication way optional items:0 anonymous, 1 username and password, 2 clientid")
-	flag.UintVar(&cfg.Auth.Datasource, "auth-ds", 0, "authentication datasource optional items:0 free, 1 redis, 2 mysql, 3 postgresql, 4 http")
+	flag.UintVar(
+		&cfg.Auth.Way,
+		"auth-way",
+		0,
+		"authentication way optional items:0 anonymous, 1 username and password, 2 clientid",
+	)
+	flag.UintVar(
+		&cfg.Auth.Datasource,
+		"auth-ds",
+		0,
+		"authentication datasource optional items:0 free, 1 redis, 2 mysql, 3 postgresql, 4 http",
+	)
 	flag.StringVar(&cfg.Auth.ConfPath, "auth-path", "", "config file path should correspond to the auth-datasource")
 	flag.StringVar(&cfg.Mqtt.TCP, "tcp", ":1883", "network address for Mqtt TCP listener")
 	flag.StringVar(&cfg.Mqtt.WS, "ws", ":1882", "network address for Mqtt Websocket listener")
+	flag.StringVar(&cfg.Mqtt.QUIC, "quic", ":2000", "network address for Mqtt Websocket listener")
 	flag.StringVar(&cfg.Mqtt.HTTP, "http", ":8080", "network address for web info dashboard listener")
 	flag.BoolVar(&cfg.Log.Enable, "log-enable", true, "log enabled or not")
 	flag.StringVar(&cfg.Log.Filename, "log-file", "./logs/comqtt.log", "log filename")
-	//parse arguments
+	// parse arguments
 	flag.Parse()
-	//load config file
+	// load config file
 	if len(confFile) > 0 {
 		if cfg, err = config.Load(confFile); err != nil {
 			onError(err, "")
 		}
 	}
 
-	//enable pprof
+	// enable pprof
 	if cfg.PprofEnable {
 		pprof()
 	}
 
-	//init log
+	// init log
 	log.Init(&cfg.Log)
 	if cfg.Log.Enable && cfg.Log.Output == log.OutputFile {
 		fmt.Println("log output to the files, please check")
@@ -91,17 +102,33 @@ func realMain(ctx context.Context) error {
 
 	// gen tls config
 	var listenerConfig *listeners.Config
+	var listenerQuicConfig *listeners.Config
+
 	if tlsConfig, err := config.GenTlsConfig(cfg); err != nil {
 		onError(err, "")
 	} else {
 		if tlsConfig != nil {
-			listenerConfig = &listeners.Config{TLSConfig: tlsConfig}
+			listenerConfig = &listeners.Config{TLSConfig: tlsConfig, ZeroRTT: cfg.Mqtt.Tls.ZeroRTT}
+			listenerQuicConfig = listenerConfig
 		}
 	}
 
 	// add tcp listener
 	tcp := listeners.NewTCP("tcp", cfg.Mqtt.TCP, listenerConfig)
 	onError(server.AddListener(tcp), "add tcp listener")
+
+	if listenerConfig == nil {
+		// quic requires min tls1.3
+		// ALPN requires
+		if tlsConfig, err := config.GenerateSelfSignedCert(); err != nil {
+			onError(err, "")
+		} else {
+			listenerQuicConfig = &listeners.Config{TLSConfig: tlsConfig, ZeroRTT: cfg.Mqtt.Tls.ZeroRTT}
+		}
+	}
+	// add quic listener
+	quic := listeners.NewQUIC("quic", cfg.Mqtt.QUIC, listenerQuicConfig)
+	onError(server.AddListener(quic), "add quic listener")
 
 	// add websocket listener
 	ws := listeners.NewWebsocket("ws", cfg.Mqtt.WS, listenerConfig)
@@ -120,7 +147,7 @@ func realMain(ctx context.Context) error {
 		}
 	}()
 
-	//log.Info("comqtt server started")
+	// log.Info("comqtt server started")
 
 	select {
 	case err := <-errCh:
@@ -189,9 +216,10 @@ func initStorage(server *mqtt.Server, conf *config.Config) {
 
 func initBridge(server *mqtt.Server, conf *config.Config) {
 	logMsg := "init bridge"
-	if conf.BridgeWay == config.BridgeWayNone {
+	switch conf.BridgeWay {
+	case config.BridgeWayNone:
 		return
-	} else if conf.BridgeWay == config.BridgeWayKafka {
+	case config.BridgeWayKafka:
 		opts := cokafka.Options{}
 		onError(plugin.LoadYaml(conf.BridgePath, &opts), logMsg)
 		onError(server.AddHook(new(cokafka.Bridge), &opts), logMsg)

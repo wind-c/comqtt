@@ -31,12 +31,14 @@ cluster:
 
 mqtt:
   tcp: :1883
+  quic: :2000
   ws: :1882
   http: :8080
   tls:
     ca-cert:   #CA root certificate file path. Not empty enable bidirectional authentication.
     server-cert:   #Server certificate file path
     server-key:   #server rsa private key file path
+    zero-rtt: false # Enable 0-RTT (TLS 1.3 early data). this flag is only effective when quic protocol used.
   options:
     client-write-buffer-size: 2048 #It is the number of individual workers and queues to initialize.
     client-read-buffer-size: 2048  #It is the size of the queue per worker.
