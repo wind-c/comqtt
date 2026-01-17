@@ -30,7 +30,7 @@ Unless it's a critical issue, new releases typically go out over the weekend. At
 
 #### Comqtt Features
 - Full MQTTv5 Feature Compliance, compatibility for MQTT v3.1.1 and v3.0.0.
-- TCP, Websocket, (including SSL/TLS) and Dashboard listeners.
+- TCP, Websocket, Quic (including SSL/TLS) and Dashboard listeners.
 - File-based server, auth, storage and bridge configuration, [Click to see config examples](cmd/config).
 - Auth and ACL Plugin is supported Redis, HTTP, Mysql and PostgreSql.
 - Packets are bridged to kafka according to the configured rule.
