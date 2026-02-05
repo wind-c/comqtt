@@ -694,20 +694,20 @@ func (x *TopicsIndex) gatherInlineSubscriptions(particle *particle, subs *Subscr
 
 // isolateParticle extracts a particle between d / and d+1 / without allocations.
 func isolateParticle(filter string, d int) (particle string, hasNext bool) {
-	var next, end int
+	var end int
 	for i := 0; end > -1 && i <= d; i++ {
 		end = strings.IndexRune(filter, '/')
 
 		switch {
 		case d > -1 && i == d && end > -1:
 			hasNext = true
-			particle = filter[next:end]
+			particle = filter[:end]
 		case end > -1:
 			hasNext = false
 			filter = filter[end+1:]
 		default:
 			hasNext = false
-			particle = filter[next:]
+			particle = filter[:]
 		}
 	}
 

@@ -565,10 +565,10 @@ func (h *Hooks) OnPublishedWithSharedFilters(pk packets.Packet, sharedFilters ma
 func (h *Hooks) StoredClients() (v []storage.Client, err error) {
 	for _, hook := range h.GetAll() {
 		if hook.Provides(StoredClients) {
-			v, err := hook.StoredClients()
+			v, err = hook.StoredClients()
 			if err != nil {
 				h.Log.Error("failed to load clients", "error", err, "hook", hook.ID())
-				return v, err
+				return nil, err
 			}
 
 			if len(v) > 0 {
@@ -577,7 +577,7 @@ func (h *Hooks) StoredClients() (v []storage.Client, err error) {
 		}
 	}
 
-	return
+	return []storage.Client{}, nil
 }
 
 // StoredSubscriptions returns all subcriptions, e.g. from a persistent store, and is

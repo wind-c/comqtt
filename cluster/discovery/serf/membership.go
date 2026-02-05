@@ -71,8 +71,8 @@ func New(conf *config.Cluster, inboundMsgCh chan<- []byte) *Membership {
 }
 
 func (m *Membership) Setup() (err error) {
-	config := wrapOptions(m.config, m.serfCh)
-	m.serf, err = serf.Create(config)
+	cfg := wrapOptions(m.config, m.serfCh)
+	m.serf, err = serf.Create(cfg)
 	if err != nil {
 		return
 	}
@@ -115,17 +115,17 @@ func (m *Membership) Stat() map[string]int64 {
 }
 
 func (m *Membership) Stop() {
-	err := m.serf.Leave()
-	if err != nil {
+	if err := m.serf.Leave(); err != nil {
 		log.Error("serf leave", "error", err)
 	}
-	err = m.serf.Shutdown()
-	if err != nil {
+	if err := m.serf.Shutdown(); err != nil {
 		log.Error("serf shutdown", "error", err)
 	}
 	// this shuts down the event loop, note that this can't be called multiple times
 	// if we need to do so, we could use a bool, sync.Once or recover from the panic
-	close(m.serfCh)
+	if m.serfCh != nil {
+		close(m.serfCh)
+	}
 }
 
 func genEvent(tp int, node *serf.Member) *mb.Event {
@@ -189,7 +189,7 @@ func (m *Membership) eventLoop() {
 			m.msgCh <- q.Payload
 			//m.handleQuery(e.(*serf.Query))
 		default:
-			panic("unknown serf event type")
+			log.Warn("unknown serf event type", "type", e.EventType())
 		}
 	}
 }

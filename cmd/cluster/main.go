@@ -8,7 +8,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	csRt "github.com/wind-c/comqtt/v2/cluster/rest"
 	"maps"
 	"net"
 	"net/http"
@@ -18,6 +17,8 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+
+	csRt "github.com/wind-c/comqtt/v2/cluster/rest"
 
 	"github.com/redis/go-redis/v9"
 	cs "github.com/wind-c/comqtt/v2/cluster"
@@ -244,6 +245,7 @@ func initClusterNode(server *mqtt.Server, conf *config.Config) {
 // onError handle errors and simplify code
 func onError(err error, msg string) {
 	if err != nil {
+		fmt.Println(msg, "error", err)
 		log.Error(msg, "error", err)
 		os.Exit(1)
 	}

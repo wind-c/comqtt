@@ -35,7 +35,7 @@ const (
 	raftDBFile = "raft.db"
 
 	// peers file
-	peersFIle = "peers.json"
+	peersFile = "peers.json"
 
 	// The `retain` parameter controls how many
 	// snapshots are retained. Must be at least 1.
@@ -132,7 +132,7 @@ func Setup(conf *config.Cluster, notifyCh chan<- *message.Message) (*Peer, error
 		  }
 		]
 	*/
-	peersFile := filepath.Join(conf.RaftDir, peersFIle)
+	peersFile := filepath.Join(conf.RaftDir, peersFile)
 	if utils.PathExists(peersFile) {
 		log.Info("found peers.json file, recovering Raft configuration...")
 
@@ -193,7 +193,10 @@ func Setup(conf *config.Cluster, notifyCh chan<- *message.Message) (*Peer, error
 func (p *Peer) Stop() {
 	// close net transport
 	if tp, ok := p.transport.(*raft.NetworkTransport); ok {
-		tp.Close()
+		err := tp.Close()
+		if err != nil {
+			return
+		}
 	}
 
 	// snapshot

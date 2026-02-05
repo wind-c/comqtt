@@ -181,8 +181,12 @@ func (m *Membership) Stat() map[string]int64 {
 }
 
 func (m *Membership) Stop() {
-	m.list.Leave(time.Second)
-	m.list.Shutdown()
+	if err := m.list.Leave(time.Second); err != nil {
+		log.Error("member leave", "error", err)
+	}
+	if err := m.list.Shutdown(); err != nil {
+		log.Error("member shutdown", "error", err)
+	}
 	m.delegate.Stop()
 }
 

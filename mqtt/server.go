@@ -313,7 +313,7 @@ func (s *Server) eventLoop() {
 	for {
 		select {
 		case <-s.done:
-			s.loop.sysTopics.Stop()
+			s.stopTickers()
 			return
 		case <-s.loop.sysTopics.C:
 			s.publishSysTopics()
@@ -327,6 +327,15 @@ func (s *Server) eventLoop() {
 			s.clearExpiredInflights(time.Now().Unix())
 		}
 	}
+}
+
+// stopTickers stops all the tickers used by the server.
+func (s *Server) stopTickers() {
+	s.loop.sysTopics.Stop()
+	s.loop.clientExpiry.Stop()
+	s.loop.retainedExpiry.Stop()
+	s.loop.willDelaySend.Stop()
+	s.loop.inflightExpiry.Stop()
 }
 
 // EstablishConnection establishes a new client when a listener accepts a new connection.

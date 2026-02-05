@@ -43,11 +43,14 @@ func (i *Inflight) Set(m packets.Packet) bool {
 func (i *Inflight) Get(id uint16) (packets.Packet, bool) {
 	i.RLock()
 	defer i.RUnlock()
+	return i.GetNoLock(id)
+}
 
+// GetNoLock returns an inflight packet by packet id without locking.
+func (i *Inflight) GetNoLock(id uint16) (packets.Packet, bool) {
 	if m, ok := i.internal[id]; ok {
 		return m, true
 	}
-
 	return packets.Packet{}, false
 }
 

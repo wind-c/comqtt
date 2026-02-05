@@ -8,6 +8,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -200,10 +201,19 @@ func newClient(c net.Conn, o *ops) *Client {
 func (cl *Client) WriteLoop() {
 	for {
 		select {
-		case pk := <-cl.State.outbound:
+		case pk, ok := <-cl.State.outbound:
+			if !ok {
+				// channel is closed, exit
+				return
+			}
+
 			if err := cl.WritePacket(*pk); err != nil {
-				// TODO : Figure out what to do with error
-				cl.ops.log.Debug("failed publishing packet", "error", err, "client", cl.ID, "packet", pk)
+				cl.ops.log.Error("failed publishing packet", "error", err, "client", cl.ID, "packet", pk)
+				// If it's a network error, stop the client
+				if errors.Is(err, net.ErrWriteToConnected) || errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) {
+					cl.Stop(err)
+					return
+				}
 			}
 			atomic.AddInt32(&cl.State.outboundQty, -1)
 		case <-cl.State.open.Done():
@@ -270,7 +280,7 @@ func (cl *Client) NextPacketID() (i uint32, err error) {
 	cl.Lock()
 	defer cl.Unlock()
 
-	i = atomic.LoadUint32(&cl.State.packetID)
+	i = cl.State.packetID
 	started := i
 	overflowed := false
 	for {
@@ -286,8 +296,9 @@ func (cl *Client) NextPacketID() (i uint32, err error) {
 
 		i++
 
-		if _, ok := cl.State.Inflight.Get(uint16(i)); !ok {
-			atomic.StoreUint32(&cl.State.packetID, i)
+		// Use lock-free access to avoid nested locking
+		if _, ok := cl.State.Inflight.GetNoLock(uint16(i)); !ok {
+			cl.State.packetID = i
 			return i, nil
 		}
 	}

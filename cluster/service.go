@@ -19,6 +19,7 @@ import (
 	crpc "github.com/wind-c/comqtt/v2/cluster/rpc"
 	"github.com/wind-c/comqtt/v2/mqtt/packets"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
 	_ "google.golang.org/grpc/health"
 	"google.golang.org/grpc/keepalive"
@@ -42,8 +43,8 @@ var kasp = keepalive.ServerParameters{
 }
 
 var kacp = keepalive.ClientParameters{
-	Time:                10 * time.Second, // send pings every 10 seconds if there is no activity
-	Timeout:             time.Second,      // wait 1 second for ping ack before considering the connection dead
+	Time:                15 * time.Second, // send pings every 15 seconds if there is no activity
+	Timeout:             3 * time.Second,  // wait 3 second for ping ack before considering the connection dead
 	PermitWithoutStream: true,             // send pings even without active streams
 }
 
@@ -64,14 +65,14 @@ func (s *RpcService) StartRpcServer() error {
 		return err
 	}
 
-	//grpcServer := grpc.NewServer()
-	grpcServer := grpc.NewServer(grpc.KeepaliveEnforcementPolicy(kaep), grpc.KeepaliveParams(kasp))
+	// s.grpcServer = grpc.NewServer()
+	s.grpcServer = grpc.NewServer(grpc.KeepaliveEnforcementPolicy(kaep), grpc.KeepaliveParams(kasp))
 	// register client services
-	crpc.RegisterRelaysServer(grpcServer, s)
+	crpc.RegisterRelaysServer(s.grpcServer, s)
 
 	// serve grpc
 	go func() {
-		if err := grpcServer.Serve(grpcListen); err != nil {
+		if err := s.grpcServer.Serve(grpcListen); err != nil {
 			log.Error("grpc server serve", "error", err)
 		}
 	}()
@@ -84,7 +85,20 @@ func (s *RpcService) StopRpcServer() {
 	if s == nil || s.grpcServer == nil {
 		return
 	}
-	s.grpcServer.GracefulStop()
+	// Gracefully stop, allowing 5 seconds for ongoing requests to complete
+	done := make(chan struct{})
+	go func() {
+		s.grpcServer.GracefulStop()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		log.Info("grpc server stopped gracefully")
+	case <-time.After(5 * time.Second):
+		log.Warn("grpc server graceful stop timeout, forcing stop")
+		s.grpcServer.Stop() // Force stop
+	}
 }
 
 func (s *RpcService) PublishPacket(ctx context.Context, req *crpc.PublishRequest) (*crpc.Response, error) {
@@ -153,9 +167,16 @@ func NewClientManager(a *Agent) *ClientManager {
 }
 
 func (c *ClientManager) RemoveGrpcClient(nodeId string) {
-	if client, ok := c.cs[nodeId]; ok {
-		delete(c.cs, nodeId)
-		client.conn.Close()
+	c.Lock()
+	defer c.Unlock()
+
+	cli, ok := c.cs[nodeId]
+	if !ok {
+		return
+	}
+	delete(c.cs, nodeId)
+	if err := cli.conn.Close(); err != nil {
+		log.Error("close grpc client error", "nodeId", nodeId, "error", err)
 	}
 }
 
@@ -171,38 +192,41 @@ func (c *ClientManager) getNodeAddr(nodeId string) (string, error) {
 func (c *ClientManager) getClient(nodeId string) (*client, error) {
 	c.Lock()
 	defer c.Unlock()
-	sc, ok := c.cs[nodeId]
-	if ok {
-		return sc, nil
+
+	// Check cache, return healthy connection directly
+	if cli, ok := c.healthCheck(nodeId); ok {
+		return cli, nil
 	}
 
+	// Get node address
 	addr, err := c.getNodeAddr(nodeId)
-	if addr == "" || err != nil {
-		return nil, errors.New("node not found")
+	if err != nil {
+		return nil, fmt.Errorf("get node addr failed: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*ReqTimeout)
-	defer cancel()
-	//serviceConfig := `{"healthCheckConfig": {"serviceName": "Transit"}, "loadBalancingConfig": [{"round_robin":{}}]}`
+	// Configure retry interceptor
 	retryOpts := []grpc_retry.CallOption{
 		grpc_retry.WithBackoff(grpc_retry.BackoffExponential(ReqTimeout)),
 		grpc_retry.WithMax(3),
 	}
-	conn, err := grpc.DialContext(ctx, addr,
-		//grpc.WithDefaultServiceConfig(serviceConfig),
+
+	// Create client
+	conn, err := grpc.NewClient(addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
-		grpc.WithUnaryInterceptor(grpc_retry.UnaryClientInterceptor(retryOpts...)),
-		grpc.WithKeepaliveParams(kacp))
+		grpc.WithChainUnaryInterceptor(grpc_retry.UnaryClientInterceptor(retryOpts...)),
+		grpc.WithKeepaliveParams(kacp),
+	)
 	if err != nil {
-		return nil, fmt.Errorf("dialing failed: %v", err)
+		return nil, fmt.Errorf("create grpc client failed: %w", err)
 	}
 
-	grpcClient := crpc.NewRelaysClient(conn)
-	wrapClient := &client{conn, grpcClient}
-	c.cs[nodeId] = wrapClient
+	// Wrap and cache the client
+	rpcClient := crpc.NewRelaysClient(conn)
+	wrapper := &client{conn: conn, RelaysClient: rpcClient}
+	c.cs[nodeId] = wrapper
 
-	return wrapClient, nil
+	return wrapper, nil
 }
 
 func (c *ClientManager) RelayPublishPacket(nodeId string, msg *message.Message) {
@@ -309,5 +333,42 @@ func (c *ClientManager) RaftJoinToOthers() {
 			continue
 		}
 		c.RelayRaftJoin(m.Name)
+	}
+}
+
+func (c *ClientManager) healthCheck(nodeId string) (*client, bool) {
+	cli, ok := c.cs[nodeId]
+	if !ok {
+		return nil, false
+	}
+	if c.isConnHealth(cli) {
+		return cli, true
+	}
+	c.removeClient(nodeId, cli)
+	return nil, false
+}
+
+func (c *ClientManager) isConnHealth(cli *client) bool {
+	state := cli.conn.GetState()
+	return state == connectivity.Ready || state == connectivity.Connecting
+}
+
+func (c *ClientManager) removeClient(nodeId string, cli *client) {
+	delete(c.cs, nodeId)
+	if err := cli.conn.Close(); err != nil {
+		log.Error("close grpc client error", "nodeId", nodeId, "error", err)
+		return
+	}
+	log.Warn("removed unhealthy grpc client", "node", nodeId)
+}
+
+func (c *ClientManager) RemoveUnhealthyClients() {
+	c.Lock()
+	defer c.Unlock()
+
+	for nodeId, cli := range c.cs {
+		if !c.isConnHealth(cli) {
+			c.removeClient(nodeId, cli)
+		}
 	}
 }

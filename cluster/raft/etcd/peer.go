@@ -167,8 +167,14 @@ func (p *Peer) Leave(nodeId string) error {
 }
 
 func (p *Peer) Propose(msg *message.Message) error {
-	p.proposeC <- msg
-	return nil
+	select {
+	case p.proposeC <- msg:
+		return nil
+	case <-time.After(5 * time.Second):
+		return fmt.Errorf("propose timeout after %v seconds: %v", 10, msg.Type)
+	case <-p.stopC:
+		return errors.New("peer is shutting down")
+	}
 }
 
 func (p *Peer) Lookup(key string) []string {
@@ -235,7 +241,7 @@ func (p *Peer) startRaft() {
 		Storage:                   p.raftStorage,
 		MaxSizePerMsg:             1024 * 1024,
 		MaxUncommittedEntriesSize: 256,
-		MaxInflightMsgs:           1 << 30,
+		MaxInflightMsgs:           1024,
 	}
 
 	if oldWal {
@@ -594,32 +600,58 @@ func (p *Peer) processMessages(ms []raftpb.Message) []raftpb.Message {
 }
 
 func (p *Peer) writeError(err error) {
-	p.stopHTTP()
-	close(p.commitC)
 	p.errorC <- err
-	close(p.errorC)
-	p.node.Stop()
+	p.Stop()
 }
 
 func (p *Peer) Stop() {
 	p.stopHTTP()
-	close(p.commitC)
-	close(p.errorC)
-	p.node.Stop()
+	if p.commitC != nil {
+		close(p.commitC)
+		p.commitC = nil
+	}
+	if p.errorC != nil {
+		close(p.errorC)
+		p.errorC = nil
+	}
+	if p.node != nil {
+		p.node.Stop()
+		p.node = nil
+	}
 }
 
 func (p *Peer) stopHTTP() {
 	p.transport.Stop()
 	close(p.httpStopC)
-	<-p.httpStopC
+	<-p.httpDoneC
 }
 
 func (p *Peer) IsApplyRight() bool {
-	return true
+	if p.node == nil {
+		return false
+	}
+	// Use SoftState to check if the current node is the leader
+	status := p.node.Status()
+	return status.SoftState.Lead == p.id
 }
 
 func (p *Peer) GetLeader() (addr, id string) {
-	return "", strconv.FormatUint(p.node.Status().SoftState.Lead, 10)
+	if p.node == nil {
+		return "", ""
+	}
+	status := p.node.Status()
+	leaderID := status.SoftState.Lead
+	if leaderID == 0 {
+		return "", ""
+	}
+
+	for i, peer := range p.peers {
+		if uint64(i+1) == leaderID {
+			return strings.TrimPrefix(peer, "http://"), strconv.FormatUint(leaderID, 10)
+		}
+	}
+
+	return "", strconv.FormatUint(leaderID, 10)
 }
 
 func (p *Peer) GenPeersFile(file string) error {

@@ -37,7 +37,7 @@ const (
 
 const (
 	NodesFile = "nodes.json"
-	PeersFIle = "peers.json"
+	PeersFile = "peers.json"
 )
 
 type Agent struct {
@@ -279,7 +279,7 @@ func (a *Agent) getNodesFile() string {
 }
 
 func (a *Agent) getPeersFile() string {
-	return filepath.Join(a.Config.RaftDir, PeersFIle)
+	return filepath.Join(a.Config.RaftDir, PeersFile)
 }
 
 func (a *Agent) genNodesFile() {
@@ -546,12 +546,18 @@ func (a *Agent) Leave() error {
 }
 
 func (a *Agent) AddRaftPeer(id, addr string) {
-	a.raftPeer.Join(id, addr)
+	if err := a.raftPeer.Join(id, addr); err != nil {
+		log.Error("add raft peer failed", "error", err, "nid", id, "addr", addr)
+		return
+	}
 	log.Info("add peer", "nid", id, "addr", addr)
 }
 
 func (a *Agent) RemoveRaftPeer(id string) {
-	a.raftPeer.Leave(id)
+	if err := a.raftPeer.Leave(id); err != nil {
+		log.Error("remove raft peer failed", "error", err, "nid", id)
+		return
+	}
 	log.Info("remove peer", "nid", id)
 }
 
