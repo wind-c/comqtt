@@ -95,7 +95,7 @@ func (s *RpcService) StopRpcServer() {
 	select {
 	case <-done:
 		log.Info("grpc server stopped gracefully")
-	case <-time.After(5 * time.Second):
+	case <-time.After(10 * time.Second):
 		log.Warn("grpc server graceful stop timeout, forcing stop")
 		s.grpcServer.Stop() // Force stop
 	}

@@ -146,9 +146,15 @@ func (p *Peer) Join(nodeId, addr string) error {
 		NodeID:  id,
 		Context: []byte("http://" + addr),
 	}
-	p.confChangeC <- cc
 
-	return nil
+	select {
+	case p.confChangeC <- cc:
+		return nil
+	case <-p.stopC:
+		return errors.New("peer is shutting down")
+	case <-time.After(3 * time.Second):
+		return errors.New("join node timeout: conf change channel is blocked")
+	}
 }
 
 func (p *Peer) Leave(nodeId string) error {
@@ -161,9 +167,15 @@ func (p *Peer) Leave(nodeId string) error {
 		Type:   raftpb.ConfChangeRemoveNode,
 		NodeID: id,
 	}
-	p.confChangeC <- cc
 
-	return nil
+	select {
+	case p.confChangeC <- cc:
+		return nil
+	case <-p.stopC:
+		return errors.New("peer is shutting down")
+	case <-time.After(3 * time.Second):
+		return errors.New("leave node timeout: conf change channel is blocked")
+	}
 }
 
 func (p *Peer) Propose(msg *message.Message) error {
@@ -311,8 +323,11 @@ func (p *Peer) serveChannels() {
 
 		for p.proposeC != nil && p.confChangeC != nil {
 			select {
+			case <-p.stopC:
+				return
 			case prop, ok := <-p.proposeC:
 				if !ok {
+					close(p.proposeC)
 					p.proposeC = nil
 				} else {
 					if err := p.node.Propose(context.TODO(), prop.MsgpackBytes()); err != nil {
@@ -322,6 +337,7 @@ func (p *Peer) serveChannels() {
 
 			case cc, ok := <-p.confChangeC:
 				if !ok {
+					close(p.confChangeC)
 					p.confChangeC = nil
 				} else {
 					confChangeCount++
@@ -613,6 +629,10 @@ func (p *Peer) Stop() {
 	if p.errorC != nil {
 		close(p.errorC)
 		p.errorC = nil
+	}
+	if p.confChangeC != nil {
+		close(p.confChangeC)
+		p.confChangeC = nil
 	}
 	if p.node != nil {
 		p.node.Stop()

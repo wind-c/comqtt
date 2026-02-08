@@ -353,6 +353,8 @@ func (a *Agent) processRelayMsg(msg *message.Message) {
 			a.mqttServer.Clients.Delete(msg.ClientID)
 		}
 		OnConnectPacketLog(DirectionInbound, msg.NodeID, msg.ClientID)
+	default:
+		log.Warn("unhandled default case")
 	}
 }
 

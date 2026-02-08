@@ -7,13 +7,14 @@ package hashicorp
 import (
 	"bytes"
 	"encoding/gob"
+	"io"
+	"strings"
+
 	"github.com/hashicorp/raft"
 	"github.com/wind-c/comqtt/v2/cluster/log"
 	"github.com/wind-c/comqtt/v2/cluster/message"
 	base "github.com/wind-c/comqtt/v2/cluster/raft"
 	"github.com/wind-c/comqtt/v2/mqtt/packets"
-	"io"
-	"strings"
 )
 
 type Fsm struct {
@@ -45,7 +46,11 @@ func (f *Fsm) Apply(l *raft.Log) interface{} {
 	}
 	log.Info("raft apply", "from", msg.NodeID, "filter", filter, "type", msg.Type)
 	if f.notifyCh != nil && deliverable {
-		f.notifyCh <- &msg
+		select {
+		case f.notifyCh <- &msg:
+		default: // channel is full, drop notification but do not block Raft
+			log.Warn("notify channel full, dropping notification")
+		}
 	}
 
 	return nil
