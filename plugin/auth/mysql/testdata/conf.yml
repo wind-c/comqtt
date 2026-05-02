@@ -23,4 +23,4 @@ acl:
   table: acl
   user-column: username
   topic-column: topic
-  access-column: access  # 0 Deny、1 publish (Write)、2 subscribe (Read)、3 pubsub (ReadWrite)
+  access-column: access  # 0 Deny, 1 subscribe (Read), 2 publish (Write), 3 pubsub (ReadWrite)
