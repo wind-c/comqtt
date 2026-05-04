@@ -150,6 +150,7 @@ func realMain(ctx context.Context) error {
 		dashRoutes, err := dashboard.Routes(dashboard.Options{
 			Server:             server,
 			Cluster:            true,
+			ClusterAgent:       agent,
 			Secret:             cfg.Dashboard.DecodeSecret(),
 			PasswordExpiryDays: cfg.Dashboard.PasswordExpiryDays,
 		})

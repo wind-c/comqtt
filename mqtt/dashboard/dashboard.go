@@ -24,6 +24,10 @@ type Options struct {
 	// the Cluster link only when this is set.
 	Cluster bool
 
+	// ClusterAgent provides cluster topology to the Cluster page. nil in
+	// single-mode; required when Cluster=true to mount /dashboard/cluster.
+	ClusterAgent handlers.ClusterAgent
+
 	// Server is the broker. Required.
 	Server *mqtt.Server
 
@@ -178,6 +182,12 @@ func Routes(opts Options) (map[string]rest.Handler, error) {
 
 		// SSE.
 		"GET /dashboard/events": wrap(handlers.Events(hub)),
+	}
+
+	if opts.Cluster && opts.ClusterAgent != nil {
+		routes["GET /dashboard/cluster"] = wrap(handlers.ClusterPage(handlers.ClusterDeps{
+			Agent: opts.ClusterAgent, Renderer: rdr, Cluster: true,
+		}))
 	}
 
 	return routes, nil

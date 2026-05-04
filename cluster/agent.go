@@ -201,6 +201,17 @@ func (a *Agent) GetMemberList() []discovery.Member {
 	return a.membership.Members()
 }
 
+// Leader returns the node name of the current Raft leader, or "" if no
+// leader is known. Used by integrations (REST handlers, dashboard) that
+// need to display cluster topology.
+func (a *Agent) Leader() string {
+	if a.raftPeer == nil {
+		return ""
+	}
+	_, id := a.raftPeer.GetLeader()
+	return id
+}
+
 func getRaftPeerAddr(member *discovery.Member) string {
 	// using serf
 	if raftPort, ok := member.Tags[discovery.TagRaftPort]; ok {
