@@ -1,0 +1,38 @@
+{{define "account_personal"}}{{template "layout" .}}{{end}}
+
+{{define "content"}}
+<div class="space-y-4 max-w-xl">
+  <div>
+    <h1 class="text-xl font-semibold tracking-tight">Account</h1>
+    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Your dashboard profile.</p>
+  </div>
+
+  <div class="bg-white dark:bg-slate-800 rounded shadow-sm border border-slate-200 dark:border-slate-700 p-4 space-y-3 text-sm">
+    <dl class="grid grid-cols-3 gap-y-2">
+      <dt class="text-slate-500 dark:text-slate-400">Username</dt>
+      <dd class="col-span-2 font-mono">{{.Account.Username}}</dd>
+
+      <dt class="text-slate-500 dark:text-slate-400">Role</dt>
+      <dd class="col-span-2">
+        {{if eq .Account.Role "admin"}}
+          <span class="inline-flex items-center rounded bg-brand-100 dark:bg-brand-700 text-brand-700 dark:text-brand-100 px-2 py-0.5 text-xs">admin</span>
+        {{else}}
+          <span class="inline-flex items-center rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 px-2 py-0.5 text-xs">viewer</span>
+        {{end}}
+      </dd>
+
+      <dt class="text-slate-500 dark:text-slate-400">Password set</dt>
+      <dd class="col-span-2">{{.Account.PasswordSetAt}}</dd>
+
+      <dt class="text-slate-500 dark:text-slate-400">Status</dt>
+      <dd class="col-span-2">
+        {{if .Account.MustChange}}<span class="text-amber-700 dark:text-amber-400">must change password</span>{{else}}active{{end}}
+        {{if .Account.Locked}}<span class="ml-2 text-rose-700 dark:text-rose-400">locked</span>{{end}}
+      </dd>
+    </dl>
+    <div>
+      <a href="/dashboard/account/password" class="inline-block px-3 py-2 rounded bg-brand-600 hover:bg-brand-700 text-white text-xs font-medium">Change password</a>
+    </div>
+  </div>
+</div>
+{{end}}

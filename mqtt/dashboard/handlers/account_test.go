@@ -20,6 +20,8 @@ const loginTemplate = `{{define "login"}}<form>{{if .Error}}<p class="err">{{.Er
 
 const passwordTemplate = `{{define "account/password"}}<form>{{if .Error}}<p class="err">{{.Error}}</p>{{end}}<p>{{.Reason}}</p></form>{{end}}`
 
+const personalTemplate = `{{define "layout"}}<html>{{template "content" .}}</html>{{end}}{{define "account_personal"}}{{template "layout" .}}{{end}}{{define "content"}}<div>user={{.Account.Username}} role={{.Account.Role}} mc={{.Account.MustChange}} locked={{.Account.Locked}} pset={{.Account.PasswordSetAt}}</div>{{end}}`
+
 func newRenderer(t *testing.T) *Renderer {
 	t.Helper()
 	return NewRenderer(fakeTplFS(t))
@@ -30,6 +32,7 @@ func fakeTplFS(t *testing.T) fs.FS {
 	return fstest.MapFS{
 		"templates/login.html":            &fstest.MapFile{Data: []byte(loginTemplate)},
 		"templates/account/password.html": &fstest.MapFile{Data: []byte(passwordTemplate)},
+		"templates/account/personal.html": &fstest.MapFile{Data: []byte(personalTemplate)},
 	}
 }
 
@@ -223,5 +226,44 @@ func TestChangePasswordPostWrongCurrent(t *testing.T) {
 	ChangePasswordPost(deps)(rr, req)
 	if rr.Code != http.StatusUnauthorized {
 		t.Fatalf("status: %d body: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestAccountGetRendersDetails(t *testing.T) {
+	deps, store := newAccountDeps(t)
+	pw, _ := store.Seed(context.Background(), "admin")
+	if err := store.SetPassword(context.Background(), "admin", "newpass1234"); err != nil {
+		t.Fatalf("SetPassword: %v", err)
+	}
+	_ = pw
+
+	req := httptest.NewRequest(http.MethodGet, "/dashboard/account", nil)
+	req = req.WithContext(auth.WithUser(req.Context(), auth.User{Username: "admin", Role: auth.RoleAdmin}))
+	rr := httptest.NewRecorder()
+	AccountGet(deps)(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status: %d body: %s", rr.Code, rr.Body.String())
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, "user=admin") {
+		t.Fatalf("expected username: %q", body)
+	}
+	if !strings.Contains(body, "role=admin") {
+		t.Fatalf("expected role: %q", body)
+	}
+	if !strings.Contains(body, "mc=false") {
+		t.Fatalf("expected must_change cleared: %q", body)
+	}
+	if strings.Contains(body, "pset=never") {
+		t.Fatalf("PasswordSetAt should be a timestamp not 'never': %q", body)
+	}
+}
+
+func TestAccountGetUnauthorizedWithoutContext(t *testing.T) {
+	deps, _ := newAccountDeps(t)
+	rr := httptest.NewRecorder()
+	AccountGet(deps)(rr, httptest.NewRequest(http.MethodGet, "/dashboard/account", nil))
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("status: %d", rr.Code)
 	}
 }

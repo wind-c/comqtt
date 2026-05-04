@@ -178,6 +178,42 @@ func ChangePasswordPost(d AccountDeps) http.HandlerFunc {
 	}
 }
 
+// AccountGet renders the personal account details page.
+// All authenticated users can view; the page itself is read-only.
+func AccountGet(d AccountDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		u := auth.UserFromContext(r.Context())
+		if u.Username == "" {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+		stored, err := d.Store.GetUser(ctx, u.Username)
+		if err != nil {
+			http.Error(w, "user lookup: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		passwordSet := "never"
+		if stored.PasswordSetAt > 0 {
+			passwordSet = time.Unix(stored.PasswordSetAt, 0).UTC().Format(time.RFC3339)
+		}
+		d.Renderer.Render(w, "account_personal", map[string]any{
+			"Title":   "Account",
+			"User":    u,
+			"CSRF":    auth.NewCSRFToken(),
+			"Cluster": false,
+			"Account": map[string]any{
+				"Username":      stored.Username,
+				"Role":          string(stored.Role),
+				"PasswordSetAt": passwordSet,
+				"MustChange":    stored.MustChange,
+				"Locked":        stored.LockedUntil > time.Now().Unix(),
+			},
+		})
+	}
+}
+
 // sanitizeNext only accepts paths under /dashboard/ to prevent open-redirect.
 // External targets, scheme-relative URLs, and missing leading slash all fall
 // back to the default landing page.
