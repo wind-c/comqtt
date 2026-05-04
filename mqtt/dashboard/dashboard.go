@@ -115,6 +115,10 @@ func Routes(opts Options) (map[string]rest.Handler, error) {
 	overviewDeps := handlers.OverviewDeps{Server: opts.Server, Renderer: rdr, Cluster: opts.Cluster, Sampler: sampler}
 	clientsDeps := handlers.ClientsDeps{Server: opts.Server, Renderer: rdr, Cluster: opts.Cluster}
 	clientDetailDeps := handlers.ClientDetailDeps{Server: opts.Server, Renderer: rdr, Cluster: opts.Cluster}
+	subscriptionsDeps := handlers.SubscriptionsDeps{Server: opts.Server, Renderer: rdr, Cluster: opts.Cluster}
+	topicsDeps := handlers.TopicsDeps{Server: opts.Server, Renderer: rdr, Cluster: opts.Cluster}
+	retainedDeps := handlers.RetainedDeps{Server: opts.Server, Renderer: rdr, Cluster: opts.Cluster}
+	sessionsDeps := handlers.SessionsDeps{Server: opts.Server, Renderer: rdr, Cluster: opts.Cluster}
 	blacklistDeps := handlers.BlacklistDeps{Server: opts.Server, Renderer: rdr, Cluster: opts.Cluster}
 	toolsDeps := handlers.ToolsDeps{Server: opts.Server, Renderer: rdr, Cluster: opts.Cluster}
 	settingsDeps := handlers.SettingsDeps{Server: opts.Server, Renderer: rdr, Cluster: opts.Cluster}
@@ -150,6 +154,12 @@ func Routes(opts Options) (map[string]rest.Handler, error) {
 		"GET /dashboard/clients":                   wrap(handlers.ClientsList(clientsDeps)),
 		"GET /dashboard/clients/{id}":              wrap(handlers.ClientDetail(clientDetailDeps)),
 		"POST /dashboard/clients/{id}/subscriptions/{topic}/delete": wrapAdmin(handlers.ClientUnsubscribe(clientDetailDeps)),
+		"GET /dashboard/subscriptions":             wrap(handlers.SubscriptionsList(subscriptionsDeps)),
+		"GET /dashboard/topics":                    wrap(handlers.TopicsTree(topicsDeps)),
+		"GET /dashboard/retained":                  wrap(handlers.RetainedList(retainedDeps)),
+		"POST /dashboard/retained/{topic}/delete":  wrapAdmin(handlers.RetainedClear(retainedDeps)),
+		"GET /dashboard/sessions":                  wrap(handlers.SessionsList(sessionsDeps)),
+		"POST /dashboard/sessions/{id}/delete":     wrapAdmin(handlers.SessionsClear(sessionsDeps)),
 		"GET /dashboard/blacklist":                 wrap(handlers.BlacklistGet(blacklistDeps)),
 		"POST /dashboard/blacklist":                wrapAdmin(handlers.BlacklistAdd(blacklistDeps)),
 		"POST /dashboard/blacklist/{id}/delete":    wrapAdmin(handlers.BlacklistRemove(blacklistDeps)),

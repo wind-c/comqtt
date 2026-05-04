@@ -1,0 +1,28 @@
+{{define "topics"}}{{template "layout" .}}{{end}}
+
+{{define "content"}}
+<div class="space-y-4">
+  <div>
+    <h1 class="text-xl font-semibold tracking-tight">Topics</h1>
+    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">{{.UniqueFilters}} unique filter{{if ne .UniqueFilters 1}}s{{end}}</p>
+  </div>
+
+  <div class="bg-white dark:bg-slate-800 rounded shadow-sm border border-slate-200 dark:border-slate-700 p-4 text-sm font-mono">
+    {{template "topic_node" .Root}}
+  </div>
+</div>
+{{end}}
+
+{{define "topic_node"}}
+{{if .Topic}}
+<details {{if .Children}}open{{end}} class="ml-2">
+  <summary class="cursor-pointer flex items-center gap-2">
+    <span>{{.Topic}}</span>
+    {{if gt .Subscribers 0}}<span class="text-xs text-slate-500 dark:text-slate-400">({{.Subscribers}} sub{{if ne .Subscribers 1}}s{{end}})</span>{{end}}
+  </summary>
+  {{range .Children}}{{template "topic_node" .}}{{end}}
+</details>
+{{else}}
+{{range .Children}}{{template "topic_node" .}}{{end}}
+{{end}}
+{{end}}

@@ -1,0 +1,46 @@
+{{define "subscriptions"}}{{template "layout" .}}{{end}}
+
+{{define "content"}}
+<div class="space-y-4">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-xl font-semibold tracking-tight">Subscriptions</h1>
+      <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">{{.Page.Total}} subscription{{if ne .Page.Total 1}}s{{end}}</p>
+    </div>
+    <form method="GET" action="/dashboard/subscriptions" class="flex items-center gap-2">
+      <input name="topic" value="{{.Topic}}" placeholder="topic filter"
+        class="px-3 py-2 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm w-44 focus:outline-none focus:border-brand-500" />
+      <input name="clientid" value="{{.ClientID}}" placeholder="client id"
+        class="px-3 py-2 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm w-44 focus:outline-none focus:border-brand-500" />
+      <button class="px-3 py-2 rounded bg-brand-600 hover:bg-brand-700 text-white text-sm">Filter</button>
+    </form>
+  </div>
+
+  <div class="overflow-x-auto bg-white dark:bg-slate-800 rounded shadow-sm border border-slate-200 dark:border-slate-700">
+    <table class="min-w-full text-sm">
+      <thead class="bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+        <tr>
+          <th class="text-left px-4 py-2 font-medium">Client ID</th>
+          <th class="text-left px-4 py-2 font-medium">Topic</th>
+          <th class="text-right px-4 py-2 font-medium">QoS</th>
+          <th class="text-right px-4 py-2 font-medium">NoLocal</th>
+          <th class="text-right px-4 py-2 font-medium">RetainAsPub</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
+        {{range .Page.Items}}
+        <tr class="hover:bg-slate-50 dark:hover:bg-slate-900">
+          <td class="px-4 py-2 font-mono"><a href="/dashboard/clients/{{.ClientID}}" class="text-brand-600 hover:underline">{{.ClientID}}</a></td>
+          <td class="px-4 py-2 font-mono">{{.Topic}}</td>
+          <td class="px-4 py-2 text-right">{{.QoS}}</td>
+          <td class="px-4 py-2 text-right">{{.NoLocal}}</td>
+          <td class="px-4 py-2 text-right">{{.RetainAsPublished}}</td>
+        </tr>
+        {{else}}
+        <tr><td colspan="5" class="px-4 py-8 text-center text-slate-500">No subscriptions match.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}

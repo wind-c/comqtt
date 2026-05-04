@@ -1,0 +1,55 @@
+{{define "sessions"}}{{template "layout" .}}{{end}}
+
+{{define "content"}}
+<div class="space-y-4">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-xl font-semibold tracking-tight">Sessions</h1>
+      <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">{{.Page.Total}} session{{if ne .Page.Total 1}}s{{end}}</p>
+    </div>
+    <form method="GET" action="/dashboard/sessions" class="flex items-center gap-2">
+      <select name="online" class="px-3 py-2 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm">
+        <option value="" {{if eq .Online ""}}selected{{end}}>All</option>
+        <option value="true" {{if eq .Online "true"}}selected{{end}}>Online</option>
+        <option value="false" {{if eq .Online "false"}}selected{{end}}>Offline</option>
+      </select>
+      <button class="px-3 py-2 rounded bg-brand-600 hover:bg-brand-700 text-white text-sm">Filter</button>
+    </form>
+  </div>
+
+  <div class="overflow-x-auto bg-white dark:bg-slate-800 rounded shadow-sm border border-slate-200 dark:border-slate-700">
+    <table class="min-w-full text-sm">
+      <thead class="bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+        <tr>
+          <th class="text-left px-4 py-2 font-medium">Client ID</th>
+          <th class="text-left px-4 py-2 font-medium">Online</th>
+          <th class="text-left px-4 py-2 font-medium">Remote</th>
+          <th class="text-right px-4 py-2 font-medium">Subs</th>
+          <th class="text-right px-4 py-2 font-medium">Inflight</th>
+          <th class="text-right px-4 py-2 font-medium">Action</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
+        {{range .Page.Items}}
+        <tr class="hover:bg-slate-50 dark:hover:bg-slate-900">
+          <td class="px-4 py-2 font-mono"><a href="/dashboard/clients/{{.ClientID}}" class="text-brand-600 hover:underline">{{.ClientID}}</a></td>
+          <td class="px-4 py-2">{{if .Online}}<span class="text-emerald-700 dark:text-emerald-300">yes</span>{{else}}<span class="text-slate-500">no</span>{{end}}</td>
+          <td class="px-4 py-2 font-mono text-slate-500">{{.Remote}}</td>
+          <td class="px-4 py-2 text-right tabular-nums">{{.Subs}}</td>
+          <td class="px-4 py-2 text-right tabular-nums">{{.Inflight}}</td>
+          <td class="px-4 py-2 text-right">
+            <form method="POST" action="/dashboard/sessions/{{.ClientID}}/delete" class="inline">
+              <input type="hidden" name="_csrf" value="{{$.CSRF}}" />
+              <button {{if $.Readonly}}disabled title="Read-only role"{{end}}
+                class="text-rose-600 hover:underline disabled:text-slate-400 disabled:cursor-not-allowed text-xs">Clear</button>
+            </form>
+          </td>
+        </tr>
+        {{else}}
+        <tr><td colspan="6" class="px-4 py-8 text-center text-slate-500">No sessions.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}

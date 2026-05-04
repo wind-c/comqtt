@@ -1,0 +1,39 @@
+{{define "retained"}}{{template "layout" .}}{{end}}
+
+{{define "content"}}
+<div class="space-y-4">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-xl font-semibold tracking-tight">Retained Messages</h1>
+      <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">{{.Page.Total}} retained</p>
+    </div>
+    <form method="GET" action="/dashboard/retained" class="flex items-center gap-2">
+      <input name="topic" value="{{.Topic}}" placeholder="topic filter"
+        class="px-3 py-2 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm w-64 focus:outline-none focus:border-brand-500" />
+      <button class="px-3 py-2 rounded bg-brand-600 hover:bg-brand-700 text-white text-sm">Filter</button>
+    </form>
+  </div>
+
+  <div class="bg-white dark:bg-slate-800 rounded shadow-sm border border-slate-200 dark:border-slate-700 divide-y divide-slate-200 dark:divide-slate-700">
+    {{range .Page.Items}}
+    <details class="px-4 py-2">
+      <summary class="cursor-pointer flex items-center justify-between gap-3 text-sm">
+        <span class="font-mono">{{.Topic}}</span>
+        <span class="flex items-center gap-3">
+          <span class="text-xs text-slate-500">QoS {{.QoS}}</span>
+          <span class="text-xs text-slate-500 tabular-nums">{{.Size}}B</span>
+          <form method="POST" action="/dashboard/retained/{{.TopicEncoded}}/delete" class="inline">
+            <input type="hidden" name="_csrf" value="{{$.CSRF}}" />
+            <button {{if $.Readonly}}disabled title="Read-only role"{{end}}
+              class="text-rose-600 hover:underline disabled:text-slate-400 disabled:cursor-not-allowed text-xs">Clear</button>
+          </form>
+        </span>
+      </summary>
+      <pre class="mt-2 text-xs bg-slate-50 dark:bg-slate-900 p-2 rounded overflow-x-auto whitespace-pre-wrap break-all">{{.PayloadHex}}</pre>
+    </details>
+    {{else}}
+    <div class="px-4 py-8 text-center text-sm text-slate-500">No retained messages.</div>
+    {{end}}
+  </div>
+</div>
+{{end}}
