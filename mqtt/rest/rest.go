@@ -15,6 +15,7 @@ const (
 	MqttGetOnlinePath         = "/api/v1/mqtt/stat/online"
 	MqttGetClientPath         = "/api/v1/mqtt/clients/{id}"
 	MqttListClientsPath       = "/api/v1/mqtt/clients"
+	MqttUnsubscribeClientPath = "/api/v1/mqtt/clients/{id}/subscriptions/{topic}"
 	MqttListSubscriptionsPath = "/api/v1/mqtt/subscriptions"
 	MqttTopicsTreePath        = "/api/v1/mqtt/topics"
 	MqttGetBlacklistPath      = "/api/v1/mqtt/blacklist"
@@ -49,6 +50,7 @@ func (s *Rest) GenHandlers() map[string]Handler {
 		"GET " + MqttGetBlacklistPath:      s.blacklist,
 		"POST " + MqttAddBlacklistPath:     s.kickClient,
 		"DELETE " + MqttDelBlacklistPath:   s.blanchClient,
+		"DELETE " + MqttUnsubscribeClientPath: s.unsubscribeClient,
 		"POST " + MqttPublishMessagePath:   s.publishMessage,
 		"GET " + PrometheusMetrics: promhttp.HandlerFor(
 			s.server.Options.PrometheusRegistry,
