@@ -114,6 +114,70 @@ func renderLoginError(d AccountDeps, w http.ResponseWriter, r *http.Request, nex
 	})
 }
 
+const minPasswordLen = 8
+
+// ChangePasswordGet renders the password-change form. Used both for forced
+// rotation (?reason=must_change|expired) and personal password change.
+func ChangePasswordGet(d AccountDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		reason := r.URL.Query().Get("reason")
+		d.Renderer.Render(w, "account/password", map[string]any{
+			"CSRF":   auth.NewCSRFToken(),
+			"Reason": reason,
+			"Error":  "",
+		})
+	}
+}
+
+// ChangePasswordPost validates the current password, enforces a new-password
+// minimum length, persists the new bcrypt hash, and redirects to the
+// dashboard root. The cred store's SetPassword clears must_change.
+func ChangePasswordPost(d AccountDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		_ = r.ParseForm()
+		current := r.PostFormValue("current")
+		next := r.PostFormValue("new")
+		confirm := r.PostFormValue("confirm")
+		reason := r.URL.Query().Get("reason")
+
+		render := func(status int, msg string) {
+			w.WriteHeader(status)
+			d.Renderer.Render(w, "account/password", map[string]any{
+				"CSRF":   auth.NewCSRFToken(),
+				"Reason": reason,
+				"Error":  msg,
+			})
+		}
+
+		u := auth.UserFromContext(r.Context())
+		if u.Username == "" {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		if next != confirm {
+			render(http.StatusBadRequest, "New password and confirmation do not match.")
+			return
+		}
+		if len(next) < minPasswordLen {
+			render(http.StatusBadRequest, "Password must be at least 8 characters.")
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+		if _, err := d.Store.Authenticate(ctx, u.Username, current); err != nil {
+			render(http.StatusUnauthorized, "Current password is incorrect.")
+			return
+		}
+		if err := d.Store.SetPassword(ctx, u.Username, next); err != nil {
+			render(http.StatusInternalServerError, "Failed to update password: "+err.Error())
+			return
+		}
+		http.Redirect(w, r, "/dashboard/", http.StatusFound)
+	}
+}
+
 // sanitizeNext only accepts paths under /dashboard/ to prevent open-redirect.
 // External targets, scheme-relative URLs, and missing leading slash all fall
 // back to the default landing page.

@@ -18,6 +18,8 @@ import (
 
 const loginTemplate = `{{define "login"}}<form>{{if .Error}}<p class="err">{{.Error}}</p>{{end}}<input name="next" value="{{.Next}}"></form>{{end}}`
 
+const passwordTemplate = `{{define "account/password"}}<form>{{if .Error}}<p class="err">{{.Error}}</p>{{end}}<p>{{.Reason}}</p></form>{{end}}`
+
 func newRenderer(t *testing.T) *Renderer {
 	t.Helper()
 	return NewRenderer(fakeTplFS(t))
@@ -26,7 +28,8 @@ func newRenderer(t *testing.T) *Renderer {
 func fakeTplFS(t *testing.T) fs.FS {
 	t.Helper()
 	return fstest.MapFS{
-		"templates/login.html": &fstest.MapFile{Data: []byte(loginTemplate)},
+		"templates/login.html":            &fstest.MapFile{Data: []byte(loginTemplate)},
+		"templates/account/password.html": &fstest.MapFile{Data: []byte(passwordTemplate)},
 	}
 }
 
@@ -138,5 +141,87 @@ func TestSanitizeNext(t *testing.T) {
 		if got := sanitizeNext(c.in); got != c.want {
 			t.Errorf("sanitizeNext(%q): got %q want %q", c.in, got, c.want)
 		}
+	}
+}
+
+func TestChangePasswordGetRenders(t *testing.T) {
+	deps, _ := newAccountDeps(t)
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/dashboard/account/password?reason=must_change", nil)
+	ChangePasswordGet(deps)(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status: %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "must_change") {
+		t.Fatalf("expected reason in body: %q", rr.Body.String())
+	}
+}
+
+func TestChangePasswordPostHappyPath(t *testing.T) {
+	deps, store := newAccountDeps(t)
+	pw, _ := store.Seed(context.Background(), "admin")
+	form := url.Values{"current": {pw}, "new": {"newpass1234"}, "confirm": {"newpass1234"}}
+	req := httptest.NewRequest(http.MethodPost, "/dashboard/account/password", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req = req.WithContext(auth.WithUser(req.Context(), auth.User{Username: "admin", Role: auth.RoleAdmin}))
+	rr := httptest.NewRecorder()
+	ChangePasswordPost(deps)(rr, req)
+	if rr.Code != http.StatusFound {
+		t.Fatalf("status: %d body: %s", rr.Code, rr.Body.String())
+	}
+	if _, err := store.Authenticate(context.Background(), "admin", "newpass1234"); err != nil {
+		t.Fatalf("new password should work: %v", err)
+	}
+	u, _ := store.GetUser(context.Background(), "admin")
+	if u.MustChange {
+		t.Fatal("must_change should be cleared")
+	}
+}
+
+func TestChangePasswordPostMismatchedConfirm(t *testing.T) {
+	deps, store := newAccountDeps(t)
+	pw, _ := store.Seed(context.Background(), "admin")
+	form := url.Values{"current": {pw}, "new": {"newpass1234"}, "confirm": {"different5678"}}
+	req := httptest.NewRequest(http.MethodPost, "/dashboard/account/password", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req = req.WithContext(auth.WithUser(req.Context(), auth.User{Username: "admin", Role: auth.RoleAdmin}))
+	rr := httptest.NewRecorder()
+	ChangePasswordPost(deps)(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("status: %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "do not match") {
+		t.Fatalf("expected mismatch message: %q", rr.Body.String())
+	}
+}
+
+func TestChangePasswordPostShortPassword(t *testing.T) {
+	deps, store := newAccountDeps(t)
+	pw, _ := store.Seed(context.Background(), "admin")
+	form := url.Values{"current": {pw}, "new": {"short"}, "confirm": {"short"}}
+	req := httptest.NewRequest(http.MethodPost, "/dashboard/account/password", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req = req.WithContext(auth.WithUser(req.Context(), auth.User{Username: "admin", Role: auth.RoleAdmin}))
+	rr := httptest.NewRecorder()
+	ChangePasswordPost(deps)(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("status: %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "8 characters") {
+		t.Fatalf("expected length error: %q", rr.Body.String())
+	}
+}
+
+func TestChangePasswordPostWrongCurrent(t *testing.T) {
+	deps, store := newAccountDeps(t)
+	_, _ = store.Seed(context.Background(), "admin")
+	form := url.Values{"current": {"wrong"}, "new": {"newpass1234"}, "confirm": {"newpass1234"}}
+	req := httptest.NewRequest(http.MethodPost, "/dashboard/account/password", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req = req.WithContext(auth.WithUser(req.Context(), auth.User{Username: "admin", Role: auth.RoleAdmin}))
+	rr := httptest.NewRecorder()
+	ChangePasswordPost(deps)(rr, req)
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("status: %d body: %s", rr.Code, rr.Body.String())
 	}
 }
