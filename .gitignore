@@ -5,3 +5,4 @@ raft.db
 .vscode
 .claude/
 docs/
+/bin/
