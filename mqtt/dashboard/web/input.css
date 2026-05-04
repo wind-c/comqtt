@@ -1,7 +1,61 @@
-/* mqtt/dashboard/web/input.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Vercel theme (tweakcn) - monochrome HSL tokens.
+   Light: white background, near-black foreground, near-black primary.
+   Dark:  black background, white foreground, white primary.
+   Components reference these via tailwind.config.js color aliases. */
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 9%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
+    --accent: 0 0% 96%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 98%;
+    --border: 0 0% 89%;
+    --input: 0 0% 89%;
+    --ring: 0 0% 9%;
+    --radius: 0.5rem;
+  }
+  .dark {
+    --background: 0 0% 0%;
+    --foreground: 0 0% 100%;
+    --card: 0 0% 4%;
+    --card-foreground: 0 0% 100%;
+    --popover: 0 0% 4%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 0 0% 100%;
+    --primary-foreground: 0 0% 0%;
+    --secondary: 0 0% 9%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 0 0% 9%;
+    --muted-foreground: 0 0% 64%;
+    --accent: 0 0% 14%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 142 70% 50%;
+    --success-foreground: 0 0% 0%;
+    --border: 0 0% 14%;
+    --input: 0 0% 14%;
+    --ring: 0 0% 80%;
+  }
+  body { font-feature-settings: "cv02","cv03","cv04","cv11"; }
+}
 
 @layer components {
   .sparkline { width: 100%; height: 100%; }

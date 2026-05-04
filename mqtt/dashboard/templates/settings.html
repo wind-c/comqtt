@@ -4,12 +4,12 @@
 <div class="space-y-4">
   <div>
     <h1 class="text-xl font-semibold tracking-tight">Settings</h1>
-    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Read-only snapshot of the running configuration.</p>
+    <p class="text-sm text-muted-foreground mt-1">Read-only snapshot of the running configuration.</p>
   </div>
 
-  <div class="rounded shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+  <div class="rounded shadow-sm border border-border overflow-hidden">
     <style>{{.HighlightCSS}}</style>
-    <div class="bg-slate-50 dark:bg-slate-900 text-xs overflow-x-auto p-4">
+    <div class="bg-muted text-xs overflow-x-auto p-4">
       {{.HighlightedYAML}}
     </div>
   </div>

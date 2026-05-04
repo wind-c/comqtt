@@ -6,3 +6,9 @@ raft.db
 .claude/
 docs/
 /bin/
+/data/
+/cmd/single/data/
+/cmd/cluster/data/
+/single
+/comqtt
+/comqtt-cluster

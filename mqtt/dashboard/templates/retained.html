@@ -5,38 +5,38 @@
   <div class="flex items-center justify-between">
     <div>
       <h1 class="text-xl font-semibold tracking-tight">Retained Messages</h1>
-      <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">{{.Page.Total}} retained</p>
+      <p class="text-sm text-muted-foreground mt-1">{{.Page.Total}} retained</p>
     </div>
     <form method="GET" action="/dashboard/retained" class="flex items-center gap-3 flex-wrap">
       <input name="topic" value="{{.Topic}}" placeholder="topic filter"
-        class="px-3 py-2 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm w-56 focus:outline-none focus:border-brand-500" />
-      <label class="inline-flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 select-none">
+        class="px-3 py-2 rounded border border-input bg-input text-sm w-56 focus:outline-none focus:border-ring" />
+      <label class="inline-flex items-center gap-2 text-xs text-muted-foreground dark:text-muted-foreground select-none">
         <input type="checkbox" name="include_sys" value="1" {{if .IncludeSys}}checked{{end}} />
         Include $SYS topics
       </label>
-      <button class="px-3 py-2 rounded bg-brand-600 hover:bg-brand-700 text-white text-sm">Filter</button>
+      <button class="px-3 py-2 rounded bg-primary text-primary-foreground hover:bg-primary/90 text-sm">Filter</button>
     </form>
   </div>
 
-  <div class="bg-white dark:bg-slate-800 rounded shadow-sm border border-slate-200 dark:border-slate-700 divide-y divide-slate-200 dark:divide-slate-700">
+  <div class="bg-card text-card-foreground rounded shadow-sm border border-border divide-y divide-border">
     {{range .Page.Items}}
     <details class="px-4 py-2">
       <summary class="cursor-pointer flex items-center justify-between gap-3 text-sm">
         <span class="font-mono">{{.Topic}}</span>
         <span class="flex items-center gap-3">
-          <span class="text-xs text-slate-500">QoS {{.QoS}}</span>
-          <span class="text-xs text-slate-500 tabular-nums">{{.Size}}B</span>
+          <span class="text-xs text-muted-foreground">QoS {{.QoS}}</span>
+          <span class="text-xs text-muted-foreground tabular-nums">{{.Size}}B</span>
           <form method="POST" action="/dashboard/retained/{{.TopicEncoded}}/delete" class="inline">
             <input type="hidden" name="_csrf" value="{{$.CSRF}}" />
             <button {{if $.Readonly}}disabled title="Read-only role"{{end}}
-              class="text-rose-600 hover:underline disabled:text-slate-400 disabled:cursor-not-allowed text-xs">Clear</button>
+              class="text-destructive hover:underline disabled:text-muted-foreground disabled:cursor-not-allowed text-xs">Clear</button>
           </form>
         </span>
       </summary>
-      <pre class="mt-2 text-xs bg-slate-50 dark:bg-slate-900 p-2 rounded overflow-x-auto whitespace-pre-wrap break-all">{{.PayloadHex}}</pre>
+      <pre class="mt-2 text-xs bg-muted p-2 rounded overflow-x-auto whitespace-pre-wrap break-all">{{.PayloadHex}}</pre>
     </details>
     {{else}}
-    <div class="px-4 py-8 text-center text-sm text-slate-500">No retained messages.</div>
+    <div class="px-4 py-8 text-center text-sm text-muted-foreground">No retained messages.</div>
     {{end}}
   </div>
 </div>

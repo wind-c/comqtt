@@ -93,13 +93,20 @@ func LoginPost(d AccountDeps) http.HandlerFunc {
 }
 
 // LogoutPost clears the session cookie and redirects to the login page.
+// Cookie attributes match LoginPost so the browser recognises this as the
+// same cookie and actually expires it (Chrome/Safari are strict about that
+// match; clearing without HttpOnly/SameSite leaves a stale cookie behind).
 func LogoutPost() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		http.SetCookie(w, &http.Cookie{
-			Name:   "comqtt_session",
-			Value:  "",
-			Path:   "/",
-			MaxAge: -1,
+			Name:     "comqtt_session",
+			Value:    "",
+			Path:     "/",
+			HttpOnly: true,
+			SameSite: http.SameSiteLaxMode,
+			Secure:   r.TLS != nil,
+			MaxAge:   -1,
+			Expires:  time.Unix(0, 0),
 		})
 		http.Redirect(w, r, "/dashboard/login", http.StatusFound)
 	}

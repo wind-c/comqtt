@@ -139,7 +139,7 @@ func Routes(opts Options) (map[string]rest.Handler, error) {
 		Renderer:   rdr,
 		SessionTTL: opts.SessionTTL,
 	}
-	overviewDeps := handlers.OverviewDeps{Server: opts.Server, Renderer: rdr, Cluster: opts.Cluster, Sampler: sampler}
+	overviewDeps := handlers.OverviewDeps{Server: opts.Server, Renderer: rdr, Cluster: opts.Cluster, Sampler: sampler, Agent: opts.ClusterAgent}
 	clientsDeps := handlers.ClientsDeps{Server: opts.Server, Renderer: rdr, Cluster: opts.Cluster}
 	clientDetailDeps := handlers.ClientDetailDeps{Server: opts.Server, Renderer: rdr, Cluster: opts.Cluster}
 	subscriptionsDeps := handlers.SubscriptionsDeps{Server: opts.Server, Renderer: rdr, Cluster: opts.Cluster}

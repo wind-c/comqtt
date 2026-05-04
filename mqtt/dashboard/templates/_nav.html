@@ -1,43 +1,53 @@
 {{define "nav"}}
 <nav id="primary-nav"
-     class="w-60 shrink-0 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 flex flex-col
+     class="w-60 shrink-0 bg-card text-card-foreground border-r border-border flex flex-col
             lg:static lg:translate-x-0
             fixed inset-y-0 left-0 z-40 -translate-x-full transition-transform duration-200">
   <div class="px-6 py-4 text-lg font-semibold tracking-tight flex items-center justify-between">
     <div>
-      <span class="text-brand-600 dark:text-brand-500">com</span>qtt
+      <span class="text-foreground">com</span>qtt
     </div>
     <button id="nav-close" type="button" aria-label="Close navigation"
-      class="lg:hidden p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700">
+      class="lg:hidden p-1 rounded hover:bg-accent">
       <svg viewBox="0 0 20 20" class="w-4 h-4" fill="currentColor" aria-hidden="true">
         <path d="M5.05 5.05a1 1 0 011.414 0L10 8.586l3.536-3.536a1 1 0 111.414 1.414L11.414 10l3.536 3.536a1 1 0 01-1.414 1.414L10 11.414l-3.536 3.536a1 1 0 01-1.414-1.414L8.586 10 5.05 6.464a1 1 0 010-1.414z"/>
       </svg>
     </button>
   </div>
   <ul class="flex-1 px-3 space-y-1 text-sm overflow-y-auto">
-    <li><a href="/dashboard/" class="nav-link block px-3 py-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700">Overview</a></li>
-    <li><a href="/dashboard/clients" class="nav-link block px-3 py-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700">Clients</a></li>
-    <li><a href="/dashboard/subscriptions" class="nav-link block px-3 py-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700">Subscriptions</a></li>
-    <li><a href="/dashboard/topics" class="nav-link block px-3 py-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700">Topics</a></li>
-    <li><a href="/dashboard/retained" class="nav-link block px-3 py-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700">Retained</a></li>
-    <li><a href="/dashboard/sessions" class="nav-link block px-3 py-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700">Sessions</a></li>
+    <li><a href="/dashboard/" class="nav-link block px-3 py-2 rounded hover:bg-accent">Overview</a></li>
+    <li><a href="/dashboard/clients" class="nav-link block px-3 py-2 rounded hover:bg-accent">Clients</a></li>
+    <li><a href="/dashboard/subscriptions" class="nav-link block px-3 py-2 rounded hover:bg-accent">Subscriptions</a></li>
+    <li><a href="/dashboard/topics" class="nav-link block px-3 py-2 rounded hover:bg-accent">Topics</a></li>
+    <li><a href="/dashboard/retained" class="nav-link block px-3 py-2 rounded hover:bg-accent">Retained</a></li>
+    <li><a href="/dashboard/sessions" class="nav-link block px-3 py-2 rounded hover:bg-accent">Sessions</a></li>
     {{if .Cluster}}
-    <li><a href="/dashboard/cluster" class="nav-link block px-3 py-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700">Cluster</a></li>
+    <li><a href="/dashboard/cluster" class="nav-link block px-3 py-2 rounded hover:bg-accent">Cluster</a></li>
     {{end}}
-    <li><a href="/dashboard/blacklist" class="nav-link block px-3 py-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700">Blacklist</a></li>
-    <li><a href="/dashboard/tools" class="nav-link block px-3 py-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700">Tools</a></li>
+    <li><a href="/dashboard/blacklist" class="nav-link block px-3 py-2 rounded hover:bg-accent">Blacklist</a></li>
+    <li><a href="/dashboard/tools" class="nav-link block px-3 py-2 rounded hover:bg-accent">Tools</a></li>
     {{if eq .User.Role "admin"}}
-    <li><a href="/dashboard/users" class="nav-link block px-3 py-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700">Users</a></li>
+    <li><a href="/dashboard/users" class="nav-link block px-3 py-2 rounded hover:bg-accent">Users</a></li>
     {{end}}
-    <li><a href="/dashboard/settings" class="nav-link block px-3 py-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700">Settings</a></li>
-    <li><a href="/dashboard/account" class="nav-link block px-3 py-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500">Account</a></li>
+    <li><a href="/dashboard/settings" class="nav-link block px-3 py-2 rounded hover:bg-accent">Settings</a></li>
+    <li><a href="/dashboard/account" class="nav-link block px-3 py-2 rounded hover:bg-accent text-muted-foreground">Account</a></li>
   </ul>
-  <div class="p-4 border-t border-slate-200 dark:border-slate-700 space-y-2">
-    <button id="theme-toggle" type="button" class="text-xs text-slate-500 hover:text-slate-900 dark:hover:text-white">Toggle theme</button>
-    <form method="POST" action="/dashboard/logout" class="block">
-      <input type="hidden" name="_csrf" value="{{.CSRF}}" />
-      <button class="text-xs text-slate-500 hover:text-slate-900 dark:hover:text-white">Logout {{.User.Username}}</button>
-    </form>
+  <div class="p-3 border-t border-border space-y-2">
+    <div class="px-1 text-xs text-muted-foreground truncate">
+      Signed in as <span class="font-mono text-foreground">{{.User.Username}}</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <button id="theme-toggle" type="button"
+        class="flex-1 px-2 py-1.5 text-xs rounded border border-input text-muted-foreground dark:text-muted-foreground hover:bg-accent"
+        title="Toggle light/dark theme">Theme</button>
+      <form method="POST" action="/dashboard/logout" class="flex-1">
+        <input type="hidden" name="_csrf" value="{{.CSRF}}" />
+        <button type="submit"
+          class="w-full px-2 py-1.5 text-xs rounded bg-destructive text-destructive-foreground hover:bg-destructive/90 font-medium">
+          Sign out
+        </button>
+      </form>
+    </div>
   </div>
 </nav>
 {{end}}

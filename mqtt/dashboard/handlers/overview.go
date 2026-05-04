@@ -40,11 +40,12 @@ type overviewPageData struct {
 }
 
 type nodeStatus struct {
-	Mode    string // "Standalone" or "Cluster"
-	Self    string // local hostname
-	Total   int    // node count
-	Leader  string // leader node name (empty in standalone)
-	Members []nodeMember
+	Mode     string // "Standalone" or "Cluster"
+	Self     string // local hostname
+	Total    int    // node count
+	Leader   string // leader node name (empty in standalone)
+	Members  []nodeMember
+	Topology template.HTML // inline SVG ring topology
 }
 
 type nodeMember struct {
@@ -84,7 +85,9 @@ func OverviewGet(d OverviewDeps) http.HandlerFunc {
 func buildNodeStatus(d OverviewDeps) nodeStatus {
 	self := hostnameOrUnknown()
 	if !d.Cluster || d.Agent == nil {
-		return nodeStatus{Mode: "Standalone", Self: self, Total: 1, Members: []nodeMember{{Name: self, IsSelf: true}}}
+		st := nodeStatus{Mode: "Standalone", Self: self, Total: 1, Members: []nodeMember{{Name: self, IsSelf: true}}}
+		st.Topology = ringTopologySVG(st.Members, st.Self, st.Leader, false)
+		return st
 	}
 	members := d.Agent.GetMemberList()
 	leader := d.Agent.Leader()
@@ -97,7 +100,9 @@ func buildNodeStatus(d OverviewDeps) nodeStatus {
 			IsSelf:   m.Name == self,
 		})
 	}
-	return nodeStatus{Mode: "Cluster", Self: self, Total: len(members), Leader: leader, Members: rows}
+	st := nodeStatus{Mode: "Cluster", Self: self, Total: len(members), Leader: leader, Members: rows}
+	st.Topology = ringTopologySVG(rows, self, leader, true)
+	return st
 }
 
 func hostnameOrUnknown() string {

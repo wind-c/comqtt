@@ -8,31 +8,31 @@
   <link rel="stylesheet" href="/dashboard/static/tailwind.css" />
   <script src="/dashboard/static/theme.js" defer></script>
 </head>
-<body class="h-full bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
-  <form method="POST" action="/dashboard/login" class="w-80 bg-white dark:bg-slate-800 p-6 rounded shadow space-y-4">
+<body class="h-full bg-background flex items-center justify-center">
+  <form method="POST" action="/dashboard/login" class="w-80 bg-card text-card-foreground p-6 rounded shadow space-y-4">
     <div>
       <h1 class="text-lg font-semibold tracking-tight">
-        <span class="text-brand-600 dark:text-brand-500">com</span>qtt
+        <span class="text-foreground">com</span>qtt
       </h1>
-      <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Sign in to the dashboard</p>
+      <p class="text-xs text-muted-foreground mt-1">Sign in to the dashboard</p>
     </div>
     {{with .Error}}
-    <div class="rounded bg-rose-100 dark:bg-rose-900 text-rose-900 dark:text-rose-100 p-2 text-xs">{{.}}</div>
+    <div class="rounded bg-destructive/10 text-destructive border border-destructive/20 p-2 text-xs">{{.}}</div>
     {{end}}
     <input type="hidden" name="_csrf" value="{{.CSRF}}" />
     <input type="hidden" name="next" value="{{.Next}}" />
     <label class="block">
-      <span class="text-xs text-slate-500 dark:text-slate-400">Username</span>
+      <span class="text-xs text-muted-foreground">Username</span>
       <input name="username" autocomplete="username" autofocus required
-        class="mt-1 w-full px-3 py-2 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:border-brand-500" />
+        class="mt-1 w-full px-3 py-2 rounded border border-input bg-input dark:text-foreground text-sm focus:outline-none focus:border-ring" />
     </label>
     <label class="block">
-      <span class="text-xs text-slate-500 dark:text-slate-400">Password</span>
+      <span class="text-xs text-muted-foreground">Password</span>
       <input name="password" type="password" autocomplete="current-password" required
-        class="mt-1 w-full px-3 py-2 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:border-brand-500" />
+        class="mt-1 w-full px-3 py-2 rounded border border-input bg-input dark:text-foreground text-sm focus:outline-none focus:border-ring" />
     </label>
-    <button class="w-full bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium py-2 rounded">Sign in</button>
-    <button id="theme-toggle" type="button" class="w-full text-xs text-slate-500 hover:text-slate-900 dark:hover:text-white">Toggle theme</button>
+    <button class="w-full bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-medium py-2 rounded">Sign in</button>
+    <button id="theme-toggle" type="button" class="w-full text-xs text-muted-foreground hover:text-foreground">Toggle theme</button>
   </form>
 </body>
 </html>

@@ -1,11 +1,11 @@
 {{define "overview_cards"}}
 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
   {{range .Cards}}
-  <div class="bg-white dark:bg-slate-800 rounded shadow-sm border border-slate-200 dark:border-slate-700 p-4">
-    <div class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{{.Label}}</div>
-    <div class="mt-1 text-2xl font-semibold tabular-nums">{{.Value}}{{with .Unit}} <span class="text-sm font-normal text-slate-500">{{.}}</span>{{end}}</div>
-    {{with .Sub}}<div class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{.}}</div>{{end}}
-    {{with .Spark}}<div class="mt-2 h-6 text-brand-500 dark:text-brand-400">{{.}}</div>{{end}}
+  <div class="bg-card text-card-foreground rounded shadow-sm border border-border p-4">
+    <div class="text-xs uppercase tracking-wide text-muted-foreground">{{.Label}}</div>
+    <div class="mt-1 text-2xl font-semibold tabular-nums">{{.Value}}{{with .Unit}} <span class="text-sm font-normal text-muted-foreground">{{.}}</span>{{end}}</div>
+    {{with .Sub}}<div class="mt-1 text-xs text-muted-foreground">{{.}}</div>{{end}}
+    {{with .Spark}}<div class="mt-2 h-6 text-foreground dark:text-foreground">{{.}}</div>{{end}}
   </div>
   {{end}}
 </div>

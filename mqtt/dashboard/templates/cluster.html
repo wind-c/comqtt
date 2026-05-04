@@ -5,16 +5,16 @@
   <div class="flex items-center justify-between">
     <div>
       <h1 class="text-xl font-semibold tracking-tight">Cluster</h1>
-      <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">{{len .Members}} node{{if ne (len .Members) 1}}s{{end}}{{with .Leader}}, leader: <span class="font-mono">{{.}}</span>{{end}}</p>
+      <p class="text-sm text-muted-foreground mt-1">{{len .Members}} node{{if ne (len .Members) 1}}s{{end}}{{with .Leader}}, leader: <span class="font-mono">{{.}}</span>{{end}}</p>
     </div>
   </div>
 
-  {{with .Flash}}<div class="rounded bg-emerald-100 dark:bg-emerald-900 text-emerald-900 dark:text-emerald-100 p-2 text-sm">{{.}}</div>{{end}}
-  {{with .Error}}<div class="rounded bg-rose-100 dark:bg-rose-900 text-rose-900 dark:text-rose-100 p-2 text-sm">{{.}}</div>{{end}}
+  {{with .Flash}}<div class="rounded bg-success/10 text-success border border-success/20 p-2 text-sm">{{.}}</div>{{end}}
+  {{with .Error}}<div class="rounded bg-destructive/10 text-destructive border border-destructive/20 p-2 text-sm">{{.}}</div>{{end}}
 
-  <div class="overflow-x-auto bg-white dark:bg-slate-800 rounded shadow-sm border border-slate-200 dark:border-slate-700">
+  <div class="overflow-x-auto bg-card text-card-foreground rounded shadow-sm border border-border">
     <table class="min-w-full text-sm">
-      <thead class="bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+      <thead class="bg-muted text-muted-foreground uppercase tracking-wide">
         <tr>
           <th class="text-left px-4 py-2 font-medium">Node</th>
           <th class="text-left px-4 py-2 font-medium">Address</th>
@@ -22,28 +22,28 @@
           <th class="text-left px-4 py-2 font-medium">Role</th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
+      <tbody class="divide-y divide-border">
         {{range .Members}}
-        <tr class="hover:bg-slate-50 dark:hover:bg-slate-900">
+        <tr class="hover:bg-muted">
           <td class="px-4 py-2 font-mono">{{.Name}}</td>
-          <td class="px-4 py-2 font-mono text-slate-500">{{.Addr}}</td>
+          <td class="px-4 py-2 font-mono text-muted-foreground">{{.Addr}}</td>
           <td class="px-4 py-2 text-right tabular-nums">{{.Port}}</td>
           <td class="px-4 py-2">
             {{if .IsLeader}}
-              <span class="inline-flex items-center rounded bg-brand-100 dark:bg-brand-700 text-brand-700 dark:text-brand-100 px-2 py-0.5 text-xs">leader</span>
+              <span class="inline-flex items-center rounded bg-accent text-foreground dark:text-primary-foreground px-2 py-0.5 text-xs">leader</span>
             {{else}}
-              <span class="inline-flex items-center rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 px-2 py-0.5 text-xs">follower</span>
+              <span class="inline-flex items-center rounded bg-secondary text-secondary-foreground px-2 py-0.5 text-xs">follower</span>
             {{end}}
           </td>
         </tr>
         {{else}}
-        <tr><td colspan="4" class="px-4 py-8 text-center text-sm text-slate-500">No cluster members.</td></tr>
+        <tr><td colspan="4" class="px-4 py-8 text-center text-sm text-muted-foreground">No cluster members.</td></tr>
         {{end}}
       </tbody>
     </table>
   </div>
 
-  <p class="text-xs text-slate-500 dark:text-slate-400">
+  <p class="text-xs text-muted-foreground">
     Add and Remove peer actions are not yet exposed on the dashboard. Use
     <code class="font-mono">POST /api/v1/cluster/peers</code> directly via curl
     (admin-only).
