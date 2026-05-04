@@ -114,6 +114,7 @@ func Routes(opts Options) (map[string]rest.Handler, error) {
 	}
 	overviewDeps := handlers.OverviewDeps{Server: opts.Server, Renderer: rdr, Cluster: opts.Cluster, Sampler: sampler}
 	clientsDeps := handlers.ClientsDeps{Server: opts.Server, Renderer: rdr, Cluster: opts.Cluster}
+	clientDetailDeps := handlers.ClientDetailDeps{Server: opts.Server, Renderer: rdr, Cluster: opts.Cluster}
 	blacklistDeps := handlers.BlacklistDeps{Server: opts.Server, Renderer: rdr, Cluster: opts.Cluster}
 	toolsDeps := handlers.ToolsDeps{Server: opts.Server, Renderer: rdr, Cluster: opts.Cluster}
 	settingsDeps := handlers.SettingsDeps{Server: opts.Server, Renderer: rdr, Cluster: opts.Cluster}
@@ -147,6 +148,8 @@ func Routes(opts Options) (map[string]rest.Handler, error) {
 		"GET /dashboard/{$}":                       wrap(handlers.OverviewGet(overviewDeps)),
 		"GET /dashboard/fragments/overview-cards":  wrap(handlers.OverviewCards(overviewDeps)),
 		"GET /dashboard/clients":                   wrap(handlers.ClientsList(clientsDeps)),
+		"GET /dashboard/clients/{id}":              wrap(handlers.ClientDetail(clientDetailDeps)),
+		"POST /dashboard/clients/{id}/subscriptions/{topic}/delete": wrapAdmin(handlers.ClientUnsubscribe(clientDetailDeps)),
 		"GET /dashboard/blacklist":                 wrap(handlers.BlacklistGet(blacklistDeps)),
 		"POST /dashboard/blacklist":                wrapAdmin(handlers.BlacklistAdd(blacklistDeps)),
 		"POST /dashboard/blacklist/{id}/delete":    wrapAdmin(handlers.BlacklistRemove(blacklistDeps)),

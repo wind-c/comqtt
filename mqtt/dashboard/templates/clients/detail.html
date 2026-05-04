@@ -1,0 +1,79 @@
+{{define "client_detail"}}{{template "layout" .}}{{end}}
+
+{{define "content"}}
+<div class="space-y-4">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-xl font-semibold tracking-tight font-mono">{{.ClientID}}</h1>
+      <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+        {{if .Online}}<span class="text-emerald-700 dark:text-emerald-300">online</span>{{else}}<span class="text-slate-500">offline</span>{{end}}
+      </p>
+    </div>
+    <a href="/dashboard/clients" class="text-sm text-slate-500 hover:text-slate-900 dark:hover:text-white">&larr; Back to clients</a>
+  </div>
+
+  {{with .Flash}}<div class="rounded bg-emerald-100 dark:bg-emerald-900 text-emerald-900 dark:text-emerald-100 p-2 text-sm">{{.}}</div>{{end}}
+  {{with .Error}}<div class="rounded bg-rose-100 dark:bg-rose-900 text-rose-900 dark:text-rose-100 p-2 text-sm">{{.}}</div>{{end}}
+
+  <div class="border-b border-slate-200 dark:border-slate-700 flex gap-2 text-sm">
+    <a href="?tab=info"   class="px-3 py-2 -mb-px {{if eq .Tab "info"}}border-b-2 border-brand-500 text-brand-700 dark:text-brand-400{{else}}text-slate-500 hover:text-slate-900 dark:hover:text-white{{end}}">Info</a>
+    <a href="?tab=subs"   class="px-3 py-2 -mb-px {{if eq .Tab "subs"}}border-b-2 border-brand-500 text-brand-700 dark:text-brand-400{{else}}text-slate-500 hover:text-slate-900 dark:hover:text-white{{end}}">Subscriptions ({{.SubCount}})</a>
+    <a href="?tab=events" class="px-3 py-2 -mb-px {{if eq .Tab "events"}}border-b-2 border-brand-500 text-brand-700 dark:text-brand-400{{else}}text-slate-500 hover:text-slate-900 dark:hover:text-white{{end}}">Events</a>
+  </div>
+
+  {{if eq .Tab "info"}}
+  <div class="bg-white dark:bg-slate-800 rounded shadow-sm border border-slate-200 dark:border-slate-700 p-4 text-sm">
+    <dl class="grid grid-cols-3 gap-y-2">
+      <dt class="text-slate-500 dark:text-slate-400">Username</dt>
+      <dd class="col-span-2 font-mono">{{.Info.Username}}</dd>
+
+      <dt class="text-slate-500 dark:text-slate-400">Remote</dt>
+      <dd class="col-span-2 font-mono">{{.Info.Remote}}</dd>
+
+      <dt class="text-slate-500 dark:text-slate-400">Listener</dt>
+      <dd class="col-span-2 font-mono">{{.Info.Listener}}</dd>
+
+      <dt class="text-slate-500 dark:text-slate-400">Protocol</dt>
+      <dd class="col-span-2">MQTT v{{.Info.ProtocolVersion}}</dd>
+
+      <dt class="text-slate-500 dark:text-slate-400">Keepalive</dt>
+      <dd class="col-span-2">{{.Info.Keepalive}}s</dd>
+
+      <dt class="text-slate-500 dark:text-slate-400">Inflight</dt>
+      <dd class="col-span-2 tabular-nums">{{.Info.Inflight}}</dd>
+
+      <dt class="text-slate-500 dark:text-slate-400">Clean session</dt>
+      <dd class="col-span-2">{{.Info.Clean}}</dd>
+    </dl>
+  </div>
+  {{end}}
+
+  {{if eq .Tab "subs"}}
+  <div class="bg-white dark:bg-slate-800 rounded shadow-sm border border-slate-200 dark:border-slate-700 divide-y divide-slate-200 dark:divide-slate-700">
+    {{range .Subs}}
+    <div class="flex items-center justify-between px-4 py-2 text-sm">
+      <span class="font-mono">{{.Topic}}</span>
+      <span class="flex items-center gap-3">
+        <span class="text-xs text-slate-500 dark:text-slate-400">QoS {{.QoS}}</span>
+        <form method="POST" action="/dashboard/clients/{{$.ClientID}}/subscriptions/{{.TopicEncoded}}/delete">
+          <input type="hidden" name="_csrf" value="{{$.CSRF}}" />
+          <button {{if $.Readonly}}disabled title="Read-only role"{{end}}
+            class="text-rose-600 hover:underline disabled:text-slate-400 disabled:cursor-not-allowed text-xs">
+            Unsubscribe
+          </button>
+        </form>
+      </span>
+    </div>
+    {{else}}
+    <div class="px-4 py-8 text-center text-sm text-slate-500">No subscriptions.</div>
+    {{end}}
+  </div>
+  {{end}}
+
+  {{if eq .Tab "events"}}
+  <div class="bg-white dark:bg-slate-800 rounded shadow-sm border border-slate-200 dark:border-slate-700 p-4 text-sm text-slate-500 dark:text-slate-400">
+    Live event filtering for a single client is not yet wired up. The Overview events feed shows all events; visit /dashboard/ for now.
+  </div>
+  {{end}}
+</div>
+{{end}}
