@@ -6,11 +6,32 @@
     <h1 class="text-xl font-semibold tracking-tight">Overview</h1>
     <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Broker health at a glance</p>
   </div>
-  <div id="overview-cards"
-       hx-get="/dashboard/fragments/overview-cards"
-       hx-trigger="load, every 2s"
-       hx-swap="innerHTML">
-    {{template "overview_cards" .}}
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="lg:col-span-2 space-y-4">
+      <div id="overview-cards"
+           hx-get="/dashboard/fragments/overview-cards"
+           hx-trigger="load, every 2s"
+           hx-swap="innerHTML">
+        {{template "overview_cards" .}}
+      </div>
+    </div>
+
+    <div class="lg:col-span-1">
+      <div class="bg-white dark:bg-slate-800 rounded shadow-sm border border-slate-200 dark:border-slate-700">
+        <div class="px-4 py-2 border-b border-slate-200 dark:border-slate-700 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          Recent events
+        </div>
+        <div hx-ext="sse" sse-connect="/dashboard/events">
+          <ul id="events-feed"
+              sse-swap="client.connected,client.disconnected,message.published,subscription.added,subscription.removed"
+              hx-swap="afterbegin"
+              class="divide-y divide-slate-200 dark:divide-slate-700 max-h-96 overflow-y-auto">
+            <li class="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">Waiting for events...</li>
+          </ul>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 {{end}}
