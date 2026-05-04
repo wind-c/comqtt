@@ -6,6 +6,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"flag"
 	"fmt"
 	"net/http"
@@ -18,6 +19,7 @@ import (
 	"github.com/wind-c/comqtt/v2/cluster/log"
 	"github.com/wind-c/comqtt/v2/config"
 	"github.com/wind-c/comqtt/v2/mqtt"
+	"github.com/wind-c/comqtt/v2/mqtt/dashboard"
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/auth"
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/storage/badger"
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/storage/bolt"
@@ -135,7 +137,24 @@ func realMain(ctx context.Context) error {
 	onError(server.AddListener(ws), "add websocket listener")
 
 	// add http listener
-	http := listeners.NewHTTP("stats", cfg.Mqtt.HTTP, nil, rest.New(server).GenHandlers())
+	restHandlers := rest.New(server).GenHandlers()
+
+	if cfg.Dashboard.Enabled {
+		dashRoutes, err := dashboard.Routes(dashboard.Options{
+			Server:             server,
+			Cluster:            false,
+			Secret:             dashboardSecretFromConfig(cfg),
+			PasswordExpiryDays: cfg.Dashboard.PasswordExpiryDays,
+		})
+		if err != nil {
+			return fmt.Errorf("dashboard routes: %w", err)
+		}
+		for path, h := range dashRoutes {
+			restHandlers[path] = h
+		}
+	}
+
+	http := listeners.NewHTTP("stats", cfg.Mqtt.HTTP, nil, restHandlers)
 	onError(server.AddListener(http), "add http listener")
 
 	errCh := make(chan error, 1)
@@ -232,4 +251,15 @@ func onError(err error, msg string) {
 		log.Error(msg, "error", err)
 		os.Exit(1)
 	}
+}
+
+func dashboardSecretFromConfig(cfg *config.Config) []byte {
+	if cfg.Dashboard.SessionSecret != "" {
+		// Try base64 first, fall back to raw bytes.
+		if b, err := base64.StdEncoding.DecodeString(cfg.Dashboard.SessionSecret); err == nil && len(b) >= 16 {
+			return b
+		}
+		return []byte(cfg.Dashboard.SessionSecret)
+	}
+	return nil
 }
