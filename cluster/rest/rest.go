@@ -23,16 +23,24 @@ func New(agent *cs.Agent) *rest {
 
 func (s *rest) GenHandlers() map[string]rt.Handler {
 	return map[string]rt.Handler{
-		"GET /api/v1/node/config":               s.viewConfig,
-		"DELETE /api/v1/node/{name}":            s.leave,
-		"GET /api/v1/cluster/nodes":             s.getNodes,
-		"POST /api/v1/cluster/nodes":            s.join,
-		"POST /api/v1/cluster/peers":            s.addRaftPeer,
-		"DELETE /api/v1/cluster/peers/{name}":   s.removeRaftPeer,
-		"GET /api/v1/cluster/stat/online":       s.getOnlineCount,
-		"GET /api/v1/cluster/clients/{id}":      s.getClient,
-		"POST /api/v1/cluster/blacklist/{id}":   s.kickClient,
-		"DELETE /api/v1/cluster/blacklist/{id}": s.blanchClient,
+		"GET /api/v1/node/config":                                   s.viewConfig,
+		"DELETE /api/v1/node/{name}":                                s.leave,
+		"GET /api/v1/cluster/nodes":                                 s.getNodes,
+		"POST /api/v1/cluster/nodes":                                s.join,
+		"POST /api/v1/cluster/peers":                                s.addRaftPeer,
+		"DELETE /api/v1/cluster/peers/{name}":                       s.removeRaftPeer,
+		"GET /api/v1/cluster/stat/online":                           s.getOnlineCount,
+		"GET /api/v1/cluster/clients/{id}":                          s.getClient,
+		"POST /api/v1/cluster/blacklist/{id}":                       s.kickClient,
+		"DELETE /api/v1/cluster/blacklist/{id}":                     s.blanchClient,
+		"GET /api/v1/cluster/clients":                               s.listClients,
+		"GET /api/v1/cluster/subscriptions":                         s.listSubscriptions,
+		"GET /api/v1/cluster/topics":                                s.topicsTree,
+		"DELETE /api/v1/cluster/clients/{id}/subscriptions/{topic}": s.unsubscribeClient,
+		"GET /api/v1/cluster/retained":                              s.listRetained,
+		"DELETE /api/v1/cluster/retained/{topic}":                   s.clearRetained,
+		"GET /api/v1/cluster/sessions":                              s.listSessions,
+		"DELETE /api/v1/cluster/sessions/{id}":                      s.clearSession,
 	}
 }
 
@@ -162,6 +170,94 @@ func (s *rest) kickClient(w http.ResponseWriter, r *http.Request) {
 func (s *rest) blanchClient(w http.ResponseWriter, r *http.Request) {
 	cid := r.PathValue("id")
 	path := strings.Replace(rt.MqttDelBlacklistPath, "{id}", cid, 1)
+	urls := genUrls(s.agent.GetMemberList(), path)
+	rs := fetchM(HttpDelete, urls, nil)
+	rt.Ok(w, rs)
+}
+
+// listClients fan out client listing to every node in the cluster
+// GET api/v1/cluster/clients
+func (s *rest) listClients(w http.ResponseWriter, r *http.Request) {
+	path := rt.MqttListClientsPath
+	if r.URL.RawQuery != "" {
+		path += "?" + r.URL.RawQuery
+	}
+	urls := genUrls(s.agent.GetMemberList(), path)
+	rs := fetchM(HttpGet, urls, nil)
+	rt.Ok(w, rs)
+}
+
+// listSubscriptions fan out subscription listing to every node in the cluster
+// GET api/v1/cluster/subscriptions
+func (s *rest) listSubscriptions(w http.ResponseWriter, r *http.Request) {
+	path := rt.MqttListSubscriptionsPath
+	if r.URL.RawQuery != "" {
+		path += "?" + r.URL.RawQuery
+	}
+	urls := genUrls(s.agent.GetMemberList(), path)
+	rs := fetchM(HttpGet, urls, nil)
+	rt.Ok(w, rs)
+}
+
+// topicsTree fan out topic tree retrieval to every node in the cluster
+// GET api/v1/cluster/topics
+func (s *rest) topicsTree(w http.ResponseWriter, r *http.Request) {
+	urls := genUrls(s.agent.GetMemberList(), rt.MqttTopicsTreePath)
+	rs := fetchM(HttpGet, urls, nil)
+	rt.Ok(w, rs)
+}
+
+// unsubscribeClient fan out unsubscribe to every node in the cluster
+// DELETE api/v1/cluster/clients/{id}/subscriptions/{topic}
+func (s *rest) unsubscribeClient(w http.ResponseWriter, r *http.Request) {
+	cid := r.PathValue("id")
+	topic := r.PathValue("topic")
+	path := strings.Replace(rt.MqttUnsubscribeClientPath, "{id}", cid, 1)
+	path = strings.Replace(path, "{topic}", topic, 1)
+	urls := genUrls(s.agent.GetMemberList(), path)
+	rs := fetchM(HttpDelete, urls, nil)
+	rt.Ok(w, rs)
+}
+
+// listRetained fan out retained message listing to every node in the cluster
+// GET api/v1/cluster/retained
+func (s *rest) listRetained(w http.ResponseWriter, r *http.Request) {
+	path := rt.MqttListRetainedPath
+	if r.URL.RawQuery != "" {
+		path += "?" + r.URL.RawQuery
+	}
+	urls := genUrls(s.agent.GetMemberList(), path)
+	rs := fetchM(HttpGet, urls, nil)
+	rt.Ok(w, rs)
+}
+
+// clearRetained fan out retained clear to every node in the cluster
+// DELETE api/v1/cluster/retained/{topic}
+func (s *rest) clearRetained(w http.ResponseWriter, r *http.Request) {
+	topic := r.PathValue("topic")
+	path := strings.Replace(rt.MqttClearRetainedPath, "{topic}", topic, 1)
+	urls := genUrls(s.agent.GetMemberList(), path)
+	rs := fetchM(HttpDelete, urls, nil)
+	rt.Ok(w, rs)
+}
+
+// listSessions fan out session listing to every node in the cluster
+// GET api/v1/cluster/sessions
+func (s *rest) listSessions(w http.ResponseWriter, r *http.Request) {
+	path := rt.MqttListSessionsPath
+	if r.URL.RawQuery != "" {
+		path += "?" + r.URL.RawQuery
+	}
+	urls := genUrls(s.agent.GetMemberList(), path)
+	rs := fetchM(HttpGet, urls, nil)
+	rt.Ok(w, rs)
+}
+
+// clearSession fan out session clear to every node in the cluster
+// DELETE api/v1/cluster/sessions/{id}
+func (s *rest) clearSession(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	path := strings.Replace(rt.MqttClearSessionPath, "{id}", id, 1)
 	urls := genUrls(s.agent.GetMemberList(), path)
 	rs := fetchM(HttpDelete, urls, nil)
 	rt.Ok(w, rs)
