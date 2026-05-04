@@ -12,7 +12,7 @@ import (
 )
 
 func TestRoutesRequiresServer(t *testing.T) {
-	if _, err := Routes(Options{}); err == nil {
+	if _, _, err := Routes(Options{}); err == nil {
 		t.Fatal("expected error for missing Server")
 	}
 }
@@ -20,7 +20,7 @@ func TestRoutesRequiresServer(t *testing.T) {
 func TestRoutesIncludesExpectedKeys(t *testing.T) {
 	server := mqtt.New(nil)
 	dir := t.TempDir()
-	rs, err := Routes(Options{
+	rs, cleanup, err := Routes(Options{
 		Server:        server,
 		CredStorePath: filepath.Join(dir, "users.json"),
 		SecretPath:    filepath.Join(dir, "secret"),
@@ -28,6 +28,7 @@ func TestRoutesIncludesExpectedKeys(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Routes: %v", err)
 	}
+	defer cleanup()
 	for _, want := range []string{
 		"GET /{$}",
 		"GET /dashboard/login",
@@ -48,11 +49,12 @@ func TestRoutesIncludesExpectedKeys(t *testing.T) {
 func TestRoutesRedirectFromRoot(t *testing.T) {
 	server := mqtt.New(nil)
 	dir := t.TempDir()
-	rs, _ := Routes(Options{
+	rs, cleanup, _ := Routes(Options{
 		Server:        server,
 		CredStorePath: filepath.Join(dir, "users.json"),
 		SecretPath:    filepath.Join(dir, "secret"),
 	})
+	defer cleanup()
 	mux := http.NewServeMux()
 	for path, handler := range rs {
 		mux.HandleFunc(path, handler)
@@ -70,11 +72,12 @@ func TestRoutesRedirectFromRoot(t *testing.T) {
 func TestRoutesAnonRedirectsToLogin(t *testing.T) {
 	server := mqtt.New(nil)
 	dir := t.TempDir()
-	rs, _ := Routes(Options{
+	rs, cleanup, _ := Routes(Options{
 		Server:        server,
 		CredStorePath: filepath.Join(dir, "users.json"),
 		SecretPath:    filepath.Join(dir, "secret"),
 	})
+	defer cleanup()
 	mux := http.NewServeMux()
 	for path, handler := range rs {
 		mux.HandleFunc(path, handler)
@@ -93,11 +96,12 @@ func TestRoutesAnonRedirectsToLogin(t *testing.T) {
 func TestRoutesStaticServesAsset(t *testing.T) {
 	server := mqtt.New(nil)
 	dir := t.TempDir()
-	rs, _ := Routes(Options{
+	rs, cleanup, _ := Routes(Options{
 		Server:        server,
 		CredStorePath: filepath.Join(dir, "users.json"),
 		SecretPath:    filepath.Join(dir, "secret"),
 	})
+	defer cleanup()
 	mux := http.NewServeMux()
 	for path, handler := range rs {
 		mux.HandleFunc(path, handler)

@@ -138,8 +138,9 @@ func realMain(ctx context.Context) error {
 	// add http listener
 	restHandlers := rest.New(server).GenHandlers()
 
+	dashCleanup := func() {}
 	if cfg.Dashboard.Enabled {
-		dashRoutes, err := dashboard.Routes(dashboard.Options{
+		dashRoutes, cleanup, err := dashboard.Routes(dashboard.Options{
 			Server:             server,
 			Cluster:            false,
 			Secret:             cfg.Dashboard.DecodeSecret(),
@@ -148,6 +149,7 @@ func realMain(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("dashboard routes: %w", err)
 		}
+		dashCleanup = cleanup
 		for path, h := range dashRoutes {
 			restHandlers[path] = h
 		}
@@ -173,6 +175,7 @@ func realMain(ctx context.Context) error {
 	case <-ctx.Done():
 		log.Warn("caught signal, stopping...")
 	}
+	dashCleanup()
 	server.Close()
 	log.Info("main.go finished")
 	return nil

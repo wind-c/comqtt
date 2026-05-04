@@ -146,13 +146,14 @@ func realMain(ctx context.Context) error {
 	mqHls := mqttRt.New(server).GenHandlers()
 	maps.Copy(csHls, mqHls)
 
+	dashCleanup := func() {}
 	if cfg.Dashboard.Enabled {
 		dashRedis := redis.NewClient(&redis.Options{
 			Addr:     cfg.Redis.Options.Addr,
 			Password: cfg.Redis.Options.Password,
 			DB:       cfg.Redis.Options.DB,
 		})
-		dashRoutes, err := dashboard.Routes(dashboard.Options{
+		dashRoutes, cleanup, err := dashboard.Routes(dashboard.Options{
 			Server:             server,
 			Cluster:            true,
 			ClusterAgent:       agent,
@@ -163,6 +164,7 @@ func realMain(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("dashboard routes: %w", err)
 		}
+		dashCleanup = cleanup
 		maps.Copy(csHls, dashRoutes)
 	}
 
@@ -187,6 +189,7 @@ func realMain(ctx context.Context) error {
 	case <-ctx.Done():
 		server.Log.Warn("caught signal, stopping...")
 	}
+	dashCleanup()
 	agent.Stop()
 	server.Close()
 	return nil

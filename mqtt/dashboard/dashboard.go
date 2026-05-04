@@ -74,12 +74,16 @@ type Options struct {
 // Routes are returned as map[string]rest.Handler keyed on the Go 1.22+
 // pattern syntax "METHOD /path/{params}". The static asset path uses the
 // {path...} catch-all.
-func Routes(opts Options) (map[string]rest.Handler, error) {
+//
+// The returned cleanup func stops background goroutines (rate sampler, and
+// the redis pub/sub bridge in cluster mode). Callers must invoke it on
+// shutdown to avoid leaking goroutines.
+func Routes(opts Options) (map[string]rest.Handler, func(), error) {
 	if opts.Server == nil {
-		return nil, errors.New("dashboard: Options.Server is required")
+		return nil, nil, errors.New("dashboard: Options.Server is required")
 	}
 	if err := opts.applyDefaults(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var store auth.CredStore = opts.Store
@@ -88,7 +92,7 @@ func Routes(opts Options) (map[string]rest.Handler, error) {
 			rs := auth.NewRedisStore(opts.Redis, "comqtt:dashboard")
 			pw, err := rs.Seed(context.Background(), "admin")
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			if pw != "" {
 				println("[dashboard] seeded admin password:", pw, "(rotate via /dashboard/account/password)")
@@ -97,11 +101,11 @@ func Routes(opts Options) (map[string]rest.Handler, error) {
 		} else {
 			fs, err := auth.NewFileStore(opts.CredStorePath)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			pw, err := fs.Seed(context.Background(), "admin")
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			if pw != "" {
 				// Printed exactly once: first boot. Operators must rotate.
@@ -121,12 +125,13 @@ func Routes(opts Options) (map[string]rest.Handler, error) {
 	// Register the broker hook so connect/publish/disconnect events reach
 	// the hub. The hook id is unique per dashboard instance.
 	if err := opts.Server.AddHook(&sse.HubHook{Hub: hub, Node: hostname()}, nil); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
+	var bridge *sse.Bridge
 	if opts.Redis != nil {
-		br := sse.NewBridge(opts.Redis, hub, hostname())
-		br.Start(context.Background())
+		bridge = sse.NewBridge(opts.Redis, hub, hostname())
+		bridge.Start(context.Background())
 	}
 
 	rdr := handlers.NewRenderer(assetsFS)
@@ -213,7 +218,14 @@ func Routes(opts Options) (map[string]rest.Handler, error) {
 		}))
 	}
 
-	return routes, nil
+	cleanup := func() {
+		sampler.Stop()
+		if bridge != nil {
+			bridge.Stop()
+		}
+	}
+
+	return routes, cleanup, nil
 }
 
 func rootRedirect(w http.ResponseWriter, r *http.Request) {
