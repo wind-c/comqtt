@@ -14,6 +14,7 @@ const (
 	MqttGetOverallPath     = "/api/v1/mqtt/stat/overall"
 	MqttGetOnlinePath      = "/api/v1/mqtt/stat/online"
 	MqttGetClientPath      = "/api/v1/mqtt/clients/{id}"
+	MqttListClientsPath    = "/api/v1/mqtt/clients"
 	MqttGetBlacklistPath   = "/api/v1/mqtt/blacklist"
 	MqttAddBlacklistPath   = "/api/v1/mqtt/blacklist/{id}"
 	MqttDelBlacklistPath   = "/api/v1/mqtt/blacklist/{id}"
@@ -40,6 +41,7 @@ func (s *Rest) GenHandlers() map[string]Handler {
 		"GET " + MqttGetOverallPath:      s.getOverallInfo,
 		"GET " + MqttGetOnlinePath:       s.getOnlineCount,
 		"GET " + MqttGetClientPath:       s.getClient,
+		"GET " + MqttListClientsPath:     s.listClients,
 		"GET " + MqttGetBlacklistPath:    s.blacklist,
 		"POST " + MqttAddBlacklistPath:   s.kickClient,
 		"DELETE " + MqttDelBlacklistPath: s.blanchClient,
