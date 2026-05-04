@@ -1,0 +1,62 @@
+{{define "clients_list"}}{{template "layout" .}}{{end}}
+
+{{define "content"}}
+<div class="space-y-4">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-xl font-semibold tracking-tight">Clients</h1>
+      <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">{{.Page.Total}} client{{if ne .Page.Total 1}}s{{end}} connected</p>
+    </div>
+    <form method="GET" action="/dashboard/clients" class="flex items-center gap-2">
+      <input name="q" value="{{.Q}}" placeholder="Filter by client ID prefix"
+        class="px-3 py-2 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm w-64 focus:outline-none focus:border-brand-500" />
+      <button class="px-3 py-2 rounded bg-brand-600 hover:bg-brand-700 text-white text-sm">Search</button>
+    </form>
+  </div>
+
+  <div class="overflow-x-auto bg-white dark:bg-slate-800 rounded shadow-sm border border-slate-200 dark:border-slate-700">
+    <table class="min-w-full text-sm">
+      <thead class="bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+        <tr>
+          <th class="text-left px-4 py-2 font-medium">Client ID</th>
+          <th class="text-left px-4 py-2 font-medium">Username</th>
+          <th class="text-left px-4 py-2 font-medium">Remote</th>
+          <th class="text-right px-4 py-2 font-medium">Subs</th>
+          <th class="text-right px-4 py-2 font-medium">Pending</th>
+          <th class="text-right px-4 py-2 font-medium">Keepalive</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
+        {{range .Page.Items}}
+        <tr class="hover:bg-slate-50 dark:hover:bg-slate-900">
+          <td class="px-4 py-2 font-mono">
+            <a href="/dashboard/clients/{{.ClientID}}" class="text-brand-600 hover:underline">{{.ClientID}}</a>
+          </td>
+          <td class="px-4 py-2">{{.Username}}</td>
+          <td class="px-4 py-2 text-slate-500">{{.Remote}}</td>
+          <td class="px-4 py-2 text-right tabular-nums">{{.Subs}}</td>
+          <td class="px-4 py-2 text-right tabular-nums">{{.Pending}}</td>
+          <td class="px-4 py-2 text-right tabular-nums">{{.Keepalive}}s</td>
+        </tr>
+        {{else}}
+        <tr><td colspan="6" class="px-4 py-8 text-center text-slate-500">No clients connected.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+
+  {{if gt .TotalPages 1}}
+  <div class="flex items-center justify-between text-sm">
+    <div class="text-slate-500 dark:text-slate-400">Page {{.Page.Page}} of {{.TotalPages}}</div>
+    <div class="space-x-2">
+      {{if gt .Page.Page 1}}
+      <a href="?{{.PrevQuery}}" class="px-3 py-1 rounded border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700">Prev</a>
+      {{end}}
+      {{if lt .Page.Page .TotalPages}}
+      <a href="?{{.NextQuery}}" class="px-3 py-1 rounded border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700">Next</a>
+      {{end}}
+    </div>
+  </div>
+  {{end}}
+</div>
+{{end}}
