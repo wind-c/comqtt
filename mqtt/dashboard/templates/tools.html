@@ -1,0 +1,54 @@
+{{define "tools"}}{{template "layout" .}}{{end}}
+
+{{define "content"}}
+<div class="space-y-4 max-w-2xl">
+  <div>
+    <h1 class="text-xl font-semibold tracking-tight">Tools</h1>
+    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Publish an MQTT message from the dashboard.</p>
+  </div>
+
+  {{with .Flash}}
+  <div class="rounded bg-emerald-100 dark:bg-emerald-900 text-emerald-900 dark:text-emerald-100 p-2 text-sm">{{.}}</div>
+  {{end}}
+  {{with .Error}}
+  <div class="rounded bg-rose-100 dark:bg-rose-900 text-rose-900 dark:text-rose-100 p-2 text-sm">{{.}}</div>
+  {{end}}
+
+  <form method="POST" action="/dashboard/tools/publish" class="bg-white dark:bg-slate-800 rounded shadow-sm border border-slate-200 dark:border-slate-700 p-4 space-y-3">
+    <input type="hidden" name="_csrf" value="{{.CSRF}}" />
+    <label class="block">
+      <span class="text-xs text-slate-500 dark:text-slate-400">Topic</span>
+      <input name="topic" required value="{{.Form.Topic}}"
+        class="mt-1 w-full px-3 py-2 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm focus:outline-none focus:border-brand-500" />
+    </label>
+    <label class="block">
+      <span class="text-xs text-slate-500 dark:text-slate-400">Payload</span>
+      <textarea name="payload" rows="6"
+        class="mt-1 w-full px-3 py-2 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm font-mono focus:outline-none focus:border-brand-500">{{.Form.Payload}}</textarea>
+    </label>
+    <div class="flex items-center gap-4">
+      <label class="block">
+        <span class="text-xs text-slate-500 dark:text-slate-400">QoS</span>
+        <select name="qos" class="mt-1 px-3 py-2 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm">
+          <option value="0" {{if eq .Form.QoS 0}}selected{{end}}>0 - At most once</option>
+          <option value="1" {{if eq .Form.QoS 1}}selected{{end}}>1 - At least once</option>
+          <option value="2" {{if eq .Form.QoS 2}}selected{{end}}>2 - Exactly once</option>
+        </select>
+      </label>
+      <label class="block">
+        <span class="text-xs text-slate-500 dark:text-slate-400 invisible">Retain</span>
+        <span class="mt-1 inline-flex items-center gap-2 px-3 py-2 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm">
+          <input type="checkbox" name="retain" value="1" {{if .Form.Retain}}checked{{end}} />
+          Retain
+        </span>
+      </label>
+    </div>
+    <div>
+      <button {{if .Readonly}}disabled title="Read-only role"{{end}}
+        class="px-4 py-2 rounded bg-brand-600 hover:bg-brand-700 disabled:bg-slate-300 disabled:dark:bg-slate-600 disabled:cursor-not-allowed text-white text-sm font-medium">
+        Publish
+      </button>
+    </div>
+  </form>
+</div>
+{{end}}
