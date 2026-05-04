@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
+	redis "github.com/redis/go-redis/v9"
 	"github.com/wind-c/comqtt/v2/mqtt"
 	"github.com/wind-c/comqtt/v2/mqtt/dashboard/auth"
 	"github.com/wind-c/comqtt/v2/mqtt/dashboard/handlers"
@@ -59,6 +60,11 @@ type Options struct {
 
 	// SessionTTL. Default: 12h.
 	SessionTTL time.Duration
+
+	// Redis is the cluster-mode redis client. When set, the cred store and
+	// HMAC secret are read from redis (not the file paths), and a pub/sub
+	// bridge fans events between cluster nodes. nil in single-mode.
+	Redis *redis.Client
 }
 
 // Routes returns the full set of HTTP routes for the dashboard, ready to be
@@ -76,21 +82,33 @@ func Routes(opts Options) (map[string]rest.Handler, error) {
 		return nil, err
 	}
 
-	store := opts.Store
+	var store auth.CredStore = opts.Store
 	if store == nil {
-		fs, err := auth.NewFileStore(opts.CredStorePath)
-		if err != nil {
-			return nil, err
+		if opts.Redis != nil {
+			rs := auth.NewRedisStore(opts.Redis, "comqtt:dashboard")
+			pw, err := rs.Seed(context.Background(), "admin")
+			if err != nil {
+				return nil, err
+			}
+			if pw != "" {
+				println("[dashboard] seeded admin password:", pw, "(rotate via /dashboard/account/password)")
+			}
+			store = rs
+		} else {
+			fs, err := auth.NewFileStore(opts.CredStorePath)
+			if err != nil {
+				return nil, err
+			}
+			pw, err := fs.Seed(context.Background(), "admin")
+			if err != nil {
+				return nil, err
+			}
+			if pw != "" {
+				// Printed exactly once: first boot. Operators must rotate.
+				println("[dashboard] seeded admin password:", pw, "(rotate via /dashboard/account/password)")
+			}
+			store = fs
 		}
-		pw, err := fs.Seed(context.Background(), "admin")
-		if err != nil {
-			return nil, err
-		}
-		if pw != "" {
-			// Printed exactly once: first boot. Operators must rotate.
-			println("[dashboard] seeded admin password:", pw, "(rotate via /dashboard/account/password)")
-		}
-		store = fs
 	}
 
 	lockout := auth.NewLockout(auth.LockoutConfig{
@@ -104,6 +122,11 @@ func Routes(opts Options) (map[string]rest.Handler, error) {
 	// the hub. The hook id is unique per dashboard instance.
 	if err := opts.Server.AddHook(&sse.HubHook{Hub: hub, Node: hostname()}, nil); err != nil {
 		return nil, err
+	}
+
+	if opts.Redis != nil {
+		br := sse.NewBridge(opts.Redis, hub, hostname())
+		br.Start(context.Background())
 	}
 
 	rdr := handlers.NewRenderer(assetsFS)
@@ -227,6 +250,14 @@ func (o *Options) applyDefaults() error {
 		o.SessionTTL = 12 * time.Hour
 	}
 	if o.Secret == nil {
+		// In cluster mode, prefer the redis-backed secret so all nodes
+		// share the same HMAC key. Fall through to env/file on error.
+		if o.Redis != nil {
+			if b, err := auth.EnsureSecret(context.Background(), o.Redis, "comqtt:dashboard:secret"); err == nil && len(b) >= 16 {
+				o.Secret = b
+				return nil
+			}
+		}
 		// Try env first.
 		if env := os.Getenv("COMQTT_DASHBOARD_SESSION_SECRET"); env != "" {
 			b, err := base64.StdEncoding.DecodeString(env)

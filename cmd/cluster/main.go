@@ -147,10 +147,16 @@ func realMain(ctx context.Context) error {
 	maps.Copy(csHls, mqHls)
 
 	if cfg.Dashboard.Enabled {
+		dashRedis := redis.NewClient(&redis.Options{
+			Addr:     cfg.Redis.Options.Addr,
+			Password: cfg.Redis.Options.Password,
+			DB:       cfg.Redis.Options.DB,
+		})
 		dashRoutes, err := dashboard.Routes(dashboard.Options{
 			Server:             server,
 			Cluster:            true,
 			ClusterAgent:       agent,
+			Redis:              dashRedis,
 			Secret:             cfg.Dashboard.DecodeSecret(),
 			PasswordExpiryDays: cfg.Dashboard.PasswordExpiryDays,
 		})
