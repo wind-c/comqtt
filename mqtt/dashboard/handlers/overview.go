@@ -2,6 +2,7 @@
 package handlers
 
 import (
+	"html/template"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -40,6 +41,7 @@ type card struct {
 	Value string
 	Unit  string
 	Sub   string
+	Spark template.HTML
 }
 
 // OverviewGet renders the overview shell. The cards inside are rendered
@@ -68,16 +70,18 @@ func OverviewCards(d OverviewDeps) http.HandlerFunc {
 func buildCards(d OverviewDeps) []card {
 	info := d.Server.Info
 	in, out := 0.0, 0.0
+	var connHist, subsHist, retHist, inHist, outHist []float64
 	if d.Sampler != nil {
 		in, out = d.Sampler.Rates()
+		connHist, subsHist, retHist, inHist, outHist = d.Sampler.History()
 	}
 	return []card{
-		{Label: "Connections", Value: itoa(atomic.LoadInt64(&info.ClientsConnected))},
-		{Label: "Subscriptions", Value: itoa(atomic.LoadInt64(&info.Subscriptions))},
-		{Label: "Retained", Value: itoa(atomic.LoadInt64(&info.Retained))},
+		{Label: "Connections", Value: itoa(atomic.LoadInt64(&info.ClientsConnected)), Spark: Sparkline(connHist)},
+		{Label: "Subscriptions", Value: itoa(atomic.LoadInt64(&info.Subscriptions)), Spark: Sparkline(subsHist)},
+		{Label: "Retained", Value: itoa(atomic.LoadInt64(&info.Retained)), Spark: Sparkline(retHist)},
 		{Label: "Inflight", Value: itoa(atomic.LoadInt64(&info.Inflight))},
-		{Label: "Msg In/sec", Value: ftoa(in), Unit: "msg/s"},
-		{Label: "Msg Out/sec", Value: ftoa(out), Unit: "msg/s"},
+		{Label: "Msg In/sec", Value: ftoa(in), Unit: "msg/s", Spark: Sparkline(inHist)},
+		{Label: "Msg Out/sec", Value: ftoa(out), Unit: "msg/s", Spark: Sparkline(outHist)},
 	}
 }
 
@@ -86,16 +90,34 @@ func buildCards(d OverviewDeps) []card {
 // rate. Exposes Rates() for read access. Stop() cleanly shuts down the
 // background goroutine.
 type RateSampler struct {
-	server  *mqtt.Server
-	mu      sync.RWMutex
+	server *mqtt.Server
+	mu     sync.RWMutex
+
 	in, out float64
 	lastIn  int64
 	lastOut int64
-	stop    chan struct{}
+
+	histLen  int
+	connHist []int64
+	subsHist []int64
+	retHist  []int64
+	inHist   []float64
+	outHist  []float64
+
+	stop chan struct{}
 }
 
 func NewRateSampler(server *mqtt.Server) *RateSampler {
-	s := &RateSampler{server: server, stop: make(chan struct{})}
+	s := &RateSampler{
+		server:   server,
+		stop:     make(chan struct{}),
+		histLen:  60,
+		connHist: make([]int64, 0, 60),
+		subsHist: make([]int64, 0, 60),
+		retHist:  make([]int64, 0, 60),
+		inHist:   make([]float64, 0, 60),
+		outHist:  make([]float64, 0, 60),
+	}
 	go s.run()
 	return s
 }
@@ -111,6 +133,10 @@ func (s *RateSampler) run() {
 			info := s.server.Info
 			ci := atomic.LoadInt64(&info.MessagesReceived)
 			co := atomic.LoadInt64(&info.MessagesSent)
+			conn := atomic.LoadInt64(&info.ClientsConnected)
+			subs := atomic.LoadInt64(&info.Subscriptions)
+			ret := atomic.LoadInt64(&info.Retained)
+
 			s.mu.Lock()
 			if s.lastIn != 0 || s.lastOut != 0 {
 				s.in = float64(ci - s.lastIn)
@@ -118,6 +144,11 @@ func (s *RateSampler) run() {
 			}
 			s.lastIn = ci
 			s.lastOut = co
+			s.connHist = pushInt64(s.connHist, conn, s.histLen)
+			s.subsHist = pushInt64(s.subsHist, subs, s.histLen)
+			s.retHist = pushInt64(s.retHist, ret, s.histLen)
+			s.inHist = pushFloat64(s.inHist, s.in, s.histLen)
+			s.outHist = pushFloat64(s.outHist, s.out, s.histLen)
 			s.mu.Unlock()
 		}
 	}
@@ -129,7 +160,44 @@ func (s *RateSampler) Rates() (in, out float64) {
 	return s.in, s.out
 }
 
+// History returns a snapshot of the per-metric ring buffers. Returned slices
+// are copies so callers can mutate freely.
+func (s *RateSampler) History() (conn, subs, ret, in, out []float64) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return int64ToFloat(s.connHist), int64ToFloat(s.subsHist), int64ToFloat(s.retHist),
+		copyFloat(s.inHist), copyFloat(s.outHist)
+}
+
 func (s *RateSampler) Stop() { close(s.stop) }
+
+func pushInt64(buf []int64, v int64, max int) []int64 {
+	if len(buf) >= max {
+		buf = buf[1:]
+	}
+	return append(buf, v)
+}
+
+func pushFloat64(buf []float64, v float64, max int) []float64 {
+	if len(buf) >= max {
+		buf = buf[1:]
+	}
+	return append(buf, v)
+}
+
+func int64ToFloat(in []int64) []float64 {
+	out := make([]float64, len(in))
+	for i, v := range in {
+		out[i] = float64(v)
+	}
+	return out
+}
+
+func copyFloat(in []float64) []float64 {
+	out := make([]float64, len(in))
+	copy(out, in)
+	return out
+}
 
 func itoa(v int64) string {
 	return formatInt(v)

@@ -2,6 +2,7 @@
 module.exports = {
   darkMode: 'class',
   content: ['./mqtt/dashboard/templates/**/*.html'],
+  safelist: ['sparkline'],
   theme: {
     extend: {
       colors: {
