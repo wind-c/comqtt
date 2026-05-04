@@ -2,9 +2,22 @@
 
 {{define "content"}}
 <div class="space-y-6">
-  <div>
-    <h1 class="text-xl font-semibold tracking-tight">Overview</h1>
-    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Broker health at a glance</p>
+  <div class="flex items-end justify-between">
+    <div>
+      <h1 class="text-xl font-semibold tracking-tight">Overview</h1>
+      <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Broker health at a glance</p>
+    </div>
+    <div class="text-right text-xs text-slate-500 dark:text-slate-400 space-y-0.5">
+      <div>
+        Mode:
+        {{if eq .NodeInfo.Mode "Cluster"}}
+          <span class="inline-flex items-center rounded bg-brand-100 dark:bg-brand-700 text-brand-700 dark:text-brand-100 px-2 py-0.5 font-medium">{{.NodeInfo.Mode}}</span>
+        {{else}}
+          <span class="inline-flex items-center rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 px-2 py-0.5 font-medium">{{.NodeInfo.Mode}}</span>
+        {{end}}
+      </div>
+      <div>This node: <span class="font-mono text-slate-700 dark:text-slate-200">{{.NodeInfo.Self}}</span></div>
+    </div>
   </div>
 
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -14,6 +27,35 @@
            hx-trigger="load, every 2s"
            hx-swap="innerHTML">
         {{template "overview_cards" .}}
+      </div>
+
+      <div class="bg-white dark:bg-slate-800 rounded shadow-sm border border-slate-200 dark:border-slate-700">
+        <div class="px-4 py-2 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+          <span class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Cluster nodes</span>
+          <span class="text-xs text-slate-500 dark:text-slate-400 tabular-nums">
+            {{.NodeInfo.Total}} node{{if ne .NodeInfo.Total 1}}s{{end}}{{with .NodeInfo.Leader}}, leader: <span class="font-mono">{{.}}</span>{{end}}
+          </span>
+        </div>
+        <ul class="divide-y divide-slate-200 dark:divide-slate-700">
+          {{range .NodeInfo.Members}}
+          <li class="px-4 py-2 text-sm flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="font-mono">{{.Name}}</span>
+              {{if .IsSelf}}<span class="text-xs text-slate-400">(this node)</span>{{end}}
+              {{with .Addr}}<span class="text-xs text-slate-500 dark:text-slate-400 font-mono">{{.}}</span>{{end}}
+            </div>
+            <div class="flex items-center gap-2">
+              {{if .IsLeader}}
+                <span class="inline-flex items-center rounded bg-brand-100 dark:bg-brand-700 text-brand-700 dark:text-brand-100 px-2 py-0.5 text-xs">leader</span>
+              {{else if eq $.NodeInfo.Mode "Cluster"}}
+                <span class="inline-flex items-center rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 px-2 py-0.5 text-xs">follower</span>
+              {{else}}
+                <span class="inline-flex items-center rounded bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-100 px-2 py-0.5 text-xs">running</span>
+              {{end}}
+            </div>
+          </li>
+          {{end}}
+        </ul>
       </div>
     </div>
 

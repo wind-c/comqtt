@@ -9,11 +9,28 @@
   <script src="/dashboard/static/htmx.min.js" defer></script>
   <script src="/dashboard/static/htmx-sse.js" defer></script>
   <script src="/dashboard/static/theme.js" defer></script>
+  <script src="/dashboard/static/nav.js" defer></script>
 </head>
 <body class="h-full bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100">
-  <div class="flex h-full">
+  <div class="flex h-full lg:flex-row flex-col">
+    <header class="lg:hidden flex items-center justify-between bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 py-2">
+      <button id="nav-toggle" type="button" aria-label="Toggle navigation"
+        class="p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700">
+        <svg viewBox="0 0 20 20" class="w-5 h-5" fill="currentColor" aria-hidden="true">
+          <path d="M3 5h14v2H3V5zm0 4h14v2H3V9zm0 4h14v2H3v-2z"/>
+        </svg>
+      </button>
+      <div class="text-sm font-semibold tracking-tight">
+        <span class="text-brand-600 dark:text-brand-500">com</span>qtt
+        <span class="text-slate-400 ml-1">/ {{.Title}}</span>
+      </div>
+      <div class="w-9"></div>
+    </header>
+    <div id="nav-backdrop"
+         class="lg:hidden fixed inset-0 bg-black/50 z-30 hidden"
+         aria-hidden="true"></div>
     {{template "nav" .}}
-    <main class="flex-1 overflow-y-auto p-8">
+    <main class="flex-1 overflow-y-auto p-4 lg:p-8">
       {{template "flash" .}}
       {{template "content" .}}
     </main>

@@ -4,6 +4,7 @@ package handlers
 import (
 	"html/template"
 	"net/http"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -11,6 +12,8 @@ import (
 	"github.com/wind-c/comqtt/v2/mqtt"
 	"github.com/wind-c/comqtt/v2/mqtt/dashboard/auth"
 )
+
+var osHostname = os.Hostname
 
 // OverviewDeps bundles dependencies for the Overview handlers.
 type OverviewDeps struct {
@@ -21,15 +24,34 @@ type OverviewDeps struct {
 	// cards report 0. Callers wiring the dashboard at startup should
 	// construct one via NewRateSampler and Stop() it at shutdown.
 	Sampler *RateSampler
+	// Agent powers the cluster status block. Optional. nil + Cluster=false
+	// renders the standalone label.
+	Agent ClusterAgent
 }
 
 type overviewPageData struct {
-	Title   string
-	User    auth.User
-	CSRF    string
-	Cluster bool
-	Flash   string
-	Cards   []card
+	Title    string
+	User     auth.User
+	CSRF     string
+	Cluster  bool
+	Flash    string
+	Cards    []card
+	NodeInfo nodeStatus
+}
+
+type nodeStatus struct {
+	Mode    string // "Standalone" or "Cluster"
+	Self    string // local hostname
+	Total   int    // node count
+	Leader  string // leader node name (empty in standalone)
+	Members []nodeMember
+}
+
+type nodeMember struct {
+	Name     string
+	Addr     string
+	IsLeader bool
+	IsSelf   bool
 }
 
 type overviewFragData struct {
@@ -49,13 +71,40 @@ type card struct {
 func OverviewGet(d OverviewDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		d.Renderer.Render(w, "overview", overviewPageData{
-			Title:   "Overview",
-			User:    auth.UserFromContext(r.Context()),
-			CSRF:    auth.NewCSRFToken(),
-			Cluster: d.Cluster,
-			Cards:   buildCards(d),
+			Title:    "Overview",
+			User:     auth.UserFromContext(r.Context()),
+			CSRF:     auth.NewCSRFToken(),
+			Cluster:  d.Cluster,
+			Cards:    buildCards(d),
+			NodeInfo: buildNodeStatus(d),
 		})
 	}
+}
+
+func buildNodeStatus(d OverviewDeps) nodeStatus {
+	self := hostnameOrUnknown()
+	if !d.Cluster || d.Agent == nil {
+		return nodeStatus{Mode: "Standalone", Self: self, Total: 1, Members: []nodeMember{{Name: self, IsSelf: true}}}
+	}
+	members := d.Agent.GetMemberList()
+	leader := d.Agent.Leader()
+	rows := make([]nodeMember, 0, len(members))
+	for _, m := range members {
+		rows = append(rows, nodeMember{
+			Name:     m.Name,
+			Addr:     m.Addr,
+			IsLeader: m.Name == leader && leader != "",
+			IsSelf:   m.Name == self,
+		})
+	}
+	return nodeStatus{Mode: "Cluster", Self: self, Total: len(members), Leader: leader, Members: rows}
+}
+
+func hostnameOrUnknown() string {
+	if h, err := osHostname(); err == nil {
+		return h
+	}
+	return "unknown"
 }
 
 // OverviewCards renders the cards fragment. Used by htmx polling.
