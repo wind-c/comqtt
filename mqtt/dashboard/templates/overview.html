@@ -1,0 +1,16 @@
+{{define "overview"}}{{template "layout" .}}{{end}}
+
+{{define "content"}}
+<div class="space-y-6">
+  <div>
+    <h1 class="text-xl font-semibold tracking-tight">Overview</h1>
+    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Broker health at a glance</p>
+  </div>
+  <div id="overview-cards"
+       hx-get="/dashboard/fragments/overview-cards"
+       hx-trigger="load, every 2s"
+       hx-swap="innerHTML">
+    {{template "overview_cards" .}}
+  </div>
+</div>
+{{end}}
