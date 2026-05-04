@@ -27,6 +27,7 @@ type topicsPageData struct {
 	User          auth.User
 	CSRF          string
 	Cluster       bool
+	Flash         string
 	Root          *topicTreeNode
 	UniqueFilters int
 }

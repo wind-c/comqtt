@@ -30,6 +30,7 @@ type sessionsPageData struct {
 	User     auth.User
 	CSRF     string
 	Cluster  bool
+	Flash    string
 	Online   string
 	Page     rest.Page[sessionRowDash]
 	Readonly bool

@@ -7,9 +7,13 @@
       <h1 class="text-xl font-semibold tracking-tight">Retained Messages</h1>
       <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">{{.Page.Total}} retained</p>
     </div>
-    <form method="GET" action="/dashboard/retained" class="flex items-center gap-2">
+    <form method="GET" action="/dashboard/retained" class="flex items-center gap-3 flex-wrap">
       <input name="topic" value="{{.Topic}}" placeholder="topic filter"
-        class="px-3 py-2 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm w-64 focus:outline-none focus:border-brand-500" />
+        class="px-3 py-2 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm w-56 focus:outline-none focus:border-brand-500" />
+      <label class="inline-flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 select-none">
+        <input type="checkbox" name="include_sys" value="1" {{if .IncludeSys}}checked{{end}} />
+        Include $SYS topics
+      </label>
       <button class="px-3 py-2 rounded bg-brand-600 hover:bg-brand-700 text-white text-sm">Filter</button>
     </form>
   </div>

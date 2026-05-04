@@ -31,22 +31,31 @@ type retainedRow struct {
 }
 
 type retainedPageData struct {
-	Title    string
-	User     auth.User
-	CSRF     string
-	Cluster  bool
-	Topic    string
-	Page     rest.Page[retainedRow]
-	Readonly bool
+	Title      string
+	User       auth.User
+	CSRF       string
+	Cluster    bool
+	Flash      string
+	Topic      string
+	IncludeSys bool
+	Page       rest.Page[retainedRow]
+	Readonly   bool
 }
 
 func RetainedList(d RetainedDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		params := rest.ParsePage(r.URL.Query())
 		topicFilter := strings.ToLower(r.URL.Query().Get("topic"))
+		// $SYS retained messages are hidden by default - they're broker
+		// internals that crowd out the user's own retained traffic.
+		// Tick the checkbox (?include_sys=1) to bring them back.
+		includeSys := r.URL.Query().Get("include_sys") == "1"
 
 		all := make([]retainedRow, 0, 64)
 		for topic, pk := range d.Server.Topics.Retained.GetAll() {
+			if !includeSys && strings.HasPrefix(topic, "$SYS/") {
+				continue
+			}
 			if topicFilter != "" && !strings.Contains(strings.ToLower(topic), topicFilter) {
 				continue
 			}
@@ -73,13 +82,14 @@ func RetainedList(d RetainedDeps) http.HandlerFunc {
 		}
 		u := auth.UserFromContext(r.Context())
 		d.Renderer.Render(w, "retained", retainedPageData{
-			Title:    "Retained",
-			User:     u,
-			CSRF:     auth.NewCSRFToken(),
-			Cluster:  d.Cluster,
-			Topic:    r.URL.Query().Get("topic"),
-			Page:     page,
-			Readonly: u.Role != auth.RoleAdmin,
+			Title:      "Retained",
+			User:       u,
+			CSRF:       auth.NewCSRFToken(),
+			Cluster:    d.Cluster,
+			Topic:      r.URL.Query().Get("topic"),
+			IncludeSys: includeSys,
+			Page:       page,
+			Readonly:   u.Role != auth.RoleAdmin,
 		})
 	}
 }

@@ -30,6 +30,7 @@ type subPageData struct {
 	User     auth.User
 	CSRF     string
 	Cluster  bool
+	Flash    string
 	Topic    string
 	ClientID string
 	Page     rest.Page[subRow]
