@@ -1,0 +1,78 @@
+{{define "users"}}{{template "layout" .}}{{end}}
+
+{{define "content"}}
+<div class="space-y-4">
+  <div>
+    <h1 class="text-xl font-semibold tracking-tight">Users</h1>
+    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">{{len .Items}} dashboard user{{if ne (len .Items) 1}}s{{end}}</p>
+  </div>
+
+  {{with .Flash}}<div class="rounded bg-emerald-100 dark:bg-emerald-900 text-emerald-900 dark:text-emerald-100 p-2 text-sm">{{.}}</div>{{end}}
+  {{with .Error}}<div class="rounded bg-rose-100 dark:bg-rose-900 text-rose-900 dark:text-rose-100 p-2 text-sm">{{.}}</div>{{end}}
+
+  <form method="POST" action="/dashboard/users" class="bg-white dark:bg-slate-800 rounded shadow-sm border border-slate-200 dark:border-slate-700 p-4 grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+    <input type="hidden" name="_csrf" value="{{.CSRF}}" />
+    <label class="block">
+      <span class="text-xs text-slate-500 dark:text-slate-400">Username</span>
+      <input name="username" required autocomplete="off"
+        class="mt-1 w-full px-3 py-2 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm" />
+    </label>
+    <label class="block">
+      <span class="text-xs text-slate-500 dark:text-slate-400">Initial password</span>
+      <input name="password" type="password" required minlength="8" autocomplete="new-password"
+        class="mt-1 w-full px-3 py-2 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm" />
+    </label>
+    <label class="block">
+      <span class="text-xs text-slate-500 dark:text-slate-400">Role</span>
+      <select name="role" class="mt-1 w-full px-3 py-2 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm">
+        <option value="admin">Admin</option>
+        <option value="viewer" selected>Viewer</option>
+      </select>
+    </label>
+    <button class="px-4 py-2 rounded bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium">Add user</button>
+  </form>
+
+  <div class="overflow-x-auto bg-white dark:bg-slate-800 rounded shadow-sm border border-slate-200 dark:border-slate-700">
+    <table class="min-w-full text-sm">
+      <thead class="bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+        <tr>
+          <th class="text-left px-4 py-2 font-medium">Username</th>
+          <th class="text-left px-4 py-2 font-medium">Role</th>
+          <th class="text-left px-4 py-2 font-medium">Status</th>
+          <th class="text-right px-4 py-2 font-medium">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
+        {{range .Items}}
+        <tr class="hover:bg-slate-50 dark:hover:bg-slate-900">
+          <td class="px-4 py-2 font-mono">{{.Username}}</td>
+          <td class="px-4 py-2">
+            {{if eq .Role "admin"}}
+              <span class="inline-flex items-center rounded bg-brand-100 dark:bg-brand-700 text-brand-700 dark:text-brand-100 px-2 py-0.5 text-xs">admin</span>
+            {{else}}
+              <span class="inline-flex items-center rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 px-2 py-0.5 text-xs">viewer</span>
+            {{end}}
+          </td>
+          <td class="px-4 py-2 text-slate-500 dark:text-slate-400">
+            {{if .MustChange}}<span class="text-amber-700 dark:text-amber-400">must change</span>{{else}}active{{end}}
+            {{if .Locked}}<span class="ml-2 text-rose-700 dark:text-rose-400">locked</span>{{end}}
+          </td>
+          <td class="px-4 py-2 text-right space-x-2">
+            <form method="POST" action="/dashboard/users/{{.Username}}/role" class="inline">
+              <input type="hidden" name="_csrf" value="{{$.CSRF}}" />
+              <button class="text-brand-600 hover:underline">Toggle role</button>
+            </form>
+            <form method="POST" action="/dashboard/users/{{.Username}}/delete" class="inline">
+              <input type="hidden" name="_csrf" value="{{$.CSRF}}" />
+              <button class="text-rose-600 hover:underline">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {{else}}
+        <tr><td colspan="4" class="px-4 py-8 text-center text-sm text-slate-500">No users.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}

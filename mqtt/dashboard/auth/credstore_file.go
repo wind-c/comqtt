@@ -207,6 +207,13 @@ func (s *FileStore) ListUsers(ctx context.Context) ([]User, error) {
 	return s.load()
 }
 
+func (s *FileStore) SetRole(ctx context.Context, username string, role Role) error {
+	if !role.Valid() {
+		return errors.New("auth: invalid role")
+	}
+	return s.mutate(username, func(u *User) { u.Role = role })
+}
+
 func (s *FileStore) SetLockedUntil(ctx context.Context, username string, until int64) error {
 	return s.mutate(username, func(u *User) { u.LockedUntil = until })
 }

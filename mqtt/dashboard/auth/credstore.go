@@ -42,6 +42,7 @@ type CredStore interface {
 	SetPassword(ctx context.Context, username, password string) error
 	CreateUser(ctx context.Context, username, password string, role Role) error
 	DeleteUser(ctx context.Context, username string) error
+	SetRole(ctx context.Context, username string, role Role) error
 	GetUser(ctx context.Context, username string) (User, error)
 	ListUsers(ctx context.Context) ([]User, error)
 	SetLockedUntil(ctx context.Context, username string, until int64) error
