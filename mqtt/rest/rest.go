@@ -20,6 +20,8 @@ const (
 	MqttTopicsTreePath        = "/api/v1/mqtt/topics"
 	MqttListRetainedPath      = "/api/v1/mqtt/retained"
 	MqttClearRetainedPath     = "/api/v1/mqtt/retained/{topic}"
+	MqttListSessionsPath      = "/api/v1/mqtt/sessions"
+	MqttClearSessionPath      = "/api/v1/mqtt/sessions/{id}"
 	MqttGetBlacklistPath      = "/api/v1/mqtt/blacklist"
 	MqttAddBlacklistPath      = "/api/v1/mqtt/blacklist/{id}"
 	MqttDelBlacklistPath      = "/api/v1/mqtt/blacklist/{id}"
@@ -51,6 +53,8 @@ func (s *Rest) GenHandlers() map[string]Handler {
 		"GET " + MqttTopicsTreePath:        s.topicsTree,
 		"GET " + MqttListRetainedPath:      s.listRetained,
 		"DELETE " + MqttClearRetainedPath:  s.clearRetained,
+		"GET " + MqttListSessionsPath:      s.listSessions,
+		"DELETE " + MqttClearSessionPath:   s.clearSession,
 		"GET " + MqttGetBlacklistPath:      s.blacklist,
 		"POST " + MqttAddBlacklistPath:     s.kickClient,
 		"DELETE " + MqttDelBlacklistPath:   s.blanchClient,

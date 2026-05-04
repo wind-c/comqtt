@@ -249,6 +249,13 @@ func (s *Server) NewClient(c net.Conn, listener string, id string, inline bool) 
 	return cl
 }
 
+// Hooks returns the registered hook bus. Used by external integrations
+// (REST handlers, dashboards) that need to inspect stored state without
+// the broker reaching back into them.
+func (s *Server) Hooks() *Hooks {
+	return s.hooks
+}
+
 // AddHook attaches a new Hook to the server. Ideally, this should be called
 // before the server is started with s.Serve().
 func (s *Server) AddHook(hook Hook, config any) error {
