@@ -1,0 +1,39 @@
+{{define "blacklist"}}{{template "layout" .}}{{end}}
+
+{{define "content"}}
+<div class="space-y-4">
+  <div>
+    <h1 class="text-xl font-semibold tracking-tight">Blacklist</h1>
+    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">{{len .Items}} blocked client{{if ne (len .Items) 1}}s{{end}}</p>
+  </div>
+
+  {{with .Error}}
+  <div class="rounded bg-rose-100 dark:bg-rose-900 text-rose-900 dark:text-rose-100 p-2 text-xs">{{.}}</div>
+  {{end}}
+
+  <form method="POST" action="/dashboard/blacklist" class="flex items-center gap-2">
+    <input type="hidden" name="_csrf" value="{{.CSRF}}" />
+    <input name="client_id" required placeholder="Client ID to block"
+      class="px-3 py-2 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm w-64 focus:outline-none focus:border-brand-500" />
+    <button {{if .Readonly}}disabled title="Read-only role"{{end}}
+      class="px-3 py-2 rounded bg-rose-600 hover:bg-rose-700 disabled:bg-slate-300 disabled:dark:bg-slate-600 disabled:cursor-not-allowed text-white text-sm">
+      Block
+    </button>
+  </form>
+
+  <div class="bg-white dark:bg-slate-800 rounded shadow-sm border border-slate-200 dark:border-slate-700 divide-y divide-slate-200 dark:divide-slate-700">
+    {{range .Items}}
+    <div class="flex items-center justify-between px-4 py-2 text-sm">
+      <span class="font-mono">{{.}}</span>
+      <form method="POST" action="/dashboard/blacklist/{{.}}/delete">
+        <input type="hidden" name="_csrf" value="{{$.CSRF}}" />
+        <button {{if $.Readonly}}disabled title="Read-only role"{{end}}
+          class="text-rose-600 hover:underline disabled:text-slate-400 disabled:cursor-not-allowed">Remove</button>
+      </form>
+    </div>
+    {{else}}
+    <div class="px-4 py-8 text-center text-sm text-slate-500">Blacklist is empty.</div>
+    {{end}}
+  </div>
+</div>
+{{end}}
