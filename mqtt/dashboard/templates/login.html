@@ -1,0 +1,39 @@
+{{define "login"}}
+<!doctype html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Sign in - comqtt</title>
+  <link rel="stylesheet" href="/dashboard/static/tailwind.css" />
+  <script src="/dashboard/static/theme.js" defer></script>
+</head>
+<body class="h-full bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
+  <form method="POST" action="/dashboard/login" class="w-80 bg-white dark:bg-slate-800 p-6 rounded shadow space-y-4">
+    <div>
+      <h1 class="text-lg font-semibold tracking-tight">
+        <span class="text-brand-600 dark:text-brand-500">com</span>qtt
+      </h1>
+      <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Sign in to the dashboard</p>
+    </div>
+    {{with .Error}}
+    <div class="rounded bg-rose-100 dark:bg-rose-900 text-rose-900 dark:text-rose-100 p-2 text-xs">{{.}}</div>
+    {{end}}
+    <input type="hidden" name="_csrf" value="{{.CSRF}}" />
+    <input type="hidden" name="next" value="{{.Next}}" />
+    <label class="block">
+      <span class="text-xs text-slate-500 dark:text-slate-400">Username</span>
+      <input name="username" autocomplete="username" autofocus required
+        class="mt-1 w-full px-3 py-2 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:border-brand-500" />
+    </label>
+    <label class="block">
+      <span class="text-xs text-slate-500 dark:text-slate-400">Password</span>
+      <input name="password" type="password" autocomplete="current-password" required
+        class="mt-1 w-full px-3 py-2 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:border-brand-500" />
+    </label>
+    <button class="w-full bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium py-2 rounded">Sign in</button>
+    <button id="theme-toggle" type="button" class="w-full text-xs text-slate-500 hover:text-slate-900 dark:hover:text-white">Toggle theme</button>
+  </form>
+</body>
+</html>
+{{end}}
