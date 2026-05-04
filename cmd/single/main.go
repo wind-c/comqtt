@@ -6,7 +6,6 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
 	"flag"
 	"fmt"
 	"net/http"
@@ -143,7 +142,7 @@ func realMain(ctx context.Context) error {
 		dashRoutes, err := dashboard.Routes(dashboard.Options{
 			Server:             server,
 			Cluster:            false,
-			Secret:             dashboardSecretFromConfig(cfg),
+			Secret:             cfg.Dashboard.DecodeSecret(),
 			PasswordExpiryDays: cfg.Dashboard.PasswordExpiryDays,
 		})
 		if err != nil {
@@ -251,15 +250,4 @@ func onError(err error, msg string) {
 		log.Error(msg, "error", err)
 		os.Exit(1)
 	}
-}
-
-func dashboardSecretFromConfig(cfg *config.Config) []byte {
-	if cfg.Dashboard.SessionSecret != "" {
-		// Try base64 first, fall back to raw bytes.
-		if b, err := base64.StdEncoding.DecodeString(cfg.Dashboard.SessionSecret); err == nil && len(b) >= 16 {
-			return b
-		}
-		return []byte(cfg.Dashboard.SessionSecret)
-	}
-	return nil
 }

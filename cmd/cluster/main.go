@@ -26,6 +26,7 @@ import (
 	coredis "github.com/wind-c/comqtt/v2/cluster/storage/redis"
 	"github.com/wind-c/comqtt/v2/config"
 	mqtt "github.com/wind-c/comqtt/v2/mqtt"
+	"github.com/wind-c/comqtt/v2/mqtt/dashboard"
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/auth"
 	"github.com/wind-c/comqtt/v2/mqtt/listeners"
 	mqttRt "github.com/wind-c/comqtt/v2/mqtt/rest"
@@ -144,6 +145,20 @@ func realMain(ctx context.Context) error {
 	csHls := csRt.New(agent).GenHandlers()
 	mqHls := mqttRt.New(server).GenHandlers()
 	maps.Copy(csHls, mqHls)
+
+	if cfg.Dashboard.Enabled {
+		dashRoutes, err := dashboard.Routes(dashboard.Options{
+			Server:             server,
+			Cluster:            true,
+			Secret:             cfg.Dashboard.DecodeSecret(),
+			PasswordExpiryDays: cfg.Dashboard.PasswordExpiryDays,
+		})
+		if err != nil {
+			return fmt.Errorf("dashboard routes: %w", err)
+		}
+		maps.Copy(csHls, dashRoutes)
+	}
+
 	http := listeners.NewHTTP("stats", cfg.Mqtt.HTTP, nil, csHls)
 	onError(server.AddListener(http), "add http listener")
 

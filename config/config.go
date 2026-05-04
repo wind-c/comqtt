@@ -10,6 +10,7 @@ import (
 	tls2 "crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/base64"
 	"encoding/pem"
 	"errors"
 	"math/big"
@@ -113,6 +114,19 @@ type Dashboard struct {
 	Enabled            bool   `yaml:"enabled"`
 	SessionSecret      string `yaml:"session-secret"`
 	PasswordExpiryDays int    `yaml:"password-expiry-days"`
+}
+
+// DecodeSecret returns the SessionSecret as raw bytes. It accepts either a
+// base64-encoded string or a raw secret. Returns nil if SessionSecret is
+// empty (in which case the dashboard auto-generates and persists one).
+func (d *Dashboard) DecodeSecret() []byte {
+	if d.SessionSecret == "" {
+		return nil
+	}
+	if b, err := base64.StdEncoding.DecodeString(d.SessionSecret); err == nil && len(b) >= 16 {
+		return b
+	}
+	return []byte(d.SessionSecret)
 }
 
 type auth struct {
