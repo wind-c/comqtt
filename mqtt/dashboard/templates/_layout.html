@@ -1,0 +1,23 @@
+{{define "layout"}}
+<!doctype html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>{{.Title}} - comqtt</title>
+  <link rel="stylesheet" href="/dashboard/static/tailwind.css" />
+  <script src="/dashboard/static/htmx.min.js" defer></script>
+  <script src="/dashboard/static/htmx-sse.js" defer></script>
+  <script src="/dashboard/static/theme.js" defer></script>
+</head>
+<body class="h-full bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100">
+  <div class="flex h-full">
+    {{template "nav" .}}
+    <main class="flex-1 overflow-y-auto p-8">
+      {{template "flash" .}}
+      {{template "content" .}}
+    </main>
+  </div>
+</body>
+</html>
+{{end}}

@@ -1,0 +1,31 @@
+{{define "nav"}}
+<nav class="w-60 shrink-0 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 flex flex-col">
+  <div class="px-6 py-4 text-lg font-semibold tracking-tight">
+    <span class="text-brand-600 dark:text-brand-500">com</span>qtt
+  </div>
+  <ul class="flex-1 px-3 space-y-1 text-sm">
+    <li><a href="/dashboard/" class="block px-3 py-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700">Overview</a></li>
+    <li><a href="/dashboard/clients" class="block px-3 py-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700">Clients</a></li>
+    <li><a href="/dashboard/subscriptions" class="block px-3 py-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700">Subscriptions</a></li>
+    <li><a href="/dashboard/topics" class="block px-3 py-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700">Topics</a></li>
+    <li><a href="/dashboard/retained" class="block px-3 py-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700">Retained</a></li>
+    <li><a href="/dashboard/sessions" class="block px-3 py-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700">Sessions</a></li>
+    {{if .Cluster}}
+    <li><a href="/dashboard/cluster" class="block px-3 py-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700">Cluster</a></li>
+    {{end}}
+    <li><a href="/dashboard/blacklist" class="block px-3 py-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700">Blacklist</a></li>
+    <li><a href="/dashboard/tools" class="block px-3 py-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700">Tools</a></li>
+    {{if eq .User.Role "admin"}}
+    <li><a href="/dashboard/users" class="block px-3 py-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700">Users</a></li>
+    {{end}}
+    <li><a href="/dashboard/settings" class="block px-3 py-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700">Settings</a></li>
+  </ul>
+  <div class="p-4 border-t border-slate-200 dark:border-slate-700 space-y-2">
+    <button id="theme-toggle" type="button" class="text-xs text-slate-500 hover:text-slate-900 dark:hover:text-white">Toggle theme</button>
+    <form method="POST" action="/dashboard/logout" class="block">
+      <input type="hidden" name="_csrf" value="{{.CSRF}}" />
+      <button class="text-xs text-slate-500 hover:text-slate-900 dark:hover:text-white">Logout {{.User.Username}}</button>
+    </form>
+  </div>
+</nav>
+{{end}}
