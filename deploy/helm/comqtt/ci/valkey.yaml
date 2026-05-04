@@ -1,0 +1,39 @@
+# Vanilla Valkey deployment used by the chart's CI pipeline. Cluster-mode
+# comqtt requires a RESP-compatible store; Valkey is the actively-maintained
+# OSS fork of Redis and is protocol-compatible.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: valkey
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: valkey
+  template:
+    metadata:
+      labels:
+        app: valkey
+    spec:
+      containers:
+        - name: valkey
+          image: valkey/valkey:8-alpine
+          ports:
+            - containerPort: 6379
+              name: resp
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: valkey
+spec:
+  selector:
+    app: valkey
+  ports:
+    - name: resp
+      port: 6379
+      targetPort: resp

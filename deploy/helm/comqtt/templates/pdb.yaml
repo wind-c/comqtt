@@ -1,0 +1,13 @@
+{{- if and (eq .Values.mode "cluster") .Values.cluster.podDisruptionBudget.enabled -}}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "comqtt.fullname" . }}
+  labels:
+    {{- include "comqtt.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ include "comqtt.raftQuorum" . }}
+  selector:
+    matchLabels:
+      {{- include "comqtt.selectorLabels" . | nindent 6 }}
+{{- end }}

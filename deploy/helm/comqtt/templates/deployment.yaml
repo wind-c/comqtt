@@ -1,0 +1,138 @@
+{{- if eq .Values.mode "single" -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "comqtt.fullname" . }}
+  labels:
+    {{- include "comqtt.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "comqtt.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "comqtt.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "comqtt.serviceAccountName" . }}
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: comqtt
+          image: {{ include "comqtt.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/comqtt"]
+          args:
+            - --conf=/etc/comqtt/config.yml
+          ports:
+            - name: mqtt
+              containerPort: 1883
+              protocol: TCP
+            - name: mqtt-ws
+              containerPort: 1882
+              protocol: TCP
+            - name: dashboard
+              containerPort: 8080
+              protocol: TCP
+          {{- if .Values.livenessProbe.enabled }}
+          livenessProbe:
+            {{- omit .Values.livenessProbe "enabled" | toYaml | nindent 12 }}
+          {{- end }}
+          {{- if .Values.readinessProbe.enabled }}
+          readinessProbe:
+            {{- omit .Values.readinessProbe "enabled" | toYaml | nindent 12 }}
+          {{- end }}
+          {{- if .Values.startupProbe.enabled }}
+          startupProbe:
+            {{- omit .Values.startupProbe "enabled" | toYaml | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/comqtt
+              readOnly: true
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+            {{- if or .Values.secret.create .Values.secret.existingSecret }}
+            - name: secrets
+              mountPath: /etc/comqtt/secrets
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "comqtt.fullname" . }}-config
+        - name: tmp
+          emptyDir: {}
+        {{- if .Values.persistence.enabled }}
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "comqtt.fullname" . }}-data
+        {{- else }}
+        - name: data
+          emptyDir: {}
+        {{- end }}
+        {{- if or .Values.secret.create .Values.secret.existingSecret }}
+        - name: secrets
+          secret:
+            secretName: {{ default (include "comqtt.fullname" .) .Values.secret.existingSecret }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- if .Values.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "comqtt.fullname" . }}-data
+  labels:
+    {{- include "comqtt.labels" . | nindent 4 }}
+  {{- with .Values.persistence.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    {{- toYaml .Values.persistence.accessModes | nindent 4 }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.size }}
+  {{- with .Values.persistence.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+{{- end }}
+{{- end }}

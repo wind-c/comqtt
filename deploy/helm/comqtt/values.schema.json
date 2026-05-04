@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "comqtt Helm chart values",
+  "type": "object",
+  "required": ["mode", "image"],
+  "properties": {
+    "mode": {
+      "type": "string",
+      "enum": ["single", "cluster"],
+      "description": "Deployment mode."
+    },
+    "replicaCount": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Replica count. In cluster mode must be odd (Raft quorum)."
+    },
+    "image": {
+      "type": "object",
+      "required": ["repository"],
+      "properties": {
+        "repository": { "type": "string", "minLength": 1 },
+        "tag": { "type": "string" },
+        "pullPolicy": {
+          "type": "string",
+          "enum": ["Always", "IfNotPresent", "Never"]
+        },
+        "pullSecrets": { "type": "array", "items": { "type": "object" } }
+      }
+    },
+    "nameOverride": { "type": "string" },
+    "fullnameOverride": { "type": "string" },
+    "serviceAccount": {
+      "type": "object",
+      "properties": {
+        "create": { "type": "boolean" },
+        "annotations": { "type": "object" },
+        "name": { "type": "string" }
+      }
+    },
+    "podAnnotations": { "type": "object" },
+    "podLabels": { "type": "object" },
+    "podSecurityContext": { "type": "object" },
+    "securityContext": { "type": "object" },
+    "resources": { "type": "object" },
+    "nodeSelector": { "type": "object" },
+    "tolerations": { "type": "array" },
+    "affinity": { "type": "object" },
+    "priorityClassName": { "type": "string" },
+    "terminationGracePeriodSeconds": { "type": "integer", "minimum": 0 },
+    "livenessProbe": { "type": "object" },
+    "readinessProbe": { "type": "object" },
+    "startupProbe": { "type": "object" },
+    "service": {
+      "type": "object",
+      "properties": {
+        "mqtt": { "$ref": "#/$defs/portService" },
+        "ws": { "$ref": "#/$defs/portService" },
+        "dashboard": { "$ref": "#/$defs/portService" }
+      }
+    },
+    "ingress": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "className": { "type": "string" },
+        "annotations": { "type": "object" },
+        "hosts": { "type": "array" },
+        "tls": { "type": "array" }
+      }
+    },
+    "tls": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "existingSecret": { "type": "string" },
+        "certManager": { "type": "object" }
+      }
+    },
+    "config": { "type": "object" },
+    "cluster": {
+      "type": "object",
+      "properties": {
+        "discoveryWay": { "type": "integer", "enum": [0, 1] },
+        "gossipPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "raftPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "grpcPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "grpcEnable": { "type": "boolean" },
+        "raftImpl": { "type": "integer", "enum": [0, 1] },
+        "queueDepth": { "type": "integer", "minimum": 0 },
+        "inboundPoolSize": { "type": "integer", "minimum": 0 },
+        "outboundPoolSize": { "type": "integer", "minimum": 0 },
+        "inoutPoolNonblocking": { "type": "boolean" },
+        "hardAntiAffinity": { "type": "boolean" },
+        "podDisruptionBudget": {
+          "type": "object",
+          "properties": { "enabled": { "type": "boolean" } }
+        }
+      }
+    },
+    "persistence": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "storageClass": { "type": "string" },
+        "accessModes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["ReadWriteOnce", "ReadOnlyMany", "ReadWriteMany", "ReadWriteOncePod"]
+          }
+        },
+        "size": { "type": "string" },
+        "annotations": { "type": "object" }
+      }
+    },
+    "secret": {
+      "type": "object",
+      "properties": {
+        "create": { "type": "boolean" },
+        "existingSecret": { "type": "string" },
+        "data": { "type": "object" }
+      }
+    },
+    "serviceMonitor": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "namespace": { "type": "string" },
+        "interval": { "type": "string" },
+        "scrapeTimeout": { "type": "string" },
+        "labels": { "type": "object" }
+      }
+    },
+    "tests": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "image": { "type": "object" }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "mode": { "const": "cluster" } } },
+      "then": {
+        "properties": {
+          "replicaCount": {
+            "type": "integer",
+            "minimum": 1,
+            "not": { "multipleOf": 2 },
+            "description": "Cluster mode requires an odd replica count for Raft quorum."
+          },
+          "persistence": {
+            "type": "object",
+            "properties": { "enabled": { "const": true } },
+            "required": ["enabled"]
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "portService": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["ClusterIP", "NodePort", "LoadBalancer", "ExternalName"]
+        },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "nodePort": { "type": ["integer", "string"] },
+        "annotations": { "type": "object" }
+      }
+    }
+  }
+}

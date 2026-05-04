@@ -90,6 +90,32 @@ docker build -t comqtt:latest .
 docker run -p 1883:1883 -p 1882:1882 -p 8080:8080 comqtt:latest
 ```
 
+Tagged release images are published to GHCR by the `release` workflow:
+
+```sh
+docker pull ghcr.io/wind-c/comqtt:<version>
+```
+
+### Using Kubernetes (Helm)
+A maintained Helm chart lives in [deploy/helm/comqtt](deploy/helm/comqtt) and supports both standalone and clustered deployments. See [the chart README](deploy/helm/comqtt/README.md) for full documentation.
+
+Single node:
+
+```sh
+helm install single deploy/helm/comqtt
+helm test single --logs
+```
+
+Three-node Raft cluster (bring your own RESP-compatible store; the chart ships an example Valkey manifest):
+
+```sh
+kubectl apply -f deploy/helm/comqtt/ci/valkey.yaml
+helm install cluster deploy/helm/comqtt \
+  -f deploy/helm/comqtt/ci/cluster-values.yaml
+```
+
+Released charts are also available from the GitHub Pages-hosted Helm repository published by the `chart-release` workflow.
+
 ## Developing with Comqtt
 ### Importing as a package
 Importing Comqtt as a package requires just a few lines of code to get started.

@@ -1,0 +1,41 @@
+{{- if .Values.tests.enabled -}}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "comqtt.fullname" . }}-test-connection
+  labels:
+    {{- include "comqtt.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  containers:
+    - name: mosquitto
+      image: "{{ .Values.tests.image.repository }}:{{ .Values.tests.image.tag }}"
+      command:
+        - /bin/sh
+        - -c
+        - |
+          set -eu
+          HOST="{{ include "comqtt.fullname" . }}"
+          PORT="{{ .Values.service.mqtt.port }}"
+          TOPIC="helm/test/{{ .Release.Name }}"
+          MSG="connectivity-check-$(date +%s)"
+
+          echo "[test] subscribing on $HOST:$PORT $TOPIC"
+          mosquitto_sub -h "$HOST" -p "$PORT" -t "$TOPIC" -C 1 -W 15 > /tmp/recv &
+          SUB=$!
+          sleep 2
+          echo "[test] publishing"
+          mosquitto_pub -h "$HOST" -p "$PORT" -t "$TOPIC" -m "$MSG"
+          wait "$SUB"
+
+          got="$(cat /tmp/recv)"
+          echo "[test] received: $got"
+          if [ "$got" != "$MSG" ]; then
+            echo "[test] mismatch — expected '$MSG'"
+            exit 1
+          fi
+          echo "[test] OK"
+{{- end }}

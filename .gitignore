@@ -3,3 +3,4 @@ bolt.db
 raft.db
 .idea
 .vscode
+.claude/
