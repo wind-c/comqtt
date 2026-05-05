@@ -44,6 +44,9 @@ archives:
     ids:
       - comqtt
       - comqtt-cluster
+    # Windows skips cmd/cluster, so its archive has 1 binary while
+    # linux/darwin archives have 2. Allow that intentional asymmetry.
+    allow_different_binary_count: true
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_
       {{- title .Os }}_
@@ -97,8 +100,8 @@ dockers:
       - comqtt
       - comqtt-cluster
     image_templates:
-      - "ghcr.io/wind-c/comqtt:{{ .Version }}-amd64"
-      - "ghcr.io/wind-c/comqtt:v{{ .Major }}.{{ .Minor }}-amd64"
+      - "ghcr.io/{{ .Env.IMAGE_OWNER }}/comqtt:{{ .Version }}-amd64"
+      - "ghcr.io/{{ .Env.IMAGE_OWNER }}/comqtt:v{{ .Major }}.{{ .Minor }}-amd64"
     dockerfile: Dockerfile.goreleaser
     extra_files:
       - cmd/config
@@ -120,8 +123,8 @@ dockers:
       - comqtt
       - comqtt-cluster
     image_templates:
-      - "ghcr.io/wind-c/comqtt:{{ .Version }}-arm64"
-      - "ghcr.io/wind-c/comqtt:v{{ .Major }}.{{ .Minor }}-arm64"
+      - "ghcr.io/{{ .Env.IMAGE_OWNER }}/comqtt:{{ .Version }}-arm64"
+      - "ghcr.io/{{ .Env.IMAGE_OWNER }}/comqtt:v{{ .Major }}.{{ .Minor }}-arm64"
     dockerfile: Dockerfile.goreleaser
     extra_files:
       - cmd/config
@@ -136,23 +139,20 @@ dockers:
       - "--label=org.opencontainers.image.licenses=MIT"
 
 docker_manifests:
-  - name_template: "ghcr.io/wind-c/comqtt:{{ .Version }}"
+  - name_template: "ghcr.io/{{ .Env.IMAGE_OWNER }}/comqtt:{{ .Version }}"
     image_templates:
-      - "ghcr.io/wind-c/comqtt:{{ .Version }}-amd64"
-      - "ghcr.io/wind-c/comqtt:{{ .Version }}-arm64"
-  - name_template: "ghcr.io/wind-c/comqtt:v{{ .Major }}.{{ .Minor }}"
+      - "ghcr.io/{{ .Env.IMAGE_OWNER }}/comqtt:{{ .Version }}-amd64"
+      - "ghcr.io/{{ .Env.IMAGE_OWNER }}/comqtt:{{ .Version }}-arm64"
+  - name_template: "ghcr.io/{{ .Env.IMAGE_OWNER }}/comqtt:v{{ .Major }}.{{ .Minor }}"
     image_templates:
-      - "ghcr.io/wind-c/comqtt:v{{ .Major }}.{{ .Minor }}-amd64"
-      - "ghcr.io/wind-c/comqtt:v{{ .Major }}.{{ .Minor }}-arm64"
-  - name_template: "ghcr.io/wind-c/comqtt:latest"
+      - "ghcr.io/{{ .Env.IMAGE_OWNER }}/comqtt:v{{ .Major }}.{{ .Minor }}-amd64"
+      - "ghcr.io/{{ .Env.IMAGE_OWNER }}/comqtt:v{{ .Major }}.{{ .Minor }}-arm64"
+  - name_template: "ghcr.io/{{ .Env.IMAGE_OWNER }}/comqtt:latest"
     image_templates:
-      - "ghcr.io/wind-c/comqtt:{{ .Version }}-amd64"
-      - "ghcr.io/wind-c/comqtt:{{ .Version }}-arm64"
+      - "ghcr.io/{{ .Env.IMAGE_OWNER }}/comqtt:{{ .Version }}-amd64"
+      - "ghcr.io/{{ .Env.IMAGE_OWNER }}/comqtt:{{ .Version }}-arm64"
 
 release:
-  github:
-    owner: wind-c
-    name: comqtt
   prerelease: auto
   draft: false
   name_template: "v{{ .Version }}"
