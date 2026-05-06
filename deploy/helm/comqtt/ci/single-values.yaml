@@ -1,0 +1,13 @@
+mode: single
+image:
+  repository: ghcr.io/wind-c/comqtt
+  tag: ""
+  pullPolicy: IfNotPresent
+persistence:
+  enabled: false
+config:
+  storage-way: 0
+  log:
+    output: 0
+tests:
+  enabled: true

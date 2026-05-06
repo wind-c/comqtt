@@ -1,0 +1,12 @@
+FROM alpine:3.20
+
+RUN apk add --no-cache ca-certificates tzdata
+
+WORKDIR /
+COPY comqtt /comqtt
+COPY comqtt-cluster /comqtt-cluster
+COPY cmd/config /etc/comqtt/examples
+
+EXPOSE 1883 1882 8080 7946 8946 17946
+
+ENTRYPOINT ["/comqtt"]

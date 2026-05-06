@@ -1,0 +1,40 @@
+{{- if .Values.ingress.enabled -}}
+{{- /*
+NOTE: A standard HTTP Ingress can ONLY proxy the dashboard (port 8080).
+Raw MQTT TCP cannot ride on a Layer 7 HTTP Ingress; expose it via a
+LoadBalancer Service or an Ingress controller with TCP passthrough.
+*/ -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "comqtt.fullname" . }}-dashboard
+  labels:
+    {{- include "comqtt.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- with .Values.ingress.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    {{- range .Values.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                name: {{ include "comqtt.fullname" $ }}
+                port:
+                  number: {{ $.Values.service.dashboard.port }}
+          {{- end }}
+    {{- end }}
+{{- end }}

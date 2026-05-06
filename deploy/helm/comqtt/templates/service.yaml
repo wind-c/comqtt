@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "comqtt.fullname" . }}
+  labels:
+    {{- include "comqtt.labels" . | nindent 4 }}
+  {{- with .Values.service.mqtt.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.mqtt.type }}
+  ports:
+    - name: mqtt
+      port: {{ .Values.service.mqtt.port }}
+      targetPort: mqtt
+      protocol: TCP
+      {{- if and (eq .Values.service.mqtt.type "NodePort") .Values.service.mqtt.nodePort }}
+      nodePort: {{ .Values.service.mqtt.nodePort }}
+      {{- end }}
+    - name: mqtt-ws
+      port: {{ .Values.service.ws.port }}
+      targetPort: mqtt-ws
+      protocol: TCP
+      {{- if and (eq .Values.service.ws.type "NodePort") .Values.service.ws.nodePort }}
+      nodePort: {{ .Values.service.ws.nodePort }}
+      {{- end }}
+    - name: dashboard
+      port: {{ .Values.service.dashboard.port }}
+      targetPort: dashboard
+      protocol: TCP
+      {{- if and (eq .Values.service.dashboard.type "NodePort") .Values.service.dashboard.nodePort }}
+      nodePort: {{ .Values.service.dashboard.nodePort }}
+      {{- end }}
+  selector:
+    {{- include "comqtt.selectorLabels" . | nindent 4 }}

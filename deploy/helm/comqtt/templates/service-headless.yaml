@@ -1,0 +1,46 @@
+{{- if eq .Values.mode "cluster" -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "comqtt.headlessName" . }}
+  labels:
+    {{- include "comqtt.labels" . | nindent 4 }}
+  annotations:
+    service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+    - name: mqtt
+      port: {{ .Values.service.mqtt.port }}
+      targetPort: mqtt
+      protocol: TCP
+    - name: mqtt-ws
+      port: {{ .Values.service.ws.port }}
+      targetPort: mqtt-ws
+      protocol: TCP
+    - name: dashboard
+      port: {{ .Values.service.dashboard.port }}
+      targetPort: dashboard
+      protocol: TCP
+    - name: gossip-tcp
+      port: {{ .Values.cluster.gossipPort }}
+      targetPort: gossip-tcp
+      protocol: TCP
+    - name: gossip-udp
+      port: {{ .Values.cluster.gossipPort }}
+      targetPort: gossip-udp
+      protocol: UDP
+    - name: raft
+      port: {{ .Values.cluster.raftPort }}
+      targetPort: raft
+      protocol: TCP
+    {{- if .Values.cluster.grpcEnable }}
+    - name: grpc
+      port: {{ .Values.cluster.grpcPort }}
+      targetPort: grpc
+      protocol: TCP
+    {{- end }}
+  selector:
+    {{- include "comqtt.selectorLabels" . | nindent 4 }}
+{{- end }}

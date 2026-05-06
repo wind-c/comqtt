@@ -1,0 +1,275 @@
+# -- Deployment mode. `single` deploys cmd/single via Deployment; `cluster`
+#    deploys cmd/cluster via StatefulSet with Raft + Gossip.
+mode: single
+
+# -- Replica count. Honored only in cluster mode. Must be odd for Raft quorum
+#    (1, 3, 5, 7). The schema enforces this when mode=cluster.
+replicaCount: 3
+
+image:
+  # -- Container image repository.
+  repository: ghcr.io/wind-c/comqtt
+  # -- Image tag. Tracks Chart.appVersion when empty. Never use `latest`.
+  tag: ""
+  pullPolicy: IfNotPresent
+  # -- Image pull secrets. List of `{name: secret-name}`.
+  pullSecrets: []
+
+# -- Override the chart name.
+nameOverride: ""
+# -- Override the full release name.
+fullnameOverride: ""
+
+serviceAccount:
+  # -- Create a dedicated ServiceAccount.
+  create: true
+  # -- Annotations for the ServiceAccount.
+  annotations: {}
+  # -- ServiceAccount name. Auto-generated when empty.
+  name: ""
+
+# -- Pod-level annotations.
+podAnnotations: {}
+
+# -- Pod-level labels.
+podLabels: {}
+
+# -- Pod security context.
+podSecurityContext:
+  fsGroup: 1000
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# -- Container security context.
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# -- Resource requests. `limits` is unset by default to avoid OOM-killing
+#    bursty MQTT workloads; configure them explicitly when needed.
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits: {}
+
+# -- nodeSelector for pod assignment.
+nodeSelector: {}
+
+# -- Tolerations.
+tolerations: []
+
+# -- Affinity rules. The chart provides sensible defaults for cluster mode in
+#    `clusterAffinity`; this block is for additional rules.
+affinity: {}
+
+# -- PriorityClass name for the pods.
+priorityClassName: ""
+
+# -- Termination grace period seconds.
+terminationGracePeriodSeconds: 30
+
+# Liveness/readiness/startup probes target the dashboard HTTP port.
+livenessProbe:
+  enabled: true
+  tcpSocket:
+    port: mqtt
+  initialDelaySeconds: 15
+  periodSeconds: 20
+  timeoutSeconds: 5
+  failureThreshold: 5
+  successThreshold: 1
+
+readinessProbe:
+  enabled: true
+  tcpSocket:
+    port: mqtt
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3
+  successThreshold: 1
+
+startupProbe:
+  enabled: true
+  tcpSocket:
+    port: mqtt
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 30
+  successThreshold: 1
+
+service:
+  mqtt:
+    type: ClusterIP
+    port: 1883
+    nodePort: ""
+    annotations: {}
+  ws:
+    type: ClusterIP
+    port: 1882
+    nodePort: ""
+    annotations: {}
+  dashboard:
+    type: ClusterIP
+    port: 8080
+    nodePort: ""
+    annotations: {}
+
+ingress:
+  # -- Enable Ingress for the dashboard. NOTE: a standard HTTP Ingress cannot
+  #    proxy raw MQTT TCP. To expose MQTT externally, use a LoadBalancer
+  #    Service or an Ingress controller with TCP/passthrough support.
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: comqtt.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+tls:
+  # -- Enable MQTT TLS. When enabled either provide `existingSecret` or wire
+  #    up cert-manager via `certManager.issuerRef`.
+  enabled: false
+  # -- Pre-existing Secret containing tls.crt, tls.key, optionally ca.crt.
+  existingSecret: ""
+  certManager:
+    enabled: false
+    issuerRef:
+      name: ""
+      kind: ClusterIssuer
+
+# -- Configuration mirroring cmd/config/single.yml and cmd/config/node1.yml.
+#    These keys render verbatim into a ConfigMap mounted at /etc/comqtt.
+config:
+  # 0 memory, 1 bolt, 2 badger, 3 redis. Cluster mode requires 3 (redis).
+  storage-way: 1
+  storage-path: /data/comqtt.db
+  bridge-way: 0
+  bridge-path: /etc/comqtt/bridge-kafka.yml
+  pprof-enable: false
+
+  auth:
+    # 0 anonymous, 1 username/password, 2 clientid
+    way: 0
+    # 0 free, 1 redis, 2 mysql, 3 postgresql, 4 http
+    datasource: 0
+    conf-path: ""
+    blacklist-path: ""
+
+  mqtt:
+    tcp: ":1883"
+    ws: ":1882"
+    http: ":8080"
+    tls:
+      ca-cert: ""
+      server-cert: ""
+      server-key: ""
+    options:
+      client-write-buffer-size: 1024
+      client-read-buffer-size: 1024
+      sys-topic-resend-interval: 1
+      inline-client: true
+      capabilities:
+        compatibilities:
+          obscure-not-authorized: false
+          passive-client-disconnect: false
+          always-return-response: false
+          restore-sys-info-restart: false
+        maximum-message-expiry-interval: 86400
+        maximum-session-expiry-interval: 4294967295
+        maximum-client-writes-pending: 65535
+        maximum-packet-size: 0
+        receive-maximum: 1024
+        topic-alias-maximum: 65535
+        maximum-qos: 2
+        retain-available: 1
+        wildcard-sub-available: 1
+        sub-id-available: 1
+        shared-sub-available: 1
+        minimum-protocol-version: 3
+
+  redis:
+    options:
+      addr: ""
+      username: ""
+      password: ""
+      db: 0
+    prefix: comqtt
+
+  log:
+    enable: true
+    format: 1
+    output: 0
+    filename: /data/logs/comqtt.log
+    maxsize: 100
+    max-age: 30
+    max-backups: 10
+    compress: true
+    level: 0
+
+# Cluster-only configuration. Ignored when mode=single.
+cluster:
+  # 0 serf, 1 memberlist
+  discoveryWay: 0
+  gossipPort: 7946
+  raftPort: 8946
+  grpcPort: 17946
+  grpcEnable: true
+  # 0 hashicorp/raft, 1 etcd/raft
+  raftImpl: 0
+  queueDepth: 10240
+  inboundPoolSize: 40960
+  outboundPoolSize: 40960
+  inoutPoolNonblocking: false
+  # Hard-anti-affinity escalates the soft default to required scheduling.
+  hardAntiAffinity: false
+  podDisruptionBudget:
+    enabled: true
+
+# Per-replica persistence. Required (and validated) in cluster mode for
+# Raft log durability. Optional in single mode for bolt/badger.
+persistence:
+  enabled: true
+  storageClass: ""
+  accessModes:
+    - ReadWriteOnce
+  size: 5Gi
+  annotations: {}
+
+# Secret rendering. Provide credential references rather than embedding
+# plaintext in values.yaml. The Secret is mounted at /etc/comqtt/secrets.
+secret:
+  # -- Create the Secret. Set false when supplying an externally-managed Secret.
+  create: false
+  # -- Use an existing Secret (overrides `data`).
+  existingSecret: ""
+  # -- Key/value pairs rendered into the Secret. Keys become file names.
+  data: {}
+  #  redis-password: "..."
+  #  mysql-password: "..."
+  #  postgresql-password: "..."
+
+serviceMonitor:
+  # -- Create a ServiceMonitor for kube-prometheus-stack.
+  enabled: false
+  namespace: ""
+  interval: 30s
+  scrapeTimeout: 10s
+  labels: {}
+
+# -- Test pod settings (used by `helm test`).
+tests:
+  enabled: true
+  image:
+    repository: eclipse-mosquitto
+    tag: "2"

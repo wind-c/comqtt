@@ -1,0 +1,158 @@
+version: 2
+
+project_name: comqtt
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: comqtt
+    main: ./cmd/single
+    binary: comqtt
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
+    ignore:
+      - goos: windows
+        goarch: arm64
+
+  - id: comqtt-cluster
+    main: ./cmd/cluster
+    binary: comqtt-cluster
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
+
+archives:
+  - id: default
+    ids:
+      - comqtt
+      - comqtt-cluster
+    # Windows skips cmd/cluster, so its archive has 1 binary while
+    # linux/darwin archives have 2. Allow that intentional asymmetry.
+    allow_different_binary_count: true
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - LICENSE.md
+      - README.md
+      - cmd/config/*.yml
+
+checksum:
+  name_template: "checksums.txt"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-snapshot-{{ .ShortCommit }}"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+      - "Merge pull request"
+      - "Merge branch"
+  groups:
+    - title: Features
+      regexp: "^.*feat[(\\w)]*:+.*$"
+      order: 0
+    - title: Bug fixes
+      regexp: "^.*fix[(\\w)]*:+.*$"
+      order: 1
+    - title: Performance
+      regexp: "^.*perf[(\\w)]*:+.*$"
+      order: 2
+    - title: Other
+      order: 999
+
+dockers:
+  - id: comqtt-amd64
+    use: buildx
+    goos: linux
+    goarch: amd64
+    ids:
+      - comqtt
+      - comqtt-cluster
+    image_templates:
+      - "ghcr.io/{{ .Env.IMAGE_OWNER }}/comqtt:{{ .Version }}-amd64"
+      - "ghcr.io/{{ .Env.IMAGE_OWNER }}/comqtt:v{{ .Major }}.{{ .Minor }}-amd64"
+    dockerfile: Dockerfile.goreleaser
+    extra_files:
+      - cmd/config
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.title={{ .ProjectName }}"
+      - "--label=org.opencontainers.image.description=A lightweight high-performance MQTT broker (v3.0/v3.1.1/v5.0) supporting clustering"
+      - "--label=org.opencontainers.image.url=https://github.com/wind-c/comqtt"
+      - "--label=org.opencontainers.image.source=https://github.com/wind-c/comqtt"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+      - "--label=org.opencontainers.image.licenses=MIT"
+
+  - id: comqtt-arm64
+    use: buildx
+    goos: linux
+    goarch: arm64
+    ids:
+      - comqtt
+      - comqtt-cluster
+    image_templates:
+      - "ghcr.io/{{ .Env.IMAGE_OWNER }}/comqtt:{{ .Version }}-arm64"
+      - "ghcr.io/{{ .Env.IMAGE_OWNER }}/comqtt:v{{ .Major }}.{{ .Minor }}-arm64"
+    dockerfile: Dockerfile.goreleaser
+    extra_files:
+      - cmd/config
+    build_flag_templates:
+      - "--platform=linux/arm64"
+      - "--label=org.opencontainers.image.title={{ .ProjectName }}"
+      - "--label=org.opencontainers.image.description=A lightweight high-performance MQTT broker (v3.0/v3.1.1/v5.0) supporting clustering"
+      - "--label=org.opencontainers.image.url=https://github.com/wind-c/comqtt"
+      - "--label=org.opencontainers.image.source=https://github.com/wind-c/comqtt"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+      - "--label=org.opencontainers.image.licenses=MIT"
+
+docker_manifests:
+  - name_template: "ghcr.io/{{ .Env.IMAGE_OWNER }}/comqtt:{{ .Version }}"
+    image_templates:
+      - "ghcr.io/{{ .Env.IMAGE_OWNER }}/comqtt:{{ .Version }}-amd64"
+      - "ghcr.io/{{ .Env.IMAGE_OWNER }}/comqtt:{{ .Version }}-arm64"
+  - name_template: "ghcr.io/{{ .Env.IMAGE_OWNER }}/comqtt:v{{ .Major }}.{{ .Minor }}"
+    image_templates:
+      - "ghcr.io/{{ .Env.IMAGE_OWNER }}/comqtt:v{{ .Major }}.{{ .Minor }}-amd64"
+      - "ghcr.io/{{ .Env.IMAGE_OWNER }}/comqtt:v{{ .Major }}.{{ .Minor }}-arm64"
+  - name_template: "ghcr.io/{{ .Env.IMAGE_OWNER }}/comqtt:latest"
+    image_templates:
+      - "ghcr.io/{{ .Env.IMAGE_OWNER }}/comqtt:{{ .Version }}-amd64"
+      - "ghcr.io/{{ .Env.IMAGE_OWNER }}/comqtt:{{ .Version }}-arm64"
+
+release:
+  prerelease: auto
+  draft: false
+  name_template: "v{{ .Version }}"

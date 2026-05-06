@@ -1,0 +1,114 @@
+{{- /*
+For single mode the ConfigMap holds a fully-rendered config.yml that is
+mounted at /etc/comqtt/config.yml.
+
+For cluster mode it holds a *template* config.tpl.yml plus an entrypoint
+script that performs runtime substitution of node identity, bind IP,
+seed members, and the Raft bootstrap flag. This is necessary because
+cmd/cluster/main.go replaces all CLI flags with the contents of --conf
+when a config file is provided, so we must inject runtime values into
+the file itself rather than passing them as flags alongside --conf.
+*/ -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "comqtt.fullname" . }}-config
+  labels:
+    {{- include "comqtt.labels" . | nindent 4 }}
+data:
+{{- if eq .Values.mode "single" }}
+  config.yml: |
+{{- tpl (toYaml .Values.config) . | nindent 4 }}
+{{- else }}
+  config.tpl.yml: |
+{{- $cfg := deepCopy .Values.config -}}
+{{- /* Inject cluster-mode keys into the templated config. */ -}}
+{{- $_ := set $cfg "storage-way" 3 -}}
+{{- $cluster := dict
+    "discovery-way" .Values.cluster.discoveryWay
+    "node-name" "__NODE_NAME__"
+    "bind-addr" "__BIND_ADDR__"
+    "bind-port" (.Values.cluster.gossipPort | int)
+    "advertise-addr" ""
+    "advertise-port" 0
+    "members" "__MEMBERS_PLACEHOLDER__"
+    "queue-depth" (.Values.cluster.queueDepth | int)
+    "raft-impl" .Values.cluster.raftImpl
+    "raft-port" (.Values.cluster.raftPort | int)
+    "raft-dir" "/data/raft"
+    "raft-bootstrap" "__RAFT_BOOTSTRAP__"
+    "grpc-enable" .Values.cluster.grpcEnable
+    "grpc-port" (.Values.cluster.grpcPort | int)
+    "inbound-pool-size" (.Values.cluster.inboundPoolSize | int)
+    "outbound-pool-size" (.Values.cluster.outboundPoolSize | int)
+    "inout-pool-nonblocking" .Values.cluster.inoutPoolNonblocking
+-}}
+{{- $_ := set $cfg "cluster" $cluster -}}
+{{- tpl (toYaml $cfg) . | nindent 4 }}
+  entrypoint.sh: |
+    #!/bin/sh
+    set -eu
+
+    : "${POD_IP:?POD_IP must be set via downward API}"
+    : "${HOSTNAME:?HOSTNAME must be set}"
+    NAMESPACE="${POD_NAMESPACE:?POD_NAMESPACE must be set}"
+    HEADLESS="${HEADLESS_SERVICE:?HEADLESS_SERVICE must be set}"
+    POD_PREFIX="${POD_PREFIX:?POD_PREFIX must be set (StatefulSet name)}"
+    REPLICAS="${REPLICA_COUNT:?REPLICA_COUNT must be set}"
+    GOSSIP_PORT="${GOSSIP_PORT:-7946}"
+    RAFT_DIR="${RAFT_DIR:-/data/raft}"
+
+    mkdir -p "$RAFT_DIR" /data/logs /tmp/comqtt
+
+    # Build YAML flow-list of seed members: ["pod-0.svc:7946","pod-1.svc:7946",...]
+    members='['
+    i=0
+    while [ "$i" -lt "$REPLICAS" ]; do
+      if [ "$i" -gt 0 ]; then members="${members},"; fi
+      members="${members}\"${POD_PREFIX}-${i}.${HEADLESS}.${NAMESPACE}.svc.cluster.local:${GOSSIP_PORT}\""
+      i=$((i+1))
+    done
+    members="${members}]"
+
+    # Idempotent Raft bootstrap: true only when we are pod-0 AND raft dir is empty.
+    bootstrap="false"
+    case "$HOSTNAME" in
+      *-0)
+        if [ -z "$(ls -A "$RAFT_DIR" 2>/dev/null || true)" ]; then
+          bootstrap="true"
+          echo "[entrypoint] genesis pod with empty raft dir; --raft-bootstrap=true"
+        else
+          echo "[entrypoint] genesis pod but raft dir is non-empty; bootstrap suppressed"
+        fi
+        ;;
+      *) ;;
+    esac
+
+    # Render template config. Bash-free sed; escape members for sed by trusting
+    # that hostnames and ports do not contain '|'.
+    sed \
+      -e "s|__NODE_NAME__|${HOSTNAME}|g" \
+      -e "s|__BIND_ADDR__|${POD_IP}|g" \
+      -e "s|__MEMBERS_PLACEHOLDER__|${members}|g" \
+      -e "s|__RAFT_BOOTSTRAP__|${bootstrap}|g" \
+      /etc/comqtt/config.tpl.yml > /tmp/comqtt/config.yml
+
+    # The members value in YAML must not be quoted as a string.
+    # sed has produced a quoted string; rewrite the line to use the bare list.
+    awk -v list="${members}" '
+      /^[[:space:]]+members: / {
+        match($0, /^[[:space:]]+/);
+        prefix = substr($0, 1, RLENGTH);
+        print prefix "members: " list;
+        next
+      }
+      { print }
+    ' /tmp/comqtt/config.yml > /tmp/comqtt/config.rendered.yml
+    mv /tmp/comqtt/config.rendered.yml /tmp/comqtt/config.yml
+
+    echo "[entrypoint] rendered config:"
+    cat /tmp/comqtt/config.yml
+    echo "[entrypoint] exec /comqtt-cluster"
+
+    exec /comqtt-cluster --conf=/tmp/comqtt/config.yml
+{{- end }}

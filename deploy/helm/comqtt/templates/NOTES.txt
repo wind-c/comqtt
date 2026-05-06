@@ -1,0 +1,39 @@
+comqtt {{ .Chart.AppVersion }} has been deployed in {{ .Values.mode }} mode.
+
+Release: {{ .Release.Name }}
+Namespace: {{ .Release.Namespace }}
+
+Listeners (in-cluster):
+  MQTT  tcp://{{ include "comqtt.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.mqtt.port }}
+  WS    ws://{{ include "comqtt.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.ws.port }}/mqtt
+  HTTP  http://{{ include "comqtt.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.dashboard.port }}
+
+{{- if eq .Values.mode "cluster" }}
+
+Cluster mode: {{ .Values.replicaCount }} replicas. Pod-0 bootstraps Raft on
+first boot when its Raft data dir is empty; subsequent restarts skip the
+bootstrap flag automatically. Members:
+{{- range $i, $_ := until (.Values.replicaCount | int) }}
+  - {{ include "comqtt.headlessName" $ }}-{{ $i }}.{{ include "comqtt.headlessName" $ }}.{{ $.Release.Namespace }}.svc.cluster.local:{{ $.Values.cluster.gossipPort }}
+{{- end }}
+
+PodDisruptionBudget minAvailable = {{ include "comqtt.raftQuorum" . }} (Raft quorum).
+{{- end }}
+
+Quick smoke test:
+
+  kubectl run mqtt-pub --rm -i --restart=Never \
+    --image={{ .Values.tests.image.repository }}:{{ .Values.tests.image.tag }} -- \
+    mosquitto_pub -h {{ include "comqtt.fullname" . }} -p {{ .Values.service.mqtt.port }} \
+                  -t test/topic -m "hello from helm"
+
+To run the chart's bundled connectivity test:
+
+  helm test {{ .Release.Name }} --logs
+
+{{- if .Values.ingress.enabled }}
+
+Dashboard Ingress is enabled. Note: raw MQTT cannot be served by a Layer 7
+HTTP Ingress; for external MQTT use a LoadBalancer Service or an Ingress
+controller with TCP passthrough.
+{{- end }}

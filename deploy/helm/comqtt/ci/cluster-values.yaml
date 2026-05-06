@@ -1,0 +1,23 @@
+mode: cluster
+replicaCount: 3
+image:
+  repository: ghcr.io/wind-c/comqtt
+  tag: ""
+  pullPolicy: IfNotPresent
+persistence:
+  enabled: true
+  size: 1Gi
+# CI assumes a RESP-compatible store named `valkey` is reachable at
+# valkey:6379. See ci/valkey.yaml — chart-lint-test workflow applies it
+# before installing the cluster.
+config:
+  storage-way: 3
+  log:
+    output: 0
+  redis:
+    options:
+      addr: "valkey:6379"
+cluster:
+  hardAntiAffinity: false
+tests:
+  enabled: false
