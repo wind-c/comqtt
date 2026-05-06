@@ -1,0 +1,27 @@
+{{- if and .Values.gateway.enabled .Values.gateway.dashboard.enabled -}}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "comqtt.fullname" . }}-dashboard
+  labels:
+    {{- include "comqtt.labels" . | nindent 4 }}
+  {{- with .Values.gateway.dashboard.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  parentRefs:
+    {{- $refs := .Values.gateway.dashboard.parentRefs }}
+    {{- if not $refs }}{{ $refs = .Values.gateway.parentRefs }}{{ end }}
+    {{- toYaml $refs | nindent 4 }}
+  {{- with .Values.gateway.dashboard.hostnames }}
+  hostnames:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    - matches:
+        {{- toYaml .Values.gateway.dashboard.matches | nindent 8 }}
+      backendRefs:
+        - name: {{ include "comqtt.fullname" . }}
+          port: {{ .Values.service.dashboard.port }}
+{{- end }}

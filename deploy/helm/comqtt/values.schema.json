@@ -60,12 +60,23 @@
     },
     "ingress": {
       "type": "object",
+      "deprecated": true,
+      "description": "DEPRECATED. Prefer `gateway.*`.",
       "properties": {
         "enabled": { "type": "boolean" },
         "className": { "type": "string" },
         "annotations": { "type": "object" },
         "hosts": { "type": "array" },
         "tls": { "type": "array" }
+      }
+    },
+    "gateway": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "parentRefs": { "type": "array", "items": { "type": "object" } },
+        "dashboard": { "$ref": "#/$defs/gatewayRoute" },
+        "mqtt": { "$ref": "#/$defs/gatewayRoute" }
       }
     },
     "tls": {
@@ -169,6 +180,16 @@
         },
         "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
         "nodePort": { "type": ["integer", "string"] },
+        "annotations": { "type": "object" }
+      }
+    },
+    "gatewayRoute": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "parentRefs": { "type": "array", "items": { "type": "object" } },
+        "hostnames": { "type": "array", "items": { "type": "string" } },
+        "matches": { "type": "array", "items": { "type": "object" } },
         "annotations": { "type": "object" }
       }
     }

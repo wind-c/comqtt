@@ -115,7 +115,13 @@ is rejected by the schema.
 | `service.mqtt.{type,port,nodePort}` | — | `ClusterIP / 1883` | |
 | `service.ws.{type,port,nodePort}` | — | `ClusterIP / 1882` | |
 | `service.dashboard.{type,port,nodePort}` | — | `ClusterIP / 8080` | |
-| `ingress.enabled` | bool | `false` | Dashboard only. |
+| `ingress.enabled` | bool | `false` | **DEPRECATED.** Use `gateway.*`. Dashboard only. |
+| `gateway.enabled` | bool | `false` | Master toggle for Gateway API resources. |
+| `gateway.parentRefs` | list | `[]` | Default `parentRefs` for both routes. |
+| `gateway.dashboard.enabled` | bool | `true` | Emit `HTTPRoute` for the dashboard. |
+| `gateway.dashboard.hostnames` | list | `[]` | HTTPRoute hostnames. |
+| `gateway.dashboard.matches` | list | PathPrefix `/` | HTTPRoute path matches. |
+| `gateway.mqtt.enabled` | bool | `false` | Emit `TCPRoute` for raw MQTT (alpha API). |
 | `tls.enabled` | bool | `false` | |
 | `tls.existingSecret` | string | `""` | Pre-created Secret with tls.crt/tls.key/ca.crt. |
 | `tls.certManager.enabled` | bool | `false` | |
@@ -143,17 +149,51 @@ and [cmd/config/node1.yml](https://github.com/wind-c/comqtt/blob/main/cmd/config
 in the upstream repo. The chart's `config:` block mirrors those files
 verbatim.
 
-## Exposing MQTT externally
+## Exposing the broker externally
 
-A standard HTTP Ingress **cannot** proxy raw MQTT TCP — it is a Layer 7
-HTTP-only resource. Use one of:
+The chart prefers [Gateway API](https://gateway-api.sigs.k8s.io/) over the
+legacy `Ingress` resource. ingress-nginx is in [retirement as of
+2025-11-11](https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/)
+and a Layer 7 Ingress cannot proxy raw MQTT in any case.
+
+### Gateway API (preferred)
+
+You bring the `Gateway` resource and a Gateway API provider. Examples:
+[Envoy Gateway](https://gateway.envoyproxy.io/), Cilium, Istio, Kong.
+
+The chart emits:
+
+- `HTTPRoute` for the dashboard (`gateway.dashboard.enabled`, default on)
+- `TCPRoute` for raw MQTT (`gateway.mqtt.enabled`, default off — TCPRoute is
+  in `gateway.networking.k8s.io/v1alpha2` and requires a TCP-aware provider)
+
+Minimal example with Envoy Gateway in front:
+
+```yaml
+# values.yaml
+gateway:
+  enabled: true
+  parentRefs:
+    - name: eg
+      namespace: envoy-gateway-system
+  dashboard:
+    enabled: true
+    hostnames: ["comqtt.example.com"]
+  mqtt:
+    enabled: true
+```
+
+For TLS termination at the Gateway, configure listeners on the `Gateway`
+itself; for TLS at the broker, set `tls.existingSecret` and wire
+`config.mqtt.tls.{ca-cert,server-cert,server-key}`.
+
+### Legacy fallbacks
+
+If Gateway API is not available in your cluster:
 
 - `service.mqtt.type: LoadBalancer` — straightforward on cloud providers.
-- An Ingress controller with TCP passthrough (e.g. NGINX `--tcp-services-configmap`).
 - A NodePort plus an external load balancer or DNS round-robin.
-
-For TLS termination at the broker, supply `tls.existingSecret` and reference
-it from `config.mqtt.tls.{ca-cert,server-cert,server-key}`.
+- `ingress.*` (deprecated; dashboard only).
 
 ## Upgrades
 
@@ -183,8 +223,10 @@ it from `config.mqtt.tls.{ca-cert,server-cert,server-key}`.
 - No bundled RESP store. The chart expects an externally-deployed Redis or
   Valkey (see [ci/valkey.yaml](ci/valkey.yaml) for a starting point) — the
   chart does not manage failover or HA for it.
-- The dashboard Ingress proxies `/`. Mounting it under a sub-path is not
-  currently supported.
+- The dashboard `HTTPRoute` defaults to `PathPrefix /`. Override
+  `gateway.dashboard.matches` to mount under a sub-path; the dashboard's
+  embedded asset paths assume `/dashboard/`, so a sub-path mount needs an
+  HTTPRoute filter (`URLRewrite`) to strip the prefix before forwarding.
 
 ## Contributing
 
