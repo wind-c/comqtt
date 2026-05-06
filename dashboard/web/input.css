@@ -2,59 +2,85 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Vercel theme (tweakcn) - monochrome HSL tokens.
-   Light: white background, near-black foreground, near-black primary.
-   Dark:  black background, white foreground, white primary.
-   Components reference these via tailwind.config.js color aliases. */
+/* IoT-Blue palette - HSL tokens.
+   Foreground/grounding: Slate. Brand accent: Sky 500 (IoT/connectivity feel).
+   Status colors: Emerald (success), Amber (warning), Red (error). */
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 9%;
+    --background: 210 40% 98%;          /* Slate 50  */
+    --foreground: 222 47% 11%;          /* Slate 900 */
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 9%;
+    --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96%;
-    --muted-foreground: 0 0% 45%;
-    --accent: 0 0% 96%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 98%;
-    --success: 142 76% 36%;
-    --success-foreground: 0 0% 98%;
-    --border: 0 0% 89%;
-    --input: 0 0% 89%;
-    --ring: 0 0% 9%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 199 89% 48%;             /* Sky 500   */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 40% 96%;           /* Slate 100 */
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;    /* Slate 500 */
+    --accent: 210 40% 96%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 84% 60%;           /* Red 500   */
+    --destructive-foreground: 0 0% 100%;
+    --success: 160 84% 39%;             /* Emerald 500 */
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;              /* Amber 500 */
+    --warning-foreground: 222 47% 11%;
+    --border: 214 32% 91%;              /* Slate 200 */
+    --input: 214 32% 91%;
+    --ring: 199 89% 48%;                /* Sky 500   */
     --radius: 0.5rem;
   }
   .dark {
-    --background: 0 0% 0%;
-    --foreground: 0 0% 100%;
-    --card: 0 0% 4%;
-    --card-foreground: 0 0% 100%;
-    --popover: 0 0% 4%;
-    --popover-foreground: 0 0% 100%;
-    --primary: 0 0% 100%;
-    --primary-foreground: 0 0% 0%;
-    --secondary: 0 0% 9%;
-    --secondary-foreground: 0 0% 100%;
-    --muted: 0 0% 9%;
-    --muted-foreground: 0 0% 64%;
-    --accent: 0 0% 14%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 0 0% 100%;
-    --success: 142 70% 50%;
-    --success-foreground: 0 0% 0%;
-    --border: 0 0% 14%;
-    --input: 0 0% 14%;
-    --ring: 0 0% 80%;
+    --background: 222 47% 11%;          /* Slate 900 */
+    --foreground: 210 40% 98%;          /* Slate 50  */
+    --card: 217 33% 17%;                /* Slate 800 */
+    --card-foreground: 210 40% 98%;
+    --popover: 217 33% 17%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 199 93% 60%;             /* Sky 400   */
+    --primary-foreground: 222 47% 11%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;    /* Slate 400 */
+    --accent: 217 33% 17%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+    --success: 160 84% 39%;
+    --success-foreground: 210 40% 98%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 222 47% 11%;
+    --border: 215 19% 27%;              /* Slate 700 */
+    --input: 215 19% 27%;
+    --ring: 199 93% 60%;
   }
   body { font-feature-settings: "cv02","cv03","cv04","cv11"; }
+
+  /* Native <select> chrome doesn't follow the theme. Strip the OS arrow and
+     paint our own chevron; fill matches --card so the select reads as a
+     surface element rather than the gray-filled --input. */
+  select {
+    appearance: none;
+    -webkit-appearance: none;
+    background-color: hsl(var(--card));
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%2364748b' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 8 4 4 4-4'/%3E%3C/svg%3E");
+    background-position: right 0.5rem center;
+    background-repeat: no-repeat;
+    background-size: 1.25rem 1.25rem;
+    padding-right: 2rem;
+  }
+  .dark select {
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%2394a3b8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 8 4 4 4-4'/%3E%3C/svg%3E");
+  }
+  /* Firefox carries the native dotted focus outline on <select> even with
+     appearance:none; replace it with the theme ring. */
+  select:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 1px;
+  }
 }
 
 @layer components {

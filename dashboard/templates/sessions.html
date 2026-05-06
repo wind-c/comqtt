@@ -8,7 +8,7 @@
       <p class="text-sm text-muted-foreground mt-1">{{.Page.Total}} session{{if ne .Page.Total 1}}s{{end}}</p>
     </div>
     <form method="GET" action="/dashboard/sessions" class="flex items-center gap-2">
-      <select name="online" class="px-3 py-2 rounded border border-input bg-input text-sm">
+      <select name="online" class="px-3 py-2 rounded border border-input text-sm">
         <option value="" {{if eq .Online ""}}selected{{end}}>All</option>
         <option value="true" {{if eq .Online "true"}}selected{{end}}>Online</option>
         <option value="false" {{if eq .Online "false"}}selected{{end}}>Offline</option>

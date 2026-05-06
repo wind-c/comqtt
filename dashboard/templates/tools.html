@@ -29,7 +29,7 @@
     <div class="flex items-center gap-4">
       <label class="block">
         <span class="text-xs text-muted-foreground">QoS</span>
-        <select name="qos" class="mt-1 px-3 py-2 rounded border border-input bg-input text-sm">
+        <select name="qos" class="mt-1 px-3 py-2 rounded border border-input text-sm">
           <option value="0" {{if eq .Form.QoS 0}}selected{{end}}>0 - At most once</option>
           <option value="1" {{if eq .Form.QoS 1}}selected{{end}}>1 - At least once</option>
           <option value="2" {{if eq .Form.QoS 2}}selected{{end}}>2 - Exactly once</option>
