@@ -14,29 +14,35 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// quicTestAddr binds to an OS-assigned ephemeral UDP port so that
+// successive QUIC tests don't fight over the same fixed port - the
+// previous test's UDP socket isn't always released by quic-go quickly
+// enough for the next test to reuse it.
+const quicTestAddr = ":0"
+
 func TestNewQUIC(t *testing.T) {
-	l := NewQUIC("t1", testAddr, nil)
+	l := NewQUIC("t1", quicTestAddr, nil)
 	require.Equal(t, "t1", l.id)
-	require.Equal(t, testAddr, l.address)
+	require.Equal(t, quicTestAddr, l.address)
 }
 
 func TestQUICID(t *testing.T) {
-	l := NewQUIC("t1", testAddr, nil)
+	l := NewQUIC("t1", quicTestAddr, nil)
 	require.Equal(t, "t1", l.ID())
 }
 
 func TestQUICAddress(t *testing.T) {
-	l := NewQUIC("t1", testAddr, nil)
-	require.Equal(t, testAddr, l.Address())
+	l := NewQUIC("t1", quicTestAddr, nil)
+	require.Equal(t, quicTestAddr, l.Address())
 }
 
 func TestQUICProtocol(t *testing.T) {
-	l := NewQUIC("t1", testAddr, nil)
+	l := NewQUIC("t1", quicTestAddr, nil)
 	require.Equal(t, "quic", l.Protocol())
 }
 
 func TestQUICInit(t *testing.T) {
-	l := NewQUIC("t2", testAddr, &Config{
+	l := NewQUIC("t2", quicTestAddr, &Config{
 		TLSConfig: tlsConfigBasic,
 	})
 	err := l.Init(logger)
@@ -46,7 +52,7 @@ func TestQUICInit(t *testing.T) {
 }
 
 func TestQUICServeAndClose(t *testing.T) {
-	l := NewQUIC("t1", testAddr, &Config{
+	l := NewQUIC("t1", quicTestAddr, &Config{
 		TLSConfig: tlsConfigBasic,
 	})
 	err := l.Init(logger)
@@ -79,7 +85,7 @@ func TestQUICEstablishThenEnd(t *testing.T) {
 	tlsConfig.InsecureSkipVerify = true
 	tlsConfig.KeyLogWriter = os.Stdout
 	tlsConfig.NextProtos = []string{"mqtt"}
-	l := NewQUIC("t1", testAddr, &Config{
+	l := NewQUIC("t1", quicTestAddr, &Config{
 		TLSConfig: tlsConfig,
 	})
 	err := l.Init(logger)
@@ -113,7 +119,7 @@ func TestQUICRTTEstablishThenEnd(t *testing.T) {
 	tlsConfig.InsecureSkipVerify = true
 	tlsConfig.KeyLogWriter = os.Stdout
 	tlsConfig.NextProtos = []string{"mqtt"}
-	l := NewQUIC("t1", testAddr, &Config{
+	l := NewQUIC("t1", quicTestAddr, &Config{
 		TLSConfig: tlsConfig,
 	})
 	err := l.Init(logger)

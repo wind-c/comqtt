@@ -13,6 +13,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/wind-c/comqtt/v2/cluster/log"
@@ -74,6 +75,7 @@ type Peer struct {
 	stopC     chan struct{} // signals proposal channel closed
 	httpStopC chan struct{} // signals http server to shutdown
 	httpDoneC chan struct{} // signals http server shutdown complete
+	stopOnce  sync.Once     // guards Stop so it's safe to call from multiple goroutines
 
 	logger *zap.Logger
 }
@@ -288,6 +290,8 @@ func (p *Peer) startRaft() {
 }
 
 func (p *Peer) serveRaft() {
+	defer close(p.httpDoneC)
+
 	addr := net.JoinHostPort(p.conf.BindAddr, strconv.Itoa(p.conf.RaftPort))
 	listener, err := newStoppableListener(addr, p.httpStopC)
 	if err != nil {
@@ -320,25 +324,25 @@ func (p *Peer) serveChannels() {
 	// send proposals over raft
 	go func() {
 		confChangeCount := uint64(0)
+		proposeC := p.proposeC
+		confChangeC := p.confChangeC
 
-		for p.proposeC != nil && p.confChangeC != nil {
+		for proposeC != nil || confChangeC != nil {
 			select {
 			case <-p.stopC:
 				return
-			case prop, ok := <-p.proposeC:
+			case prop, ok := <-proposeC:
 				if !ok {
-					close(p.proposeC)
-					p.proposeC = nil
+					proposeC = nil
 				} else {
 					if err := p.node.Propose(context.TODO(), prop.MsgpackBytes()); err != nil {
 						log.Error("Propose", "error", err, "filter", prop.Payload, "nid", prop.NodeID, "type", prop.Type)
 					}
 				}
 
-			case cc, ok := <-p.confChangeC:
+			case cc, ok := <-confChangeC:
 				if !ok {
-					close(p.confChangeC)
-					p.confChangeC = nil
+					confChangeC = nil
 				} else {
 					confChangeCount++
 					cc.ID = confChangeCount
@@ -348,11 +352,10 @@ func (p *Peer) serveChannels() {
 				}
 			}
 		}
-		// client closed channel; shutdown raft if not ready
-		close(p.stopC)
 	}()
 
 	// event loop on raft state machine updates
+	defer p.shutdown()
 	for {
 		select {
 		case <-ticker.C:
@@ -390,7 +393,6 @@ func (p *Peer) serveChannels() {
 			return
 
 		case <-p.stopC:
-			p.Stop()
 			return
 		}
 	}
@@ -616,12 +618,32 @@ func (p *Peer) processMessages(ms []raftpb.Message) []raftpb.Message {
 }
 
 func (p *Peer) writeError(err error) {
-	p.errorC <- err
+	select {
+	case p.errorC <- err:
+	case <-p.stopC:
+	}
 	p.Stop()
 }
 
+// Stop signals the peer's goroutines to shut down. Safe to call from any
+// goroutine, including from inside serveChannels itself; subsequent calls
+// are no-ops. Channel/transport/node teardown happens in serveChannels'
+// deferred shutdown so the event loop never sees a half-torn-down peer.
 func (p *Peer) Stop() {
+	p.stopOnce.Do(func() {
+		close(p.stopC)
+	})
+}
+
+// shutdown is invoked by serveChannels on exit (deferred). It tears down
+// resources owned by the peer in a fixed order. Running it from a single
+// goroutine on a single path means the event loop never races with Stop().
+func (p *Peer) shutdown() {
 	p.stopHTTP()
+	if p.node != nil {
+		p.node.Stop()
+		p.node = nil
+	}
 	if p.commitC != nil {
 		close(p.commitC)
 		p.commitC = nil
@@ -634,15 +656,16 @@ func (p *Peer) Stop() {
 		close(p.confChangeC)
 		p.confChangeC = nil
 	}
-	if p.node != nil {
-		p.node.Stop()
-		p.node = nil
-	}
 }
 
 func (p *Peer) stopHTTP() {
 	p.transport.Stop()
-	close(p.httpStopC)
+	select {
+	case <-p.httpStopC:
+		// already closed
+	default:
+		close(p.httpStopC)
+	}
 	<-p.httpDoneC
 }
 
