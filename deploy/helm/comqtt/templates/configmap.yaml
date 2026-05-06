@@ -16,12 +16,21 @@ metadata:
   labels:
     {{- include "comqtt.labels" . | nindent 4 }}
 data:
+{{- $cfgBase := deepCopy .Values.config -}}
+{{- if .Values.dashboard.enabled -}}
+{{- $_ := set $cfgBase "dashboard" (dict
+    "enabled" true
+    "session-secret" ""
+    "password-expiry-days" (.Values.dashboard.passwordExpiryDays | int)) -}}
+{{- else -}}
+{{- $_ := set $cfgBase "dashboard" (dict "enabled" false) -}}
+{{- end -}}
 {{- if eq .Values.mode "single" }}
   config.yml: |
-{{- tpl (toYaml .Values.config) . | nindent 4 }}
+{{- tpl (toYaml $cfgBase) . | nindent 4 }}
 {{- else }}
   config.tpl.yml: |
-{{- $cfg := deepCopy .Values.config -}}
+{{- $cfg := $cfgBase -}}
 {{- /* Inject cluster-mode keys into the templated config. */ -}}
 {{- $_ := set $cfg "storage-way" 3 -}}
 {{- $cluster := dict

@@ -85,6 +85,7 @@ spec:
               value: {{ .Values.cluster.gossipPort | quote }}
             - name: RAFT_DIR
               value: /data/raft
+            {{- include "comqtt.dashboardEnv" . | nindent 12 }}
           ports:
             - name: mqtt
               containerPort: 1883

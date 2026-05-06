@@ -99,3 +99,47 @@ Render the rendered config (single-mode — used as-is) or the template config
 {{- define "comqtt.configYaml" -}}
 {{- toYaml .Values.config | nindent 0 -}}
 {{- end -}}
+
+{{/*
+Name of the chart-managed dashboard Secret (session secret + initial password).
+*/}}
+{{- define "comqtt.dashboardSecretName" -}}
+{{- printf "%s-dashboard" (include "comqtt.fullname" .) -}}
+{{- end -}}
+
+{{/*
+Whether the chart should render its own dashboard Secret (i.e. at least one of
+the inline values is set and no existingSecret overrides it).
+*/}}
+{{- define "comqtt.dashboardSecretCreate" -}}
+{{- $d := .Values.dashboard -}}
+{{- $sess := and (not $d.sessionSecret.existingSecret) $d.sessionSecret.value -}}
+{{- $pw := and (not $d.initialPassword.existingSecret) $d.initialPassword.value -}}
+{{- if or $sess $pw -}}true{{- end -}}
+{{- end -}}
+
+{{/*
+Env entries that wire the dashboard session secret + initial password from
+Secret references into the broker container. Emits nothing when neither is
+configured.
+*/}}
+{{- define "comqtt.dashboardEnv" -}}
+{{- if .Values.dashboard.enabled -}}
+{{- $d := .Values.dashboard -}}
+{{- $managed := include "comqtt.dashboardSecretName" . -}}
+{{- if or $d.sessionSecret.existingSecret $d.sessionSecret.value }}
+- name: COMQTT_DASHBOARD_SESSION_SECRET
+  valueFrom:
+    secretKeyRef:
+      name: {{ default $managed $d.sessionSecret.existingSecret | quote }}
+      key: {{ $d.sessionSecret.key | quote }}
+{{- end }}
+{{- if or $d.initialPassword.existingSecret $d.initialPassword.value }}
+- name: DASHBOARD_INITIAL_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ default $managed $d.initialPassword.existingSecret | quote }}
+      key: {{ $d.initialPassword.key | quote }}
+{{- end }}
+{{- end }}
+{{- end -}}

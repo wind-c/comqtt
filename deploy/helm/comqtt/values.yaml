@@ -267,6 +267,36 @@ serviceMonitor:
   scrapeTimeout: 10s
   labels: {}
 
+# Embedded web dashboard. Mounts on the dashboard HTTP port (8080) alongside
+# the existing /api/v1 admin API. Requires comqtt with the dashboard feature
+# (PR #151); on older images the chart values are inert.
+dashboard:
+  # -- Enable the embedded web dashboard. Defaults match the broker default.
+  enabled: true
+  # -- Password expiry in days. 0 disables expiry.
+  passwordExpiryDays: 90
+  # Session HMAC secret. Pin one across pod restarts so login cookies survive
+  # rolling updates. In cluster mode the broker prefers a redis-backed shared
+  # secret automatically; this block is then a fallback if redis is unreachable
+  # at boot. Provide either an existing Secret reference or an inline value
+  # (rendered into a chart-managed Secret named `<release>-dashboard`).
+  sessionSecret:
+    # -- Source from an existing Secret. Takes precedence over `value`.
+    existingSecret: ""
+    # -- Key inside the Secret. Value must be base64 (>= 16 raw bytes) or raw.
+    key: session-secret
+    # -- Inline value (base64 or raw). Rendered into the chart-managed Secret.
+    value: ""
+  # Initial admin password. If unset, the broker prints a random password to
+  # stdout on first boot (`kubectl logs ...`). After first login, change it.
+  initialPassword:
+    # -- Source from an existing Secret. Takes precedence over `value`.
+    existingSecret: ""
+    # -- Key inside the Secret.
+    key: initial-password
+    # -- Inline value. Rendered into the chart-managed Secret.
+    value: ""
+
 # -- Test pod settings (used by `helm test`).
 tests:
   enabled: true

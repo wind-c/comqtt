@@ -136,6 +136,14 @@ is rejected by the schema.
 | `secret.data` | map | `{}` | Keys become file names under `/etc/comqtt/secrets`. |
 | `serviceMonitor.enabled` | bool | `false` | kube-prometheus-stack. |
 | `tests.enabled` | bool | `true` | `helm test` mosquitto pod. |
+| `dashboard.enabled` | bool | `true` | Embedded web dashboard (broker default). |
+| `dashboard.passwordExpiryDays` | int | `90` | 0 disables. |
+| `dashboard.sessionSecret.existingSecret` | string | `""` | Pre-created Secret holding the HMAC session secret. |
+| `dashboard.sessionSecret.key` | string | `session-secret` | Key inside the Secret. |
+| `dashboard.sessionSecret.value` | string | `""` | Inline secret rendered into a chart-managed Secret. |
+| `dashboard.initialPassword.existingSecret` | string | `""` | Pre-created Secret holding the initial admin password. |
+| `dashboard.initialPassword.key` | string | `initial-password` | Key inside the Secret. |
+| `dashboard.initialPassword.value` | string | `""` | Inline initial password rendered into a chart-managed Secret. |
 
 For the full list of `config.*` keys (storage, auth, mqtt, redis, log) see
 [cmd/config/single.yml](https://github.com/wind-c/comqtt/blob/main/cmd/config/single.yml)

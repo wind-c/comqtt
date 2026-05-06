@@ -131,6 +131,15 @@
         "labels": { "type": "object" }
       }
     },
+    "dashboard": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "passwordExpiryDays": { "type": "integer", "minimum": 0 },
+        "sessionSecret": { "$ref": "#/$defs/secretRef" },
+        "initialPassword": { "$ref": "#/$defs/secretRef" }
+      }
+    },
     "tests": {
       "type": "object",
       "properties": {
@@ -170,6 +179,14 @@
         "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
         "nodePort": { "type": ["integer", "string"] },
         "annotations": { "type": "object" }
+      }
+    },
+    "secretRef": {
+      "type": "object",
+      "properties": {
+        "existingSecret": { "type": "string" },
+        "key": { "type": "string", "minLength": 1 },
+        "value": { "type": "string" }
       }
     }
   }
