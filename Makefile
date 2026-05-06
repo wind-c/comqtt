@@ -3,9 +3,9 @@ TAILWIND_BIN := bin/tailwindcss
 
 .PHONY: dashboard
 dashboard: $(TAILWIND_BIN)
-	$(TAILWIND_BIN) -c mqtt/dashboard/web/tailwind.config.js \
-		-i mqtt/dashboard/web/input.css \
-		-o mqtt/dashboard/static/tailwind.css --minify
+	$(TAILWIND_BIN) -c dashboard/web/tailwind.config.js \
+		-i dashboard/web/input.css \
+		-o dashboard/static/tailwind.css --minify
 
 $(TAILWIND_BIN):
 	@mkdir -p bin

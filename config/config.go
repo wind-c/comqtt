@@ -107,7 +107,7 @@ type Config struct {
 }
 
 // Dashboard holds the v1 web-dashboard wiring choices. Defaults are applied
-// in mqtt/dashboard.Options.applyDefaults; these YAML fields let operators
+// in dashboard.Options.applyDefaults; these YAML fields let operators
 // opt out (Enabled=false), pin a session secret across restarts, or change
 // the password expiry policy without code changes.
 type Dashboard struct {

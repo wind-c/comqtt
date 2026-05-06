@@ -18,7 +18,7 @@ import (
 	"github.com/wind-c/comqtt/v2/cluster/log"
 	"github.com/wind-c/comqtt/v2/config"
 	"github.com/wind-c/comqtt/v2/mqtt"
-	"github.com/wind-c/comqtt/v2/mqtt/dashboard"
+	"github.com/wind-c/comqtt/v2/dashboard"
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/auth"
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/storage/badger"
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/storage/bolt"
