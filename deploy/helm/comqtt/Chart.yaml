@@ -4,7 +4,7 @@ description: |
   comqtt — a lightweight, high-performance MQTT broker (v3.0/v3.1.1/v5.0)
   supporting standalone and clustered (Raft + Gossip) deployments.
 type: application
-version: 0.1.0
+version: 0.2.0
 appVersion: "2.6.0"
 kubeVersion: ">=1.23.0-0"
 home: https://github.com/wind-c/comqtt
@@ -25,7 +25,7 @@ icon: https://raw.githubusercontent.com/wind-c/comqtt/main/README.md
 annotations:
   artifacthub.io/changes: |
     - kind: added
-      description: Initial Helm chart with single-node and clustered deployment modes (resolves #137).
+      description: dashboard.* values block plus Secret-mounted session secret and initial password (follow-up to #151).
   artifacthub.io/license: MIT
 ## Bitnami sub-charts intentionally omitted: as of 2025 the public bitnami/*
 ## Docker images are behind authentication. Bring your own Redis/Valkey,
