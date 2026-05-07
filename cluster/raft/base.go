@@ -37,7 +37,11 @@ func NewKV() *KV {
 func (k *KV) GetAll() *data {
 	k.RLock()
 	defer k.RUnlock()
-	return &k.data
+	cp := make(data, len(k.data))
+	for k, v := range k.data {
+		cp[k] = append([]string(nil), v...)
+	}
+	return &cp
 }
 
 func (k *KV) Get(key string) []string {
