@@ -115,12 +115,12 @@ is rejected by the schema.
 | `service.mqtt.{type,port,nodePort}` | — | `ClusterIP / 1883` | |
 | `service.ws.{type,port,nodePort}` | — | `ClusterIP / 1882` | |
 | `service.dashboard.{type,port,nodePort}` | — | `ClusterIP / 8080` | |
-| `ingress.enabled` | bool | `false` | **DEPRECATED.** Use `gateway.*`. Dashboard only. |
+| `ingress.enabled` | bool | `false` | **DEPRECATED.** Use `gateway.*`. HTTP listener only. |
 | `gateway.enabled` | bool | `false` | Master toggle for Gateway API resources. |
 | `gateway.parentRefs` | list | `[]` | Default `parentRefs` for both routes. |
-| `gateway.dashboard.enabled` | bool | `true` | Emit `HTTPRoute` for the dashboard. |
-| `gateway.dashboard.hostnames` | list | `[]` | HTTPRoute hostnames. |
-| `gateway.dashboard.matches` | list | PathPrefix `/` | HTTPRoute path matches. |
+| `gateway.api.enabled` | bool | `true` | Emit `HTTPRoute` for the broker's HTTP listener (REST + metrics). |
+| `gateway.api.hostnames` | list | `[]` | HTTPRoute hostnames. |
+| `gateway.api.matches` | list | PathPrefix `/` | HTTPRoute path matches. |
 | `gateway.mqtt.enabled` | bool | `false` | Emit `TCPRoute` for raw MQTT (alpha API). |
 | `tls.enabled` | bool | `false` | |
 | `tls.existingSecret` | string | `""` | Pre-created Secret with tls.crt/tls.key/ca.crt. |
@@ -163,7 +163,10 @@ You bring the `Gateway` resource and a Gateway API provider. Examples:
 
 The chart emits:
 
-- `HTTPRoute` for the dashboard (`gateway.dashboard.enabled`, default on)
+- `HTTPRoute` for the broker's HTTP listener on port 8080
+  (`gateway.api.enabled`, default on). This serves the existing `/api/v1/*`
+  REST surface and `/metrics`. Most users will not expose this externally;
+  flip the toggle off if you don't need it.
 - `TCPRoute` for raw MQTT (`gateway.mqtt.enabled`, default off — TCPRoute is
   in `gateway.networking.k8s.io/v1alpha2` and requires a TCP-aware provider)
 
@@ -176,7 +179,7 @@ gateway:
   parentRefs:
     - name: eg
       namespace: envoy-gateway-system
-  dashboard:
+  api:
     enabled: true
     hostnames: ["comqtt.example.com"]
   mqtt:
@@ -193,7 +196,7 @@ If Gateway API is not available in your cluster:
 
 - `service.mqtt.type: LoadBalancer` — straightforward on cloud providers.
 - A NodePort plus an external load balancer or DNS round-robin.
-- `ingress.*` (deprecated; dashboard only).
+- `ingress.*` (deprecated; HTTP listener only, cannot proxy raw MQTT).
 
 ## Upgrades
 
@@ -223,10 +226,10 @@ If Gateway API is not available in your cluster:
 - No bundled RESP store. The chart expects an externally-deployed Redis or
   Valkey (see [ci/valkey.yaml](ci/valkey.yaml) for a starting point) — the
   chart does not manage failover or HA for it.
-- The dashboard `HTTPRoute` defaults to `PathPrefix /`. Override
-  `gateway.dashboard.matches` to mount under a sub-path; the dashboard's
-  embedded asset paths assume `/dashboard/`, so a sub-path mount needs an
-  HTTPRoute filter (`URLRewrite`) to strip the prefix before forwarding.
+- The HTTP `HTTPRoute` defaults to `PathPrefix /`. Override
+  `gateway.api.matches` to mount under a sub-path; consumers expecting
+  routes at `/api/v1/...` and `/metrics` will need an HTTPRoute filter
+  (`URLRewrite`) to strip the prefix before forwarding.
 
 ## Contributing
 

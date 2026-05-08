@@ -127,9 +127,9 @@ ingress:
   #    back-compat only; ingress-nginx is in retirement
   #    (https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/) and a
   #    standard HTTP Ingress cannot proxy raw MQTT TCP regardless. New
-  #    deployments should use `gateway.dashboard` (HTTPRoute) and
-  #    `gateway.mqtt` (TCPRoute) with a Gateway API provider such as Envoy
-  #    Gateway, Cilium, or Istio.
+  #    deployments should use `gateway.api` (HTTPRoute) and `gateway.mqtt`
+  #    (TCPRoute) with a Gateway API provider such as Envoy Gateway, Cilium,
+  #    or Istio.
   enabled: false
   className: ""
   annotations: {}
@@ -141,8 +141,9 @@ ingress:
   tls: []
 
 # Gateway API (preferred over `ingress:`). The chart emits an HTTPRoute for
-# the dashboard and a TCPRoute for raw MQTT. You bring the Gateway resource —
-# install one of the Gateway API providers (Envoy Gateway, Cilium, Istio,
+# the broker's HTTP listener (REST API at /api/v1/* and Prometheus metrics at
+# /metrics on port 8080) and a TCPRoute for raw MQTT. You bring the Gateway
+# resource: install a Gateway API provider (Envoy Gateway, Cilium, Istio,
 # Kong, etc.) and reference it from `parentRefs`. TCPRoute is alpha
 # (gateway.networking.k8s.io/v1alpha2) and supported by a subset of providers.
 gateway:
@@ -155,8 +156,9 @@ gateway:
   #    namespace: gateway-system
   #    sectionName: http        # for HTTPRoute
   #    sectionName: mqtt        # for TCPRoute
-  dashboard:
-    # -- Emit an HTTPRoute for the dashboard backend.
+  api:
+    # -- Emit an HTTPRoute for the broker's HTTP listener (REST API +
+    #    metrics on port 8080).
     enabled: true
     # -- Override `gateway.parentRefs` for this route. Empty inherits.
     parentRefs: []

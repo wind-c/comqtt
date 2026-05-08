@@ -36,7 +36,7 @@ To run the chart's bundled connectivity test:
 WARNING: `ingress.*` is DEPRECATED. ingress-nginx is in retirement
 (https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/) and
 a Layer 7 Ingress cannot proxy raw MQTT. Migrate to `gateway.*`
-(Gateway API): set `gateway.enabled=true` plus `gateway.dashboard.enabled=true`
+(Gateway API): set `gateway.enabled=true` plus `gateway.api.enabled=true`
 (and `gateway.mqtt.enabled=true` for raw MQTT) and supply a Gateway via
 `gateway.parentRefs`.
 {{- end }}
@@ -44,11 +44,12 @@ a Layer 7 Ingress cannot proxy raw MQTT. Migrate to `gateway.*`
 {{- if .Values.gateway.enabled }}
 
 Gateway API routes:
-{{- if .Values.gateway.dashboard.enabled }}
-  HTTPRoute  {{ include "comqtt.fullname" . }}-dashboard  -> Service/{{ include "comqtt.fullname" . }}:{{ .Values.service.dashboard.port }}
+{{- if .Values.gateway.api.enabled }}
+  HTTPRoute  {{ include "comqtt.fullname" . }}-api  -> Service/{{ include "comqtt.fullname" . }}:{{ .Values.service.dashboard.port }}
+                                                       (REST API + /metrics)
 {{- end }}
 {{- if .Values.gateway.mqtt.enabled }}
-  TCPRoute   {{ include "comqtt.fullname" . }}-mqtt       -> Service/{{ include "comqtt.fullname" . }}:{{ .Values.service.mqtt.port }}
-                                                            (requires gateway.networking.k8s.io/v1alpha2)
+  TCPRoute   {{ include "comqtt.fullname" . }}-mqtt -> Service/{{ include "comqtt.fullname" . }}:{{ .Values.service.mqtt.port }}
+                                                       (requires gateway.networking.k8s.io/v1alpha2)
 {{- end }}
 {{- end }}

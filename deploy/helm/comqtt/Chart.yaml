@@ -25,7 +25,7 @@ icon: https://raw.githubusercontent.com/wind-c/comqtt/main/README.md
 annotations:
   artifacthub.io/changes: |
     - kind: added
-      description: Gateway API support — HTTPRoute (dashboard) and TCPRoute (MQTT).
+      description: Gateway API support, HTTPRoute (REST API + /metrics) and TCPRoute (MQTT).
     - kind: deprecated
       description: ingress.* (use gateway.* instead).
   artifacthub.io/license: MIT

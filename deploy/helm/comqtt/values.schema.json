@@ -75,7 +75,7 @@
       "properties": {
         "enabled": { "type": "boolean" },
         "parentRefs": { "type": "array", "items": { "type": "object" } },
-        "dashboard": { "$ref": "#/$defs/gatewayRoute" },
+        "api": { "$ref": "#/$defs/gatewayRoute" },
         "mqtt": { "$ref": "#/$defs/gatewayRoute" }
       }
     },
