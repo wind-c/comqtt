@@ -33,7 +33,23 @@ To run the chart's bundled connectivity test:
 
 {{- if .Values.ingress.enabled }}
 
-Dashboard Ingress is enabled. Note: raw MQTT cannot be served by a Layer 7
-HTTP Ingress; for external MQTT use a LoadBalancer Service or an Ingress
-controller with TCP passthrough.
+WARNING: `ingress.*` is DEPRECATED. ingress-nginx is in retirement
+(https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/) and
+a Layer 7 Ingress cannot proxy raw MQTT. Migrate to `gateway.*`
+(Gateway API): set `gateway.enabled=true` plus `gateway.api.enabled=true`
+(and `gateway.mqtt.enabled=true` for raw MQTT) and supply a Gateway via
+`gateway.parentRefs`.
+{{- end }}
+
+{{- if .Values.gateway.enabled }}
+
+Gateway API routes:
+{{- if .Values.gateway.api.enabled }}
+  HTTPRoute  {{ include "comqtt.fullname" . }}-api  -> Service/{{ include "comqtt.fullname" . }}:{{ .Values.service.dashboard.port }}
+                                                       (REST API + /metrics)
+{{- end }}
+{{- if .Values.gateway.mqtt.enabled }}
+  TCPRoute   {{ include "comqtt.fullname" . }}-mqtt -> Service/{{ include "comqtt.fullname" . }}:{{ .Values.service.mqtt.port }}
+                                                       (requires gateway.networking.k8s.io/v1alpha2)
+{{- end }}
 {{- end }}

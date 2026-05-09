@@ -1,0 +1,34 @@
+{{- if and .Values.gateway.enabled .Values.gateway.api.enabled -}}
+{{- /*
+HTTPRoute for the broker's HTTP listener (port 8080 by default), which
+serves the /api/v1/* REST surface and /metrics. The chart's
+`service.dashboard.port` value name is kept for back-compat with chart
+0.1.0; it refers to the HTTP listener port regardless of what is mounted
+on it.
+*/ -}}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "comqtt.fullname" . }}-api
+  labels:
+    {{- include "comqtt.labels" . | nindent 4 }}
+  {{- with .Values.gateway.api.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  parentRefs:
+    {{- $refs := .Values.gateway.api.parentRefs }}
+    {{- if not $refs }}{{ $refs = .Values.gateway.parentRefs }}{{ end }}
+    {{- toYaml $refs | nindent 4 }}
+  {{- with .Values.gateway.api.hostnames }}
+  hostnames:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    - matches:
+        {{- toYaml .Values.gateway.api.matches | nindent 8 }}
+      backendRefs:
+        - name: {{ include "comqtt.fullname" . }}
+          port: {{ .Values.service.dashboard.port }}
+{{- end }}

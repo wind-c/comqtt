@@ -123,9 +123,13 @@ service:
     annotations: {}
 
 ingress:
-  # -- Enable Ingress for the dashboard. NOTE: a standard HTTP Ingress cannot
-  #    proxy raw MQTT TCP. To expose MQTT externally, use a LoadBalancer
-  #    Service or an Ingress controller with TCP/passthrough support.
+  # -- DEPRECATED. Prefer `gateway.*` (Gateway API). Ingress is retained for
+  #    back-compat only; ingress-nginx is in retirement
+  #    (https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/) and a
+  #    standard HTTP Ingress cannot proxy raw MQTT TCP regardless. New
+  #    deployments should use `gateway.api` (HTTPRoute) and `gateway.mqtt`
+  #    (TCPRoute) with a Gateway API provider such as Envoy Gateway, Cilium,
+  #    or Istio.
   enabled: false
   className: ""
   annotations: {}
@@ -135,6 +139,44 @@ ingress:
         - path: /
           pathType: Prefix
   tls: []
+
+# Gateway API (preferred over `ingress:`). The chart emits an HTTPRoute for
+# the broker's HTTP listener (REST API at /api/v1/* and Prometheus metrics at
+# /metrics on port 8080) and a TCPRoute for raw MQTT. You bring the Gateway
+# resource: install a Gateway API provider (Envoy Gateway, Cilium, Istio,
+# Kong, etc.) and reference it from `parentRefs`. TCPRoute is alpha
+# (gateway.networking.k8s.io/v1alpha2) and supported by a subset of providers.
+gateway:
+  # -- Master toggle. Routes also need their per-route `enabled` flag.
+  enabled: false
+  # -- Default `parentRefs` applied to both routes when the per-route value
+  #    is empty. Each entry is a Gateway API ParentReference object.
+  parentRefs: []
+  #  - name: my-gateway
+  #    namespace: gateway-system
+  #    sectionName: http        # for HTTPRoute
+  #    sectionName: mqtt        # for TCPRoute
+  api:
+    # -- Emit an HTTPRoute for the broker's HTTP listener (REST API +
+    #    metrics on port 8080).
+    enabled: true
+    # -- Override `gateway.parentRefs` for this route. Empty inherits.
+    parentRefs: []
+    # -- Hostnames the route matches (HTTPRoute `spec.hostnames`).
+    hostnames: []
+    # -- HTTPRoute path matches. Defaults to PathPrefix `/`.
+    matches:
+      - path:
+          type: PathPrefix
+          value: /
+    annotations: {}
+  mqtt:
+    # -- Emit a TCPRoute for raw MQTT. Requires a Gateway implementation
+    #    that supports gateway.networking.k8s.io/v1alpha2 TCPRoute.
+    enabled: false
+    # -- Override `gateway.parentRefs` for this route.
+    parentRefs: []
+    annotations: {}
 
 tls:
   # -- Enable MQTT TLS. When enabled either provide `existingSecret` or wire

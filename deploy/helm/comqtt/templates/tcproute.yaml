@@ -1,0 +1,26 @@
+{{- if and .Values.gateway.enabled .Values.gateway.mqtt.enabled -}}
+{{- /*
+TCPRoute is in gateway.networking.k8s.io/v1alpha2 as of Gateway API v1.2 and
+ships only with TCP-aware Gateway implementations (Envoy Gateway, Cilium,
+etc.). Plain ingress-nginx does not support TCPRoute.
+*/ -}}
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: TCPRoute
+metadata:
+  name: {{ include "comqtt.fullname" . }}-mqtt
+  labels:
+    {{- include "comqtt.labels" . | nindent 4 }}
+  {{- with .Values.gateway.mqtt.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  parentRefs:
+    {{- $refs := .Values.gateway.mqtt.parentRefs }}
+    {{- if not $refs }}{{ $refs = .Values.gateway.parentRefs }}{{ end }}
+    {{- toYaml $refs | nindent 4 }}
+  rules:
+    - backendRefs:
+        - name: {{ include "comqtt.fullname" . }}
+          port: {{ .Values.service.mqtt.port }}
+{{- end }}
