@@ -1,0 +1,76 @@
+{{define "auth"}}{{template "layout" .}}{{end}}
+{{define "title"}}Auth Users{{end}}
+{{define "content"}}
+<div id="auth-area">
+<div class="toolbar">
+    <input class="search-box" type="text" id="auth-search" placeholder="Search username..." oninput="filterAuth()">
+    <span class="text-muted" id="auth-count"></span>
+    <button class="btn btn-accent" onclick="showUserModal()">+ Add User</button>
+</div>
+<table><thead><tr><th>Username</th><th>Allow</th><th>ACL</th><th></th></tr></thead><tbody id="auth-tbody"></tbody></table>
+</div>
+<div id="user-modal" class="modal" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+    <div class="modal-box"><h3 style="margin-bottom:16px" id="user-modal-title">Add User</h3>
+        <div class="form-group"><label>Username</label><input id="user-name" autocomplete="off"></div>
+        <div class="form-group"><label>Password</label><input id="user-pwd" type="password" autocomplete="new-password" placeholder="leave empty to keep"></div>
+        <div class="form-group">
+            <label for="user-allow" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer">Allow Access <input type="checkbox" id="user-allow" checked></label>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+            <button class="btn" onclick="closeUserModal()">Cancel</button>
+            <button class="btn btn-accent" id="user-save-btn" onclick="saveUser()">Create</button>
+        </div>
+    </div>
+</div>
+<script>
+(function(){
+var editUser = '', allUsers = [];
+function load() {
+    api('/api/v1/auth/users').then(function(users){
+        allUsers = users;
+        renderUsers();
+    });
+}
+function renderUsers() {
+    var s = (document.getElementById('auth-search').value||'').toLowerCase();
+    var filtered = allUsers.filter(function(u){ return u.username.toLowerCase().indexOf(s) >= 0 });
+    document.getElementById('auth-count').textContent = allUsers.length + ' users' + (s ? ' ('+filtered.length+' shown)' : '');
+    document.getElementById('auth-tbody').innerHTML = filtered.map(function(u){
+        return '<tr><td class="mono">'+esc(u.username)+'</td><td><span class="tag '+(u.allow?'tag-accent':'')+'">'+(u.allow?'Allowed':'Denied')+'</span></td>'+
+          '<td><a href="/dashboard/acl?user='+encodeURIComponent(u.username)+'" class="btn" style="font-size:0.75rem;padding:4px 8px">Manage ACL</a></td>'+
+          '<td><button class="btn" style="font-size:0.75rem;padding:4px 8px;margin-right:4px" onclick="editUserModal(\''+esc(u.username)+'\','+u.allow+')">Edit</button>'+
+          '<button class="btn btn-danger" style="font-size:0.75rem;padding:4px 8px" onclick="deleteUser(\''+esc(u.username)+'\')">Delete</button></td></tr>';
+    }).join('');
+}
+window.filterAuth = function(){ renderUsers(); };
+window.showUserModal = function() {
+    editUser = ''; document.getElementById('user-modal-title').textContent='Add User';
+    document.getElementById('user-name').value=''; document.getElementById('user-name').disabled=false;
+    document.getElementById('user-pwd').value=''; document.getElementById('user-allow').checked=true;
+    document.getElementById('user-save-btn').textContent='Create'; document.getElementById('user-modal').style.display='flex';
+};
+window.editUserModal = function(u,allow) {
+    editUser = u; document.getElementById('user-modal-title').textContent='Edit '+u;
+    document.getElementById('user-name').value=u; document.getElementById('user-name').disabled=true;
+    document.getElementById('user-pwd').value=''; document.getElementById('user-allow').checked=allow;
+    document.getElementById('user-save-btn').textContent='Save'; document.getElementById('user-modal').style.display='flex';
+};
+window.closeUserModal = function() { document.getElementById('user-modal').style.display='none' };
+window.saveUser = function() {
+    var name = document.getElementById('user-name').value;
+    var pwd = document.getElementById('user-pwd').value;
+    var allow = document.getElementById('user-allow').checked;
+    var method = editUser ? 'PUT' : 'POST';
+    var url = editUser ? '/api/v1/auth/users/'+editUser : '/api/v1/auth/users';
+    var body = JSON.stringify(editUser?{password:pwd,allow:allow}:{username:name,password:pwd,allow:allow});
+    api(url,{method:method,body:body}).then(function(){ closeUserModal(); load() });
+};
+window.deleteUser = function(u) {
+    if (confirm('Delete user '+u+' and all ACL rules?')) {
+        api('/api/v1/auth/users/'+u,{method:'DELETE'}).then(function(){ load() });
+    }
+};
+load();
+})();
+</script>
+{{end}}

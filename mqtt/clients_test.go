@@ -744,3 +744,18 @@ var (
 		packets.TPacketData[packets.Auth].Get(packets.TAuth),
 	}
 )
+
+func TestClientConnectedAtSetOnCreation(t *testing.T) {
+	cl, _, _ := newTestClient()
+
+	require.False(t, cl.ConnectedAt.IsZero())
+	require.WithinDuration(t, time.Now(), cl.ConnectedAt, 100*time.Millisecond)
+}
+
+func TestClientConnectedAtRoundTrip(t *testing.T) {
+	cl, _, _ := newTestClient()
+	expected := time.Date(2025, 1, 15, 10, 30, 0, 0, time.UTC)
+	cl.ConnectedAt = expected
+
+	require.True(t, expected.Equal(cl.ConnectedAt))
+}

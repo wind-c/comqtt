@@ -24,6 +24,7 @@ const (
 const (
 	TagRaftPort = "raft-port"
 	TagGrpcPort = "grpc-port"
+	TagHttpPort = "http-port"
 )
 
 type Node interface {

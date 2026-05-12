@@ -5,6 +5,7 @@
 package serf
 
 import (
+	"net"
 	"strconv"
 
 	"github.com/hashicorp/logutils"
@@ -27,6 +28,18 @@ func wrapOptions(conf *config.Cluster, ech chan serf.Event) *serf.Config {
 	config.Init()
 	config.MemberlistConfig.BindAddr = conf.BindAddr
 	config.MemberlistConfig.BindPort = conf.BindPort
+	if conf.AdvertiseAddr != "" {
+		config.MemberlistConfig.AdvertiseAddr = conf.AdvertiseAddr
+		// memberlist requires IP, not hostname. If it's a hostname, resolve it.
+		if net.ParseIP(conf.AdvertiseAddr) == nil {
+			if ips, err := net.LookupIP(conf.AdvertiseAddr); err == nil && len(ips) > 0 {
+				config.MemberlistConfig.AdvertiseAddr = ips[0].String()
+			}
+		}
+	}
+	if conf.AdvertisePort != 0 {
+		config.MemberlistConfig.AdvertisePort = conf.AdvertisePort
+	}
 	config.NodeName = conf.NodeName
 	config.EventCh = ech
 	if conf.Tags == nil {
@@ -35,6 +48,7 @@ func wrapOptions(conf *config.Cluster, ech chan serf.Event) *serf.Config {
 	if len(conf.Tags) == 0 {
 		conf.Tags[mb.TagRaftPort] = strconv.Itoa(conf.RaftPort)
 		conf.Tags[mb.TagGrpcPort] = strconv.Itoa(conf.GrpcPort)
+		conf.Tags[mb.TagHttpPort] = strconv.Itoa(conf.HttpPort)
 	}
 	config.Tags = conf.Tags
 	if conf.QueueDepth != 0 {

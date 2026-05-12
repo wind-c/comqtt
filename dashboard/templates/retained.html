@@ -1,0 +1,75 @@
+{{define "retained"}}{{template "layout" .}}{{end}}
+{{define "title"}}Retained{{end}}
+{{define "content"}}
+<div id="retained-area">
+<div class="toolbar"><input class="search-box" type="text" id="ret-search" placeholder="Search topic..." oninput="filterTable()"></div>
+{{if .IsCluster}}
+<div style="display:flex;gap:4px;margin-bottom:8px;border-bottom:1px solid var(--border)" id="ret-tab-bar"></div>
+{{end}}
+<table><thead><tr><th>Topic</th><th>Payload</th><th>QoS</th><th>Client</th><th>Created</th><th></th></tr></thead><tbody id="ret-tbody"></tbody></table>
+<div class="pagination" id="ret-pager"></div>
+</div>
+<script>
+(function(){
+var page=1,pageSize=20,search='',activeTab='',retByNode={};
+{{if .IsCluster}}
+function load(){
+  api('/api/v1/cluster/retained').then(function(data){
+    retByNode={}; (data||[]).forEach(function(r){ var n=r.node||'local'; if(!retByNode[n]) retByNode[n]=[]; retByNode[n].push(r) });
+    renderTabs();
+    var keys=Object.keys(retByNode);
+    if(keys.length) switchRetTab(keys[0]);
+  });
+}
+function renderTabs(){
+  var bar=document.getElementById('ret-tab-bar');
+  var keys=Object.keys(retByNode);
+  bar.innerHTML=keys.map(function(n,i){
+    return '<button class="btn" style="border-radius:6px 6px 0 0;border-bottom:none;font-size:0.75rem;padding:4px 10px'+
+      (i===0?';background:var(--bg-secondary);color:var(--text-primary)':'')+
+      '" onclick="switchRetTab(\''+n+'\')">'+n+' ('+(retByNode[n]||[]).length+')</button>';
+  }).join('');
+}
+window.switchRetTab=function(n){ activeTab=n; page=1; renderTable(); };
+function renderTable(){
+  var items=retByNode[activeTab]||[];
+  if(search){ search=document.getElementById('ret-search').value||''; items=items.filter(function(m){ return m.topic.toLowerCase().indexOf(search.toLowerCase())>=0 }); }
+  var total=items.length, start=(page-1)*pageSize, end=Math.min(start+pageSize,total), pageItems=items.slice(start,end);
+  document.getElementById('ret-tbody').innerHTML=pageItems.map(function(m){
+    var pl=(m.payload||''); if(pl.length>80) pl=pl.slice(0,80)+'...';
+    return '<tr><td class="mono">'+esc(m.topic)+'</td><td class="mono">'+esc(pl)+'</td><td>'+m.qos+'</td><td>'+esc(m.client_id||'-')+'</td><td>'+fmtTime(m.created)+'</td>'+
+      '<td><button class="btn btn-danger" onclick="delRet(\''+esc(encodeURIComponent(m.topic))+'\')">Delete</button></td></tr>';
+  }).join('');
+  document.getElementById('ret-pager').innerHTML=
+    '<button class="btn" '+(page<=1?'disabled':'')+' onclick="changePage('+(page-1)+')">Prev</button>'+
+    '<span>Page '+page+' / '+Math.max(1,Math.ceil(total/pageSize))+'</span>'+
+    '<button class="btn" '+(page*pageSize>=total?'disabled':'')+' onclick="changePage('+(page+1)+')">Next</button>';
+}
+function filterTable(){ search=document.getElementById('ret-search').value||''; page=1; renderTable(); }
+window.changePage=function(p){ page=p; renderTable(); };
+window.delRet=function(topic){ api('/api/v1/mqtt/retained/'+topic,{method:'DELETE'}).then(function(){ load() }); };
+load();
+{{else}}
+function load(){
+  search=document.getElementById('ret-search').value||'';
+  var q='?page='+page+'&page_size='+pageSize+(search?'&search='+search:'');
+  api('/api/v1/mqtt/retained'+q).then(function(d){
+    document.getElementById('ret-tbody').innerHTML=d.items.map(function(m){
+      var pl=(m.payload||''); if(pl.length>80) pl=pl.slice(0,80)+'...';
+      return '<tr><td class="mono">'+esc(m.topic)+'</td><td class="mono">'+esc(pl)+'</td><td>'+m.qos+'</td><td>'+esc(m.client_id||'-')+'</td><td>'+fmtTime(m.created)+'</td>'+
+        '<td><button class="btn btn-danger" onclick="delRet(\''+esc(encodeURIComponent(m.topic))+'\')">Delete</button></td></tr>';
+    }).join('');
+    document.getElementById('ret-pager').innerHTML=
+      '<button class="btn" '+(page<=1?'disabled':'')+' onclick="page='+(page-1)+';load()">Prev</button>'+
+      '<span>Page '+page+' / '+Math.ceil(d.total/pageSize)+'</span>'+
+      '<button class="btn" '+(page*pageSize>=d.total?'disabled':'')+' onclick="page='+(page+1)+';load()">Next</button>';
+  });
+}
+function filterTable(){ search=document.getElementById('ret-search').value||''; page=1; load(); }
+window.delRet=function(topic){ api('/api/v1/mqtt/retained/'+topic,{method:'DELETE'}).then(function(){ load() }); };
+{{end}}
+window.filterTable=filterTable; window.load=load;
+load();
+})();
+</script>
+{{end}}

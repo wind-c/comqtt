@@ -17,6 +17,7 @@ import (
 	rv8 "github.com/redis/go-redis/v9"
 	"github.com/wind-c/comqtt/v2/cluster/log"
 	"github.com/wind-c/comqtt/v2/config"
+	"github.com/wind-c/comqtt/v2/dashboard"
 	"github.com/wind-c/comqtt/v2/mqtt"
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/auth"
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/storage/badger"
@@ -135,7 +136,34 @@ func realMain(ctx context.Context) error {
 	onError(server.AddListener(ws), "add websocket listener")
 
 	// add http listener
-	http := listeners.NewHTTP("stats", cfg.Mqtt.HTTP, nil, rest.New(server).GenHandlers())
+	handlers := rest.New(server).GenHandlers()
+
+	secret, _ := os.ReadFile("./data/dashboard-secret")
+	dash, err := dashboard.New(dashboard.Options{
+		AuthSecret: string(secret),
+		UsersFile:  "./data/dashboard-users.json",
+		SiteTitle:  "Comqtt Dashboard",
+	})
+	if err != nil {
+		onError(err, "dashboard init")
+	}
+	handlers["/dashboard/"] = dash.Routes().ServeHTTP
+
+	// wire auth management if redis is configured
+	if cfg.Redis.Options.Addr != "" {
+		rdb := rv8.NewClient(&rv8.Options{
+			Addr:     cfg.Redis.Options.Addr,
+			Username: cfg.Redis.Options.Username,
+			Password: cfg.Redis.Options.Password,
+			DB:       cfg.Redis.Options.DB,
+		})
+		authHls := rest.NewAuthManager(rdb, "", "").GenHandlers()
+		for k, v := range authHls {
+			handlers[k] = v
+		}
+	}
+
+	http := listeners.NewHTTP("stats", cfg.Mqtt.HTTP, nil, handlers)
 	onError(server.AddListener(http), "add http listener")
 
 	errCh := make(chan error, 1)

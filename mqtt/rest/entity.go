@@ -1,21 +1,40 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2022 mochi-mqtt, mochi-co
+// SPDX-FileContributor: mochi-co
+
 package rest
 
 import (
+	"time"
+
 	"github.com/wind-c/comqtt/v2/mqtt"
+	"github.com/wind-c/comqtt/v2/mqtt/packets"
 )
 
+type RetainedMsg struct {
+	Topic    string `json:"topic"`
+	Payload  string `json:"payload"`
+	Qos      byte   `json:"qos"`
+	ClientID string `json:"client_id"`
+	Created  int64  `json:"created"`
+}
+
 type client struct {
-	ID              string   `json:"id"`
-	IP              string   `json:"ip"`
-	Online          bool     `json:"online"`
-	Username        string   `json:"username"`
-	TopicFilters    []string `json:"topic_filters"`
-	ProtocolVersion byte     `json:"protocol_version"`
-	SessionClean    bool     `json:"session_clean"`
-	WillTopicName   string   `json:"will_topic_name"`
-	WillPayload     string   `json:"will_payload"`
-	WillRetain      bool     `json:"will_retain"`
-	InflightCount   int      `json:"inflight_count"`
+	ID              string    `json:"id"`
+	IP              string    `json:"ip"`
+	Online          bool      `json:"online"`
+	Username        string    `json:"username"`
+	TopicFilters    []string  `json:"topic_filters"`
+	ProtocolVersion byte      `json:"protocol_version"`
+	SessionClean    bool      `json:"session_clean"`
+	WillTopicName   string    `json:"will_topic_name"`
+	WillPayload     string    `json:"will_payload"`
+	WillRetain      bool      `json:"will_retain"`
+	InflightCount   int       `json:"inflight_count"`
+	ConnectedAt     time.Time `json:"connected_at"`
+	BytesReceived   int64     `json:"bytes_received"`
+	BytesSent       int64     `json:"bytes_sent"`
+	Keepalive       uint16    `json:"keepalive"`
 }
 
 func genClient(cl *mqtt.Client) client {
@@ -35,6 +54,10 @@ func genClient(cl *mqtt.Client) client {
 		WillTopicName:   cl.Properties.Will.TopicName,
 		WillRetain:      cl.Properties.Will.Retain,
 		InflightCount:   cl.State.Inflight.Len(),
+		ConnectedAt:     cl.ConnectedAt,
+		Keepalive:       cl.State.Keepalive,
+		BytesReceived:   cl.BytesRecv(),
+		BytesSent:       cl.BytesSent(),
 	}
 	if cl.Properties.Will.Payload != nil {
 		nc.WillPayload = string(cl.Properties.Will.Payload)
@@ -48,4 +71,14 @@ type message struct {
 	Payload   string `json:"payload"`
 	Retain    bool   `json:"retain"`
 	Qos       byte   `json:"qos"`
+}
+
+func retainedMsgFromPacket(pk packets.Packet) RetainedMsg {
+	return RetainedMsg{
+		Topic:    pk.TopicName,
+		Payload:  string(pk.Payload),
+		Qos:      pk.FixedHeader.Qos,
+		ClientID: pk.Origin,
+		Created:  pk.Created,
+	}
 }

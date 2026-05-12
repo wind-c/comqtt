@@ -25,6 +25,7 @@ import (
 	"github.com/wind-c/comqtt/v2/cluster/log"
 	coredis "github.com/wind-c/comqtt/v2/cluster/storage/redis"
 	"github.com/wind-c/comqtt/v2/config"
+	"github.com/wind-c/comqtt/v2/dashboard"
 	mqtt "github.com/wind-c/comqtt/v2/mqtt"
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/auth"
 	"github.com/wind-c/comqtt/v2/mqtt/listeners"
@@ -119,6 +120,12 @@ func realMain(ctx context.Context) error {
 	if cfg.Cluster.Members == nil {
 		onError(config.ErrClusterOpts, "members parameter etc")
 	} else {
+		// parse http port for node discovery
+		if port := strings.TrimPrefix(cfg.Mqtt.HTTP, ":"); port != "" {
+			if p, err := strconv.Atoi(port); err == nil {
+				cfg.Cluster.HttpPort = p
+			}
+		}
 		initClusterNode(server, cfg)
 	}
 
@@ -144,6 +151,30 @@ func realMain(ctx context.Context) error {
 	csHls := csRt.New(agent).GenHandlers()
 	mqHls := mqttRt.New(server).GenHandlers()
 	maps.Copy(csHls, mqHls)
+
+	secret, _ := os.ReadFile("./data/dashboard-secret")
+	dash, err := dashboard.New(dashboard.Options{
+		AuthSecret: string(secret),
+		UsersFile:  "./data/dashboard-users.json",
+		SiteTitle:  "Comqtt Dashboard",
+		IsCluster:  true,
+	})
+	if err == nil {
+		csHls["/dashboard/"] = dash.Routes().ServeHTTP
+	}
+
+	// wire auth management (always redis in cluster mode)
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     cfg.Redis.Options.Addr,
+		Username: cfg.Redis.Options.Username,
+		Password: cfg.Redis.Options.Password,
+		DB:       cfg.Redis.Options.DB,
+	})
+	authHls := mqttRt.NewAuthManager(rdb, cfg.Redis.HPrefix+":auth", cfg.Redis.HPrefix+":acl").GenHandlers()
+	for k, v := range authHls {
+		csHls[k] = v
+	}
+
 	http := listeners.NewHTTP("stats", cfg.Mqtt.HTTP, nil, csHls)
 	onError(server.AddListener(http), "add http listener")
 

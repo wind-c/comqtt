@@ -5,12 +5,12 @@
 package auth
 
 import (
-	"log/slog"
-	"os"
-	"testing"
 	"github.com/stretchr/testify/require"
 	"github.com/wind-c/comqtt/v2/mqtt"
 	"github.com/wind-c/comqtt/v2/mqtt/packets"
+	"log/slog"
+	"os"
+	"testing"
 )
 
 var logger = slog.New(slog.NewTextHandler(os.Stdout, nil))

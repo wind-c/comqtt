@@ -156,6 +156,7 @@ type Cluster struct {
 	OutboundPoolSize     int               `yaml:"outbound-pool-size"     json:"outbound-pool-size"`
 	InoutPoolNonblocking bool              `yaml:"inout-pool-nonblocking" json:"inout-pool-nonblocking"`
 	NodesFileDir         string            `yaml:"nodes-file-dir"         json:"nodes-file-dir"`
+	HttpPort             int               `yaml:"http-port"              json:"http-port"`
 }
 
 func GenTlsConfig(conf *Config) (*tls2.Config, error) {

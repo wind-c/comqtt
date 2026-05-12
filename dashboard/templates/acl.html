@@ -1,0 +1,83 @@
+{{define "acl"}}{{template "layout" .}}{{end}}
+{{define "title"}}ACL Rules{{end}}
+{{define "content"}}
+<div id="acl-area">
+<div class="toolbar">
+    <span class="text-muted" id="acl-title">ACL Rules</span>
+    <button class="btn btn-accent" id="acl-add-btn" onclick="showAclModal()">+ Add Rule</button>
+</div>
+<table><thead><tr><th>Topic Filter</th><th>Access</th><th></th></tr></thead><tbody id="acl-tbody"></tbody></table>
+</div>
+<div id="acl-modal" class="modal" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+    <div class="modal-box"><h3 style="margin-bottom:16px" id="acl-modal-title">Add ACL Rule</h3>
+        <div class="form-group" id="acl-user-group"><label>Username</label><input id="acl-user-input" autocomplete="off"></div>
+        <div class="form-group"><label>Topic Filter</label><input id="acl-topic" placeholder="sensors/#"></div>
+        <div class="form-group"><label>Access Level</label>
+            <select id="acl-access" style="width:100%;padding:8px 12px;background:var(--bg-page);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-size:0.875rem">
+                <option value="0">Deny</option><option value="1">Read Only</option><option value="2">Write Only</option><option value="3" selected>Read &amp; Write</option>
+            </select>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+            <button class="btn" onclick="document.getElementById('acl-modal').style.display='none'">Cancel</button>
+            <button class="btn btn-accent" id="acl-save-btn" onclick="saveAcl()">Add</button>
+        </div>
+    </div>
+</div>
+<script>
+var aclUser = new URLSearchParams(window.location.search).get('user')||'';
+var aclEditTopic = '';
+(function(){
+document.getElementById('acl-title').textContent = 'ACL: '+(aclUser||'All Users');
+if (!aclUser) {
+    document.getElementById('acl-tbody').innerHTML='<tr><td colspan="3" style="color:var(--text-muted);text-align:center;padding:40px">Select a user from <a href="/dashboard/auth" style="color:var(--link)">Auth Users</a> or enter a username when adding a rule.</td></tr>';
+} else {
+    load();
+}
+function load() {
+    api('/api/v1/auth/users/'+aclUser+'/acl').then(function(rules){
+        document.getElementById('acl-tbody').innerHTML = rules.map(function(r){
+            var labels = ['Deny','Read','Write','ReadWrite'];
+            return '<tr><td class="mono">'+esc(r.topic)+'</td><td><span class="tag">'+(labels[r.access]||r.access)+'</span></td>'+
+              '<td><button class="btn" style="font-size:0.75rem;padding:4px 8px;margin-right:4px" onclick="editAcl(\''+esc(r.topic)+'\','+r.access+')">Edit</button>'+
+              '<button class="btn btn-danger" style="font-size:0.75rem;padding:4px 8px" onclick="delAcl(\''+esc(encodeURIComponent(r.topic))+'\')">Delete</button></td></tr>';
+        }).join('');
+    });
+}
+window.editAcl = function(topic,access) {
+    aclEditTopic = topic; document.getElementById('acl-modal-title').textContent='Edit '+topic;
+    document.getElementById('acl-topic').value=topic; document.getElementById('acl-topic').disabled=true;
+    document.getElementById('acl-access').value=access; document.getElementById('acl-save-btn').textContent='Save';
+    document.getElementById('acl-user-group').style.display='none';
+    document.getElementById('acl-modal').style.display='flex';
+};
+window.showAclModal = function() {
+    aclEditTopic = ''; document.getElementById('acl-modal-title').textContent='Add ACL Rule';
+    document.getElementById('acl-topic').value=''; document.getElementById('acl-topic').disabled=false;
+    document.getElementById('acl-access').value='3'; document.getElementById('acl-save-btn').textContent='Add';
+    if (aclUser) {
+        document.getElementById('acl-user-group').style.display='none';
+    } else {
+        document.getElementById('acl-user-group').style.display='';
+        document.getElementById('acl-user-input').value='';
+    }
+    document.getElementById('acl-modal').style.display='flex';
+};
+window.saveAcl = function() {
+    var user = aclUser || document.getElementById('acl-user-input').value;
+    if (!user) return alert('Username is required');
+    var topic = document.getElementById('acl-topic').value;
+    if (!topic) return alert('Topic is required');
+    var access = parseInt(document.getElementById('acl-access').value);
+    var method = aclEditTopic ? 'PUT' : 'POST';
+    api('/api/v1/auth/users/'+user+'/acl',{method:method,body:JSON.stringify({topic:topic,access:access})})
+      .then(function(){ document.getElementById('acl-modal').style.display='none'; if(!aclUser){aclUser=user;document.getElementById('acl-title').textContent='ACL: '+user} load() })
+      .catch(function(e){ alert('Error: '+e.message) });
+};
+window.delAcl = function(topic) {
+    if (confirm('Delete ACL rule '+decodeURIComponent(topic)+'?')) {
+        api('/api/v1/auth/users/'+aclUser+'/acl/'+topic,{method:'DELETE'}).then(function(){ load() });
+    }
+};
+})();
+</script>
+{{end}}

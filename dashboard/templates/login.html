@@ -1,0 +1,72 @@
+{{define "login"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{.SiteTitle}} - Login</title>
+<style>
+:root { --bg-page: #0F172A; --bg-panel: #1E293B; --bg-secondary: #334155;
+        --text-primary: #F8FAFC; --text-muted: #94A3B8; --accent: #22C55E;
+        --danger: #EF4444; --link: #60A5FA; --border: #475569; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg-page); color: var(--text-primary); }
+.login-page { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+.login-card { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px; padding: 32px; width: 380px; max-width: 90vw; }
+.login-card h1 { font-size: 1.25rem; text-align: center; margin-bottom: 24px; }
+input { width: 100%; padding: 10px 12px; background: var(--bg-page); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.875rem; }
+input:focus { outline: 2px solid var(--link); outline-offset: 2px; }
+.btn { width: 100%; padding: 10px; background: var(--accent); border: none; border-radius: 6px; color: #0F172A; font-size: 0.875rem; font-weight: 600; cursor: pointer; margin-top: 8px; }
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-size: 0.875rem; margin-bottom: 4px; color: var(--text-muted); }
+.error { font-size: 0.875rem; color: var(--danger); text-align: center; margin-bottom: 12px; }
+.pwd-wrapper { position: relative; }
+.pwd-toggle { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 2px 4px; line-height: 1; }
+.pwd-toggle:hover { color: var(--text-primary); }
+</style>
+</head>
+<body>
+<div class="login-page">
+    <div class="login-card">
+        <h1>{{.SiteTitle}}</h1>
+        <div class="error" id="login-error" style="display:none"></div>
+        <form id="login-form" onsubmit="return doLogin()">
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" id="username" required autofocus autocomplete="username">
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <div class="pwd-wrapper">
+                    <input type="password" id="password" required autocomplete="current-password">
+                    <button type="button" class="pwd-toggle" onclick="togglePwd()" title="Toggle password visibility">
+                        <svg id="eye-off" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                        <svg id="eye-on" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                </div>
+            </div>
+            <button type="submit" class="btn">Login</button>
+        </form>
+    </div>
+</div>
+<script>
+function togglePwd() {
+    var pwd = document.getElementById('password');
+    var off = document.getElementById('eye-off');
+    var on = document.getElementById('eye-on');
+    if (pwd.type === 'password') { pwd.type = 'text'; off.style.display = 'none'; on.style.display = '' }
+    else { pwd.type = 'password'; off.style.display = ''; on.style.display = 'none' }
+}
+function doLogin() {
+    var u = document.getElementById('username').value;
+    var p = document.getElementById('password').value;
+    var err = document.getElementById('login-error');
+    fetch('/dashboard/login',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({username:u,password:p})})
+    .then(function(r){ if(!r.ok) throw new Error('Login failed'); return r.json() })
+    .then(function(d){ if(d.username) window.location = '/dashboard/overview' })
+    .catch(function(e){ err.style.display = ''; err.textContent = e.message||'Login failed' });
+    return false;
+}
+</script>
+</body>
+</html>
+{{end}}
