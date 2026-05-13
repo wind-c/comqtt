@@ -31,3 +31,4 @@ log:
 dashboard-enable: true
 dashboard:
   users-file: /app/data/dashboard-users.json
+  password-hash: 1

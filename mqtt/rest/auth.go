@@ -6,20 +6,38 @@ package rest
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/md5"
+	"crypto/sha1"
+	"crypto/sha256"
+	"crypto/sha512"
+	"encoding/hex"
 	"encoding/json"
+	"hash"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/auth"
+	"golang.org/x/crypto/bcrypt"
 )
 
 const (
-	AuthUsersPath  = "/api/v1/auth/users"
-	AuthUserPath   = "/api/v1/auth/users/{username}"
-	AuthUserAclPath = "/api/v1/auth/users/{username}/acl"
-	AuthUserAclFilterPath = "/api/v1/auth/users/{username}/acl/{filter...}"
+	AuthUsersPath           = "/api/v1/auth/users"
+	AuthUserPath            = "/api/v1/auth/users/{username}"
+	AuthUserAclPath         = "/api/v1/auth/users/{username}/acl"
+	AuthUserAclFilterPath   = "/api/v1/auth/users/{username}/acl/{filter...}"
+
+	hashNone int = iota
+	hashBcrypt
+	hashMd5
+	hashSha1
+	hashSha256
+	hashSha512
+	hashHmacSha1
+	hashHmacSha256
+	hashHmacSha512
 )
 
 type AuthEntry struct {
@@ -39,15 +57,17 @@ type AclUpdate struct {
 }
 
 type AuthManager struct {
-	rdb      redis.UniversalClient
-	authKey  string
+	rdb          redis.UniversalClient
+	authKey      string
 	aclKeyPrefix string
+	hashType     int
+	hashKey      string
 }
 
-func NewAuthManager(rdb redis.UniversalClient, authKey, aclPrefix string) *AuthManager {
+func NewAuthManager(rdb redis.UniversalClient, authKey, aclPrefix string, hashType int, hashKey string) *AuthManager {
 	if authKey == "" { authKey = "comqtt:auth" }
 	if aclPrefix == "" { aclPrefix = "comqtt:acl" }
-	return &AuthManager{rdb: rdb, authKey: authKey, aclKeyPrefix: aclPrefix}
+	return &AuthManager{rdb: rdb, authKey: authKey, aclKeyPrefix: aclPrefix, hashType: hashType, hashKey: hashKey}
 }
 
 func (m *AuthManager) GenHandlers() map[string]Handler {
@@ -93,7 +113,7 @@ func (m *AuthManager) createUser(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	rule := auth.AuthRule{Username: auth.RString(req.Username), Password: auth.RString(req.Password), Allow: req.Allow}
+	rule := auth.AuthRule{Username: auth.RString(req.Username), Password: auth.RString(hashPassword(req.Password, m.hashType, m.hashKey)), Allow: req.Allow}
 	data, _ := json.Marshal(rule)
 	if err := m.rdb.HSet(ctx, m.authKey, req.Username, string(data)).Err(); err != nil {
 		Error(w, http.StatusInternalServerError, err.Error())
@@ -125,7 +145,7 @@ func (m *AuthManager) updateUser(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusInternalServerError, "invalid user data")
 		return
 	}
-	if req.Password != "" { rule.Password = auth.RString(req.Password) }
+	if req.Password != "" { rule.Password = auth.RString(hashPassword(req.Password, m.hashType, m.hashKey)) }
 	if req.Allow != nil { rule.Allow = *req.Allow }
 	data, _ := json.Marshal(rule)
 	if err := m.rdb.HSet(ctx, m.authKey, username, string(data)).Err(); err != nil {
@@ -134,6 +154,36 @@ func (m *AuthManager) updateUser(w http.ResponseWriter, r *http.Request) {
 	}
 	Ok(w, map[string]string{"username": username})
 }
+
+func hashPassword(pwd string, hashType int, key string) string {
+	switch hashType {
+	case hashBcrypt:
+		if h, err := bcrypt.GenerateFromPassword([]byte(pwd), bcrypt.DefaultCost); err == nil {
+			return string(h)
+		}
+	case hashMd5:
+		return hex.EncodeToString(md5Sum([]byte(pwd)))
+	case hashSha1:
+		return hex.EncodeToString(sha1Sum([]byte(pwd)))
+	case hashSha256:
+		return hex.EncodeToString(sha256Sum([]byte(pwd)))
+	case hashSha512:
+		return hex.EncodeToString(sha512Sum([]byte(pwd)))
+	case hashHmacSha1:
+		return hex.EncodeToString(hmacSum([]byte(pwd), []byte(key), sha1.New))
+	case hashHmacSha256:
+		return hex.EncodeToString(hmacSum([]byte(pwd), []byte(key), sha256.New))
+	case hashHmacSha512:
+		return hex.EncodeToString(hmacSum([]byte(pwd), []byte(key), sha512.New))
+	}
+	return pwd
+}
+
+func md5Sum(in []byte) []byte    { h := md5.New(); h.Write(in); return h.Sum(nil) }
+func sha1Sum(in []byte) []byte   { h := sha1.New(); h.Write(in); return h.Sum(nil) }
+func sha256Sum(in []byte) []byte { h := sha256.New(); h.Write(in); return h.Sum(nil) }
+func sha512Sum(in []byte) []byte { h := sha512.New(); h.Write(in); return h.Sum(nil) }
+func hmacSum(in, key []byte, h func() hash.Hash) []byte { mac := hmac.New(h, key); mac.Write(in); return mac.Sum(nil) }
 
 func (m *AuthManager) deleteUser(w http.ResponseWriter, r *http.Request) {
 	username := r.PathValue("username")

@@ -108,8 +108,10 @@ type Config struct {
 }
 
 type DashboardConfig struct {
-	SecretFile string `yaml:"secret-file"`
-	UsersFile  string `yaml:"users-file"`
+	SecretFile   string `yaml:"secret-file"`
+	UsersFile    string `yaml:"users-file"`
+	PasswordHash int    `yaml:"password-hash"`
+	HashKey      string `yaml:"hash-key"`
 }
 
 type auth struct {

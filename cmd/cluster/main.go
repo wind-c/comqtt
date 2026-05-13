@@ -183,7 +183,7 @@ func realMain(ctx context.Context) error {
 		Password: cfg.Redis.Options.Password,
 		DB:       cfg.Redis.Options.DB,
 	})
-	authHls := mqttRt.NewAuthManager(rdb, cfg.Redis.HPrefix+":auth", cfg.Redis.HPrefix+":acl").GenHandlers()
+	authHls := mqttRt.NewAuthManager(rdb, cfg.Redis.HPrefix+":auth", cfg.Redis.HPrefix+":acl", cfg.Dashboard.PasswordHash, cfg.Dashboard.HashKey).GenHandlers()
 	for k, v := range authHls {
 		csHls[k] = v
 	}
