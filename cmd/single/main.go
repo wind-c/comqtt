@@ -145,9 +145,10 @@ func realMain(ctx context.Context) error {
 		SiteTitle:  "Comqtt Dashboard",
 	})
 	if err != nil {
-		onError(err, "dashboard init")
+		log.Error("dashboard init", "error", err)
+	} else {
+		handlers["/dashboard/"] = dash.Routes().ServeHTTP
 	}
-	handlers["/dashboard/"] = dash.Routes().ServeHTTP
 
 	// wire auth management if redis is configured
 	if cfg.Redis.Options.Addr != "" {
