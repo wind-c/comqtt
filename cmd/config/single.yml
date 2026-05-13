@@ -7,8 +7,6 @@ dashboard-enable: true #Whether to enable the built-in Web Dashboard
 dashboard:
   secret-file: #JWT signing secret file path (leave empty to use built-in default)
   users-file: ./config/dashboard-users.json #Dashboard user credentials file path
-  password-hash: 0 #0 no encrypt, 1 bcrypt, 2 md5, 3 sha1, 4 sha256, 5 sha512, 6 hmac-sha1, 7 hmac-sha256, 8 hmac-sha512
-  hash-key: #The key is required for the HMAC algorithm
 
 auth:
   way: 0  #Authentication way: 0 anonymous, 1 username and password, 2 clientid

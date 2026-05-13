@@ -169,7 +169,7 @@ func realMain(ctx context.Context) error {
 			Password: cfg.Redis.Options.Password,
 			DB:       cfg.Redis.Options.DB,
 		})
-		authHls := rest.NewAuthManager(rdb, "", "", cfg.Dashboard.PasswordHash, cfg.Dashboard.HashKey).GenHandlers()
+		authHls := rest.NewAuthManager(rdb, "", "").GenHandlers()
 		for k, v := range authHls {
 			handlers[k] = v
 		}
