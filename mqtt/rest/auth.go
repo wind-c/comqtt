@@ -16,9 +16,9 @@ import (
 )
 
 const (
-	AuthUsersPath  = "/api/v1/auth/users"
-	AuthUserPath   = "/api/v1/auth/users/{username}"
-	AuthUserAclPath = "/api/v1/auth/users/{username}/acl"
+	AuthUsersPath         = "/api/v1/auth/users"
+	AuthUserPath          = "/api/v1/auth/users/{username}"
+	AuthUserAclPath       = "/api/v1/auth/users/{username}/acl"
 	AuthUserAclFilterPath = "/api/v1/auth/users/{username}/acl/{filter...}"
 )
 
@@ -39,27 +39,31 @@ type AclUpdate struct {
 }
 
 type AuthManager struct {
-	rdb      redis.UniversalClient
-	authKey  string
+	rdb          redis.UniversalClient
+	authKey      string
 	aclKeyPrefix string
 }
 
 func NewAuthManager(rdb redis.UniversalClient, authKey, aclPrefix string) *AuthManager {
-	if authKey == "" { authKey = "comqtt:auth" }
-	if aclPrefix == "" { aclPrefix = "comqtt:acl" }
+	if authKey == "" {
+		authKey = "comqtt-auth"
+	}
+	if aclPrefix == "" {
+		aclPrefix = "comqtt-acl"
+	}
 	return &AuthManager{rdb: rdb, authKey: authKey, aclKeyPrefix: aclPrefix}
 }
 
 func (m *AuthManager) GenHandlers() map[string]Handler {
 	return map[string]Handler{
-		"GET " + AuthUsersPath:     m.listUsers,
-		"POST " + AuthUsersPath:    m.createUser,
-		"PUT " + AuthUserPath:      m.updateUser,
-		"DELETE " + AuthUserPath:   m.deleteUser,
-		"GET " + AuthUserAclPath:   m.listAcl,
-		"POST " + AuthUserAclPath:  m.addAcl,
-		"PUT " + AuthUserAclPath:   m.updateAcl,
-		"DELETE " + AuthUserAclFilterPath: m.deleteAcl,
+		"GET " + AuthUsersPath:                              m.listUsers,
+		"POST " + AuthUsersPath:                             m.createUser,
+		"PUT " + AuthUserPath:                               m.updateUser,
+		"DELETE " + AuthUserPath:                            m.deleteUser,
+		"GET " + AuthUserAclPath:                            m.listAcl,
+		"POST " + AuthUserAclPath:                           m.addAcl,
+		"PUT " + AuthUserAclPath:                            m.updateAcl,
+		"DELETE " + AuthUserAclFilterPath:                   m.deleteAcl,
 	}
 }
 
@@ -74,7 +78,9 @@ func (m *AuthManager) listUsers(w http.ResponseWriter, r *http.Request) {
 	result := make([]AuthEntry, 0, len(users))
 	for username, val := range users {
 		var rule auth.AuthRule
-		if json.Unmarshal([]byte(val), &rule) != nil { continue }
+		if json.Unmarshal([]byte(val), &rule) != nil {
+			continue
+		}
 		result = append(result, AuthEntry{Username: username, Allow: rule.Allow})
 	}
 	Ok(w, result)
@@ -125,8 +131,12 @@ func (m *AuthManager) updateUser(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusInternalServerError, "invalid user data")
 		return
 	}
-	if req.Password != "" { rule.Password = auth.RString(req.Password) }
-	if req.Allow != nil { rule.Allow = *req.Allow }
+	if req.Password != "" {
+		rule.Password = auth.RString(req.Password)
+	}
+	if req.Allow != nil {
+		rule.Allow = *req.Allow
+	}
 	data, _ := json.Marshal(rule)
 	if err := m.rdb.HSet(ctx, m.authKey, username, string(data)).Err(); err != nil {
 		Error(w, http.StatusInternalServerError, err.Error())
