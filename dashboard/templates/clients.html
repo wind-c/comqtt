@@ -1,0 +1,98 @@
+{{define "clients"}}{{template "layout" .}}{{end}}
+{{define "title"}}Clients{{end}}
+{{define "content"}}
+<div id="clients-area">
+<div class="toolbar">
+    <input class="search-box" type="text" id="client-search" placeholder="Search clients..." oninput="filterTable()">
+{{if .IsCluster}}
+    <span class="text-muted" id="client-count"></span>
+{{end}}
+</div>
+{{if .IsCluster}}
+<div style="display:flex;gap:4px;margin-bottom:2px;border-bottom:1px solid var(--border)" id="cluster-tab-bar"></div>
+{{end}}
+<table><thead><tr>
+    <th>Client ID</th><th>Username</th><th>IP</th>{{if .IsCluster}}<th>Node</th>{{end}}<th>Connected</th><th>Keepalive</th><th></th>
+</tr></thead><tbody id="clients-tbody"></tbody></table>
+<div class="pagination" id="clients-pager"></div>
+<div id="client-detail" class="detail-panel" style="display:none"></div>
+</div>
+<script>
+(function(){
+var page=1,pageSize=20,search='',activeNode='',clientsByNode={},allClients=[];
+{{if .IsCluster}}
+function init(){
+  api('/api/v1/cluster/clients').then(function(data){
+    allClients=data||[];
+    clientsByNode={};
+    allClients.forEach(function(c){ var n=c.node||'local'; if(!clientsByNode[n]) clientsByNode[n]=[]; clientsByNode[n].push(c); });
+    var bar=document.getElementById('cluster-tab-bar');
+    var keys=Object.keys(clientsByNode);
+    bar.innerHTML=keys.map(function(n,i){
+      return '<button class="btn" style="border-radius:6px 6px 0 0;border-bottom:none;font-size:0.75rem;padding:6px 12px">'+n+' ('+(clientsByNode[n]||[]).length+')</button>';
+    }).join('');
+    var btns=bar.querySelectorAll('button');
+    btns.forEach(function(b,i){ b.addEventListener('click',function(){switchNode(keys[i])}) });
+    document.getElementById('client-count').textContent=allClients.length+' total, '+keys.length+' nodes';
+    if(keys.length) switchNode(keys[0]);
+  });
+}
+function switchNode(node){
+  activeNode=node; page=1; search=''; document.getElementById('client-search').value='';
+  renderTable();
+  var btns=document.querySelectorAll('#cluster-tab-bar button');
+  var keys=Object.keys(clientsByNode);
+  keys.forEach(function(k,i){ if(btns[i]){ btns[i].style.background=k===node?'var(--bg-secondary)':''; btns[i].style.color=k===node?'var(--text-primary)':''; }});
+}
+function renderTable(){
+  var clients=clientsByNode[activeNode]||[];
+  search=document.getElementById('client-search').value||'';
+  if(search){ clients=clients.filter(function(c){return c.id.toLowerCase().indexOf(search.toLowerCase())>=0||(c.username||'').toLowerCase().indexOf(search.toLowerCase())>=0}); }
+  var total=clients.length, start=(page-1)*pageSize, end=Math.min(start+pageSize,total), items=clients.slice(start,end);
+  document.getElementById('clients-tbody').innerHTML=items.map(function(c){
+    return '<tr onclick="showClient(\''+esc(c.id)+'\')"><td><span class="'+(c.online?'status-online':'status-offline')+'"></span><span class="mono">'+esc(c.id)+'</span></td>'+
+      '<td>'+esc(c.username||'-')+'</td><td class="mono">'+esc(c.ip)+'</td>'+
+      '<td><span class="tag" style="font-size:0.65rem">'+esc(c.node||activeNode)+'</span></td>'+
+      '<td>'+fmtTime(c.connected_at)+'</td><td>'+(c.keepalive||0)+'s</td>'+
+      '<td><button class="btn btn-danger" onclick="event.stopPropagation();disconnectClient(\''+esc(c.id)+'\')">Disconnect</button></td></tr>';
+  }).join('');
+  document.getElementById('clients-pager').innerHTML=
+    '<button class="btn" '+(page<=1?'disabled':'')+' onclick="changePage('+(page-1)+')">Prev</button>'+
+    '<span>Page '+page+' / '+Math.max(1,Math.ceil(total/pageSize))+'</span>'+
+    '<button class="btn" '+(page*pageSize>=total?'disabled':'')+' onclick="changePage('+(page+1)+')">Next</button>';
+}
+function filterTable(){ search=document.getElementById('client-search').value; page=1; renderTable(); }
+window.changePage=function(p){ page=p; renderTable(); };
+window.switchPage=function(p){ page=p; renderTable(); };
+window.filterTable=filterTable;
+init();
+{{else}}
+function loadClients(p) {
+    if(p)page=p;
+    var q='?page='+page+'&page_size='+pageSize+(search?'&search='+search:'');
+    api('/api/v1/mqtt/clients'+q).then(function(d){ renderLocal(d.items, d.total) });
+}
+function renderLocal(items, total){
+    document.getElementById('clients-tbody').innerHTML=items.map(function(c){
+        return '<tr onclick="showClient(\''+esc(c.id)+'\')"><td><span class="'+(c.online?'status-online':'status-offline')+'"></span><span class="mono">'+esc(c.id)+'</span></td>'+
+          '<td>'+esc(c.username||'-')+'</td><td class="mono">'+esc(c.ip)+'</td>'+
+          '<td>'+fmtTime(c.connected_at)+'</td><td>'+(c.keepalive||0)+'s</td>'+
+          '<td><button class="btn btn-danger" onclick="event.stopPropagation();disconnectClient(\''+esc(c.id)+'\')">Disconnect</button></td></tr>';
+    }).join('');
+    document.getElementById('clients-pager').innerHTML=
+        '<button class="btn" '+(page<=1?'disabled':'')+' onclick="loadClients('+(page-1)+')">Prev</button>'+
+        '<span>Page '+page+' / '+Math.max(1,Math.ceil(total/pageSize))+'</span>'+
+        '<button class="btn" '+(page*pageSize>=total?'disabled':'')+' onclick="loadClients('+(page+1)+')">Next</button>';
+}
+function filterTable(){ search=document.getElementById('client-search').value; page=1; loadClients(1); }
+loadClients(1);
+{{end}}
+window.showClient=function(id){ api('/api/v1/mqtt/clients/'+id).then(function(c){
+  var d=document.getElementById('client-detail');d.style.display='block';
+  d.innerHTML='<dl><dt>Topic Filters</dt><dd>'+(c.topic_filters||[]).join(', ')+'</dd><dt>Protocol</dt><dd>v'+c.protocol_version+'</dd><dt>Session Clean</dt><dd>'+c.session_clean+'</dd><dt>Inflight</dt><dd>'+(c.inflight_count||0)+'</dd><dt>Bytes Rx/Tx</dt><dd>'+fmtBytes(c.bytes_received)+' / '+fmtBytes(c.bytes_sent)+'</dd></dl><button class="btn" onclick="document.getElementById(\'client-detail\').style.display=\'none\'">Close</button>';
+}) };
+window.disconnectClient=function(id){ api('/api/v1/mqtt/clients/'+id+'/disconnect',{method:'POST'}).then(function(){ init?init():loadClients(page) }) };
+window.filterTable=filterTable; window.loadClients=loadClients; window.switchNode=function(n){switchNode(n)};
+})();
+</script>
+{{end}}

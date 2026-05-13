@@ -6,10 +6,12 @@ package mlist
 
 import (
 	"encoding/json"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/hashicorp/memberlist"
+	mb "github.com/wind-c/comqtt/v2/cluster/discovery"
 	"github.com/wind-c/comqtt/v2/cluster/log"
 	mqtt "github.com/wind-c/comqtt/v2/mqtt"
 )
@@ -44,6 +46,7 @@ type Delegate struct {
 	Broadcasts *memberlist.TransmitLimitedQueue
 	LocalNode  *memberlist.Node
 	server     *mqtt.Server
+	httpPort   int
 }
 
 func NewDelegate(inboundMsgCh chan<- []byte) *Delegate {
@@ -65,7 +68,16 @@ func (d *Delegate) NotifyMsg(msg []byte) {
 }
 
 func (d *Delegate) NodeMeta(limit int) []byte {
-	return []byte{}
+	if d.httpPort <= 0 {
+		return []byte{}
+	}
+	tags := map[string]string{mb.TagHttpPort: strconv.Itoa(d.httpPort)}
+	data, _ := json.Marshal(tags)
+	return data
+}
+
+func (d *Delegate) SetHttpPort(port int) {
+	d.httpPort = port
 }
 
 func (d *Delegate) LocalState(join bool) []byte {

@@ -17,6 +17,7 @@ import (
 	rv8 "github.com/redis/go-redis/v9"
 	"github.com/wind-c/comqtt/v2/cluster/log"
 	"github.com/wind-c/comqtt/v2/config"
+	"github.com/wind-c/comqtt/v2/dashboard"
 	"github.com/wind-c/comqtt/v2/mqtt"
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/auth"
 	"github.com/wind-c/comqtt/v2/mqtt/hooks/storage/badger"
@@ -135,7 +136,46 @@ func realMain(ctx context.Context) error {
 	onError(server.AddListener(ws), "add websocket listener")
 
 	// add http listener
-	http := listeners.NewHTTP("stats", cfg.Mqtt.HTTP, nil, rest.New(server).GenHandlers())
+	handlers := rest.New(server).GenHandlers()
+
+	// init dashboard (conditional on config)
+	if cfg.DashboardEnable {
+		secret := cfg.Dashboard.SecretFile
+		if secret != "" {
+			if data, err := os.ReadFile(secret); err == nil {
+				secret = string(data)
+			} else {
+				log.Warn("failed to read dashboard secret file, using default", "path", cfg.Dashboard.SecretFile, "error", err)
+				secret = ""
+			}
+		}
+		dash, err := dashboard.New(dashboard.Options{
+			AuthSecret: secret,
+			UsersFile:  cfg.Dashboard.UsersFile,
+			SiteTitle:  "Comqtt Dashboard",
+		})
+		if err != nil {
+			log.Error("dashboard init failed, continuing without dashboard", "error", err)
+		} else {
+			handlers["/dashboard/"] = dash.Routes().ServeHTTP
+		}
+	}
+
+	// wire auth management if redis is configured
+	if cfg.Redis.Options.Addr != "" {
+		rdb := rv8.NewClient(&rv8.Options{
+			Addr:     cfg.Redis.Options.Addr,
+			Username: cfg.Redis.Options.Username,
+			Password: cfg.Redis.Options.Password,
+			DB:       cfg.Redis.Options.DB,
+		})
+		authHls := rest.NewAuthManager(rdb, "", "").GenHandlers()
+		for k, v := range authHls {
+			handlers[k] = v
+		}
+	}
+
+	http := listeners.NewHTTP("stats", cfg.Mqtt.HTTP, nil, handlers)
 	onError(server.AddListener(http), "add http listener")
 
 	errCh := make(chan error, 1)

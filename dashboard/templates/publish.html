@@ -1,0 +1,39 @@
+{{define "publish"}}{{template "layout" .}}{{end}}
+{{define "title"}}Publish{{end}}
+{{define "content"}}
+<div style="max-width:600px">
+<div class="card">
+    <div class="form-group"><label>Topic</label><input type="text" id="pub-topic" placeholder="devices/sensor/status"></div>
+    <div class="form-group"><label>Payload</label><textarea id="pub-payload" rows="4" placeholder='{"value": 42}'></textarea></div>
+    <div class="form-group"><label>QoS</label>
+        <div style="display:flex;gap:16px">
+            <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="radio" name="pub-qos" value="0"> 0</label>
+            <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="radio" name="pub-qos" value="1" checked> 1</label>
+            <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="radio" name="pub-qos" value="2"> 2</label>
+        </div>
+    </div>
+    <div class="form-group">
+        <label for="pub-retain" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer">Retain <input type="checkbox" id="pub-retain"></label>
+    </div>
+    <button class="btn btn-accent" onclick="doPublish()">Publish</button>
+</div>
+<div id="pub-toast" style="display:none" class="toast"></div>
+</div>
+<script>
+function doPublish() {
+    var topic = document.getElementById('pub-topic').value;
+    var payload = document.getElementById('pub-payload').value;
+    var qos = parseInt(document.querySelector('input[name="pub-qos"]:checked').value);
+    var retain = document.getElementById('pub-retain').checked;
+    var body = JSON.stringify({topic_name:topic, payload:payload, qos:qos, retain:retain});
+    api('/api/v1/mqtt/message',{method:'POST',body:body}).then(function(){
+        showToast('Published successfully', true);
+    }).catch(function(e){ showToast(e.message, false) });
+}
+function showToast(msg, ok) {
+    var t = document.getElementById('pub-toast');
+    t.textContent = msg; t.className = 'toast '+(ok?'toast-success':'toast-error'); t.style.display='block';
+    setTimeout(function(){ t.style.display='none' }, 3000);
+}
+</script>
+{{end}}

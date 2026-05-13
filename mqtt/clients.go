@@ -113,7 +113,13 @@ type Client struct {
 	sync.RWMutex                        // mutex
 	InheritWay   int                    // session inheritance way
 	Ext          map[string]interface{} // client extension.
+	ConnectedAt  time.Time              // time the client connected
+	bytesRecv    atomic.Int64           // total bytes received by this client
+	bytesSent    atomic.Int64           // total bytes sent by this client
 }
+
+func (cl *Client) BytesRecv() int64 { return cl.bytesRecv.Load() }
+func (cl *Client) BytesSent() int64 { return cl.bytesSent.Load() }
 
 // ClientConnection contains the connection transport and metadata for the client.
 type ClientConnection struct {
@@ -179,8 +185,9 @@ func newClient(c net.Conn, o *ops) *Client {
 		Properties: ClientProperties{
 			ProtocolVersion: defaultClientProtocolVersion, // default protocol version
 		},
-		ops: o,
-		Ext: make(map[string]interface{}),
+		ops:         o,
+		Ext:         make(map[string]interface{}),
+		ConnectedAt: time.Now(),
 	}
 
 	if c != nil {
@@ -437,6 +444,7 @@ func (cl *Client) ReadFixedHeader(fh *packets.FixedHeader) error {
 	}
 
 	atomic.AddInt64(&cl.ops.info.BytesReceived, int64(bu+1))
+	cl.bytesRecv.Add(int64(bu + 1))
 	return nil
 }
 
@@ -453,6 +461,7 @@ func (cl *Client) ReadPacket(fh *packets.FixedHeader) (pk packets.Packet, err er
 	}
 
 	atomic.AddInt64(&cl.ops.info.BytesReceived, int64(n))
+	cl.bytesRecv.Add(int64(n))
 
 	// Decode the remaining packet values using a fresh copy of the bytes,
 	// otherwise the next packet will change the data of this one.
@@ -585,6 +594,7 @@ func (cl *Client) WritePacket(pk packets.Packet) error {
 	}
 
 	atomic.AddInt64(&cl.ops.info.BytesSent, n)
+	cl.bytesSent.Add(n)
 	atomic.AddInt64(&cl.ops.info.PacketsSent, 1)
 	if pk.FixedHeader.Type == packets.Publish {
 		atomic.AddInt64(&cl.ops.info.MessagesSent, 1)

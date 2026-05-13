@@ -1,0 +1,58 @@
+{{define "overview"}}{{template "layout" .}}{{end}}
+{{define "title"}}Overview{{end}}
+{{define "content"}}
+<div id="stats-area">
+<div id="aggregate-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px"></div>
+{{if .IsCluster}}
+<h2 style="margin:0 0 16px;font-size:1rem;font-weight:600">Cluster Nodes</h2>
+<div id="cluster-nodes-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px"></div>
+{{end}}
+</div>
+<script>
+(function(){
+{{if .IsCluster}}
+function load() {
+  fetch('/api/v1/mqtt/stat/overall',{credentials:'same-origin'}).then(r=>r.json()).then(function(local){
+    fetch('/api/v1/cluster/stat/overall',{credentials:'same-origin'}).then(r=>r.json()).then(function(results){
+      var nodes=[];
+      var agg={clients_connected:0,messages_received:0,messages_sent:0,subscriptions:0,uptime:local.uptime,memory_alloc:0,packets_received:0,clients_total:0};
+      results.forEach(function(r){
+        if(r.err||!r.data) return;
+        try {
+          var s=JSON.parse(r.data); s._url=r.url;
+          agg.clients_connected+=s.clients_connected||0; agg.messages_received+=s.messages_received||0;
+          agg.messages_sent+=s.messages_sent||0; agg.subscriptions+=s.subscriptions||0;
+          agg.memory_alloc+=(s.memory_alloc||0); agg.packets_received+=s.packets_received||0; agg.clients_total+=s.clients_total||0;
+          nodes.push(s);
+        } catch(e){}
+      });
+      var items=[['Online Clients',fmtNum(agg.clients_connected)],['Messages Received',fmtNum(agg.messages_received)],['Messages Sent',fmtNum(agg.messages_sent)],['Subscriptions',fmtNum(agg.subscriptions)],['Uptime',fmtUptime(agg.uptime)],['Memory',fmtBytes(agg.memory_alloc)],['Packets Received',fmtNum(agg.packets_received)],['Total Clients',fmtNum(agg.clients_total)]];
+      document.getElementById('aggregate-grid').innerHTML='<div style="grid-column:1/-1;font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">Cluster Aggregate</div>'+
+        items.map(function(i){ return '<div class="card" style="box-shadow:0 0 16px rgba(34,197,94,0.06)"><div class="card-label">'+i[0]+'</div><div class="card-value">'+i[1]+'</div></div>' }).join('');
+      document.getElementById('cluster-nodes-grid').innerHTML=nodes.map(function(s){
+        var nn=s._url.match(/\/\/([^:]+):/)?.[1]||'node';
+        return '<div class="card" style="box-shadow:0 0 12px rgba(96,165,250,0.04)"><div class="card-label" style="font-size:0.85rem;font-weight:700;color:var(--text-primary)">'+nn+'</div>'+
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">'+
+          '<div><div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Clients</div><div style="font-size:1.1rem;font-weight:700;font-family:monospace">'+fmtNum(s.clients_connected||0)+'</div></div>'+
+          '<div><div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Msgs Recv</div><div style="font-size:1.1rem;font-weight:700;font-family:monospace">'+fmtNum(s.messages_received||0)+'</div></div>'+
+          '<div><div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Msgs Sent</div><div style="font-size:1.1rem;font-weight:700;font-family:monospace">'+fmtNum(s.messages_sent||0)+'</div></div>'+
+          '<div><div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Subs</div><div style="font-size:1.1rem;font-weight:700;font-family:monospace">'+fmtNum(s.subscriptions||0)+'</div></div>'+
+          '<div><div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Uptime</div><div style="font-size:1.1rem;font-weight:700;font-family:monospace">'+fmtUptime(s.uptime)+'</div></div>'+
+          '<div><div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">Memory</div><div style="font-size:1.1rem;font-weight:700;font-family:monospace">'+fmtBytes(s.memory_alloc)+'</div></div>'+
+          '</div></div>';
+      }).join('');
+    });
+  });
+}
+{{else}}
+function load() {
+  fetch('/api/v1/mqtt/stat/overall',{credentials:'same-origin'}).then(r=>r.json()).then(function(s){
+    var items=[['Online Clients',fmtNum(s.clients_connected)],['Messages Received',fmtNum(s.messages_received)],['Messages Sent',fmtNum(s.messages_sent)],['Subscriptions',fmtNum(s.subscriptions)],['Uptime',fmtUptime(s.uptime)],['Memory',fmtBytes(s.memory_alloc)],['Packets Received',fmtNum(s.packets_received)],['Total Clients',fmtNum(s.clients_total)]];
+    document.getElementById('aggregate-grid').innerHTML=items.map(function(i){ return '<div class="card"><div class="card-label">'+i[0]+'</div><div class="card-value">'+i[1]+'</div></div>' }).join('');
+  });
+}
+{{end}}
+load();setInterval(load,5000);
+})();
+</script>
+{{end}}

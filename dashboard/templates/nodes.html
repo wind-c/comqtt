@@ -1,0 +1,59 @@
+{{define "nodes"}}{{template "layout" .}}{{end}}
+{{define "title"}}Nodes{{end}}
+{{define "content"}}
+<div id="nodes-area">
+<div class="toolbar"><span class="text-muted" id="nodes-count"></span><button class="btn btn-accent" onclick="showJoinModal()">+ Join Node</button></div>
+<table><thead><tr><th>Name</th><th>Address</th><th>Port</th><th>Tags</th><th></th></tr></thead><tbody id="nodes-tbody"></tbody></table>
+</div>
+<div id="join-modal" class="modal" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+    <div class="modal-box"><h3 style="margin-bottom:16px">Join Node</h3>
+        <div class="form-group"><label>Name</label><input id="join-name"></div>
+        <div class="form-group"><label>Address (ip:port)</label><input id="join-addr" placeholder="192.168.1.10:7946"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+            <button class="btn" onclick="document.getElementById('join-modal').style.display='none'">Cancel</button>
+            <button class="btn btn-accent" onclick="doJoin()">Join</button>
+        </div>
+    </div>
+</div>
+<div id="config-modal" class="modal" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+    <div class="modal-box" style="min-width:700px;max-width:90vw">
+        <h3 style="margin-bottom:16px" id="config-modal-title">Config</h3>
+        <pre id="config-modal-body" style="background:var(--bg-page);border:1px solid var(--border);border-radius:6px;padding:16px;font-family:'Fira Code','Cascadia Code','Consolas',monospace;font-size:0.8rem;line-height:1.5;color:var(--text-primary);overflow:auto;max-height:70vh;white-space:pre-wrap;word-break:break-all"></pre>
+        <div style="display:flex;justify-content:flex-end;margin-top:12px">
+            <button class="btn" onclick="document.getElementById('config-modal').style.display='none'">Close</button>
+        </div>
+    </div>
+</div>
+<script>
+(function(){
+function load() {
+    api('/api/v1/cluster/nodes').then(function(nodes) {
+        document.getElementById('nodes-count').textContent = nodes.length + ' nodes';
+        document.getElementById('nodes-tbody').innerHTML = nodes.map(function(n){
+            var tagStr = ''; if(n.tags) for(var k in n.tags) tagStr += '<span class="tag" style="margin-right:4px">'+esc(k)+'='+esc(n.tags[k])+'</span>';
+            return '<tr><td class="mono">'+esc(n.name)+'</td><td>'+esc(n.addr)+'</td><td>'+n.port+'</td><td>'+tagStr+'</td>'+
+              '<td><button class="btn" style="font-size:0.7rem;padding:4px 8px;margin-right:4px" onclick="showConfig(\'Cluster\',\'/api/v1/node/config\')">Cluster</button>'+
+              '<button class="btn" style="font-size:0.7rem;padding:4px 8px;margin-right:4px" onclick="showConfig(\'MQTT\',\'/api/v1/mqtt/config\')">MQTT</button>'+
+              '<button class="btn btn-danger" style="font-size:0.7rem;padding:4px 8px" onclick="api(\'/api/v1/node/'+esc(n.name)+'\',{method:\'DELETE\'}).then(function(){location.reload()})">Leave</button></td></tr>';
+        }).join('');
+    });
+}
+window.showConfig = function(title, url) {
+    document.getElementById('config-modal-title').textContent=title+' Config';
+    document.getElementById('config-modal-body').textContent='Loading...';
+    document.getElementById('config-modal').style.display='flex';
+    api(url).then(function(d){
+        document.getElementById('config-modal-body').textContent=JSON.stringify(d,null,2);
+    }).catch(function(e){ document.getElementById('config-modal-body').textContent='Error: '+e.message });
+};
+window.showJoinModal = function() { document.getElementById('join-modal').style.display='flex' };
+window.doJoin = function() {
+    var n=document.getElementById('join-name').value,a=document.getElementById('join-addr').value;
+    api('/api/v1/cluster/nodes',{method:'POST',body:JSON.stringify({name:n,addr:a})}).then(function(){
+        document.getElementById('join-modal').style.display='none'; load();
+    });
+};
+load();
+})();
+</script>
+{{end}}

@@ -1,0 +1,158 @@
+{{define "layout"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{.SiteTitle}}</title>
+<style>
+:root {
+    --bg-page: #0F172A;
+    --bg-panel: #1E293B;
+    --bg-secondary: #334155;
+    --text-primary: #F8FAFC;
+    --text-muted: #94A3B8;
+    --accent: #22C55E;
+    --warning: #F59E0B;
+    --danger: #EF4444;
+    --link: #60A5FA;
+    --border: #475569;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Fira Sans', 'Segoe UI', system-ui, sans-serif;
+       background: var(--bg-page); color: var(--text-primary);
+       display: flex; min-height: 100vh; }
+.sidebar { width: 240px; background: var(--bg-panel);
+           border-right: 1px solid var(--border);
+           display: flex; flex-direction: column; flex-shrink: 0; }
+.sidebar-logo { height: 53px; display: flex; align-items: center; padding: 0 20px;
+                font-size: 1.1rem; font-weight: 700; border-bottom: 1px solid var(--border); }
+.sidebar-nav { flex: 1; padding: 8px 0; }
+.sidebar-nav a { display: flex; align-items: center; gap: 10px;
+                 padding: 10px 20px; color: var(--text-muted);
+                 text-decoration: none; font-size: 0.875rem;
+                 transition: background 200ms; cursor: pointer; }
+.sidebar-nav a:hover, .sidebar-nav a.active { background: var(--bg-secondary); color: var(--text-primary); }
+.sidebar-nav a.active { border-left: 3px solid var(--accent); }
+.sidebar-group { padding: 16px 20px 4px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--border); }
+.sidebar-divider { margin: 4px 16px; border-top: 1px solid rgba(71,85,105,0.3); }
+.sidebar-footer { padding: 12px 20px; border-top: 1px solid var(--border); }
+.sidebar-footer a { color: var(--text-muted); text-decoration: none; font-size: 0.875rem; cursor: pointer; }
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.header { height: 53px; display: flex; align-items: center; padding: 0 28px;
+          border-bottom: 1px solid var(--border); background: var(--bg-panel); }
+.header h1 { font-size: 1.25rem; font-weight: 700; }
+.content { flex: 1; padding: 24px; overflow-y: auto; }
+.card { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+.card-label { font-size: 0.875rem; color: var(--text-muted); margin-bottom: 8px; }
+.card-value { font-size: 1.875rem; font-weight: 700; font-family: monospace; }
+.metric-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+table { width: 100%; border-collapse: collapse; }
+th { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;
+     text-align: left; padding: 10px 16px; border-bottom: 1px solid var(--border); }
+td { font-size: 0.875rem; padding: 10px 16px; border-bottom: 1px solid rgba(71,85,105,0.3); }
+tr:nth-child(even) { background: var(--bg-panel); }
+tr:hover { background: var(--bg-secondary); transition: background 200ms; cursor: pointer; }
+.btn { padding: 8px 16px; border: 1px solid var(--border); border-radius: 6px;
+       background: var(--bg-secondary); color: var(--text-primary); font-size: 0.875rem;
+       font-weight: 500; cursor: pointer; transition: background 200ms; }
+.btn:hover { background: var(--border); }
+.btn-danger { border-color: var(--danger); color: var(--danger); }
+.btn-danger:hover { background: var(--danger); color: white; }
+.btn-accent { background: var(--accent); border-color: var(--accent); color: #0F172A; }
+.btn-accent:hover { opacity: 0.9; }
+input, textarea, select { width: 100%; padding: 8px 12px; background: var(--bg-page);
+    border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary);
+    font-size: 0.875rem; font-family: inherit; }
+input:focus, textarea:focus, select:focus { outline: 2px solid var(--link); outline-offset: 2px; }
+.search-box { margin-bottom: 16px; max-width: 360px; }
+.pagination { display: flex; gap: 8px; align-items: center; padding: 12px 0; font-size: 0.875rem; }
+.pagination span { color: var(--text-muted); }
+.status-online { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-right: 6px; }
+.status-offline { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--warning); margin-right: 6px; }
+.detail-panel { background: var(--bg-page); border: 1px solid var(--border); border-radius: 8px;
+    padding: 16px; margin: 12px 0; }
+.detail-panel dt { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; }
+.detail-panel dd { font-size: 0.875rem; margin-bottom: 8px; font-family: monospace; }
+.topic-tree { font-family: monospace; }
+.topic-tree .node { cursor: pointer; padding: 2px 0; }
+.topic-tree .node:hover { color: var(--link); }
+.topic-tree .children { padding-left: 20px; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem;
+       background: var(--bg-secondary); color: var(--text-muted); }
+.tag-accent { background: rgba(34,197,94,0.15); color: var(--accent); }
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex;
+         align-items: center; justify-content: center; z-index: 100; }
+.modal-box { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px;
+             padding: 24px; min-width: 400px; max-width: 90vw; }
+.toast { position: fixed; top: 16px; right: 16px; padding: 12px 20px; border-radius: 8px;
+         font-size: 0.875rem; z-index: 200; transition: opacity 300ms; }
+.toast-success { background: rgba(34,197,94,0.15); border: 1px solid var(--accent); color: var(--accent); }
+.toast-error { background: rgba(239,68,68,0.15); border: 1px solid var(--danger); color: var(--danger); }
+.toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px; }
+.mono { font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace; }
+.text-muted { color: var(--text-muted); font-size: 0.875rem; }
+.login-page { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+.login-card { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px;
+              padding: 32px; width: 380px; max-width: 90vw; }
+.login-card h1 { font-size: 1.25rem; text-align: center; margin-bottom: 24px; }
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-size: 0.875rem; margin-bottom: 4px; color: var(--text-muted); }
+.form-error { font-size: 0.75rem; color: var(--danger); margin-top: 4px; }
+table.w-full { overflow-x: auto; display: block; }
+@media (max-width: 768px) {
+    .sidebar { width: 200px; }
+    .metric-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+    .header { padding: 12px 16px; }
+    .content { padding: 16px; }
+}
+</style>
+<script src="/dashboard/static/dashboard.js"></script>
+</head>
+<body>
+<aside class="sidebar">
+    <div class="sidebar-logo">{{.SiteTitle}}</div>
+    <nav class="sidebar-nav">
+        <div class="sidebar-group">Monitoring</div>
+        <a href="/dashboard/overview">Overview</a>{{if .IsCluster}}
+        <a href="/dashboard/nodes">Nodes</a>{{end}}
+        <a href="/dashboard/clients">Clients</a>
+        <div class="sidebar-divider"></div>
+        <div class="sidebar-group">Access Control</div>
+        <a href="/dashboard/auth">Auth</a>
+        <a href="/dashboard/acl">ACL</a>
+        <div class="sidebar-divider"></div>
+        <div class="sidebar-group">Data</div>
+        <a href="/dashboard/subscriptions">Subscriptions</a>
+
+        <a href="/dashboard/retained">Retained</a>
+        <div class="sidebar-divider"></div>
+        <div class="sidebar-group">Tools</div>
+        <a href="/dashboard/publish">Publish</a>
+    </nav>
+    <div class="sidebar-footer">
+        <a href="#" onclick="showPwdModal()">Change Password</a>
+        <span style="margin:0 8px;color:var(--border)">|</span>
+        <a href="#" onclick="document.getElementById('logout-form').submit()">Logout</a>
+        <form id="logout-form" method="post" action="/dashboard/logout" hidden></form>
+    </div>
+</aside>
+<div class="main">
+    <header class="header"><h1>{{block "title" .}}Overview{{end}}</h1></header>
+    <main class="content">{{template "content" .}}</main>
+</div>
+<div id="pwd-modal" class="modal" style="display:none" onclick="if(event.target===this)closePwdModal()">
+    <div class="modal-box">
+        <h3 style="margin-bottom:16px">Change Password</h3>
+        <div class="form-group"><label>Current Password</label><input id="pwd-old" type="password" autocomplete="current-password"></div>
+        <div class="form-group"><label>New Password</label><input id="pwd-new" type="password" autocomplete="new-password"></div>
+        <div id="pwd-error" class="form-error" style="display:none"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+            <button class="btn" onclick="closePwdModal()">Cancel</button>
+            <button class="btn btn-accent" onclick="changePassword()">Save</button>
+        </div>
+    </div>
+</div>
+</body>
+</html>
+{{end}}

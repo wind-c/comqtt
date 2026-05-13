@@ -1,0 +1,33 @@
+storage-way: 3
+mqtt:
+  tcp: :1883
+  ws: :1882
+  http: :8080
+  options:
+    inline-client: true
+cluster:
+  discovery-way: 0
+  node-name: comqtt1
+  bind-addr: 0.0.0.0
+  bind-port: 7946
+  raft-port: 8946
+  raft-dir: /data/raft
+  raft-bootstrap: true
+  grpc-enable: false
+  http-port: 8080
+  members:
+    - comqtt1:7946
+    - comqtt2:7946
+    - comqtt3:7946
+redis:
+  options:
+    addr: redis:6379
+    db: 0
+  prefix: comqtt
+log:
+  enable: true
+  output: 0
+  level: -4
+dashboard-enable: true
+dashboard:
+  users-file: /app/data/dashboard-users.json

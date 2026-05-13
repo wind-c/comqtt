@@ -1082,3 +1082,87 @@ func TestInlineUnsubscribe(t *testing.T) {
 	require.Equal(t, 0, count)
 	require.False(t, ok)
 }
+
+func TestWalkTopicTreeEmpty(t *testing.T) {
+	index := NewTopicsIndex()
+	tree := index.WalkTopicTree()
+
+	require.NotNil(t, tree)
+	require.Equal(t, 0, tree.SubscriberCount)
+	require.Len(t, tree.Children, 0)
+}
+
+func TestWalkTopicTreeWithSubscribers(t *testing.T) {
+	index := NewTopicsIndex()
+	index.Subscribe("cl1", packets.Subscription{Filter: "a/b/c", Qos: 1})
+	index.Subscribe("cl2", packets.Subscription{Filter: "a/b/c", Qos: 2})
+	index.Subscribe("cl3", packets.Subscription{Filter: "a/b/d", Qos: 0})
+	index.Subscribe("cl4", packets.Subscription{Filter: "x/y", Qos: 1})
+
+	tree := index.WalkTopicTree()
+	require.NotNil(t, tree)
+	require.Equal(t, 4, tree.SubscriberCount)
+	require.Len(t, tree.Children, 2)
+
+	a := findChild(tree, "a")
+	require.NotNil(t, a)
+	require.Equal(t, "a", a.FullPath)
+	require.Equal(t, 3, a.SubscriberCount)
+
+	b := findChild(a, "b")
+	require.NotNil(t, b)
+	require.Equal(t, "a/b", b.FullPath)
+
+	c := findChild(b, "c")
+	require.NotNil(t, c)
+	require.Equal(t, "a/b/c", c.FullPath)
+	require.Equal(t, 2, c.SubscriberCount)
+
+	d := findChild(b, "d")
+	require.NotNil(t, d)
+	require.Equal(t, "a/b/d", d.FullPath)
+	require.Equal(t, 1, d.SubscriberCount)
+
+	x := findChild(tree, "x")
+	require.NotNil(t, x)
+	require.Equal(t, "x", x.FullPath)
+	require.Equal(t, 1, x.SubscriberCount)
+
+	y := findChild(x, "y")
+	require.NotNil(t, y)
+	require.Equal(t, "x/y", y.FullPath)
+	require.Equal(t, 1, y.SubscriberCount)
+}
+
+func TestWalkTopicTreeWithRetained(t *testing.T) {
+	index := NewTopicsIndex()
+	index.RetainMessage(packets.Packet{TopicName: "devices/sensor/temp", Payload: []byte("22.5"), FixedHeader: packets.FixedHeader{Retain: true}})
+	index.RetainMessage(packets.Packet{TopicName: "devices/sensor/humidity", Payload: []byte("60"), FixedHeader: packets.FixedHeader{Retain: true}})
+	index.Subscribe("cl1", packets.Subscription{Filter: "devices/#", Qos: 0})
+
+	tree := index.WalkTopicTree()
+
+	devices := findChild(tree, "devices")
+	require.NotNil(t, devices)
+
+	sensor := findChild(devices, "sensor")
+	require.NotNil(t, sensor)
+
+	temp := findChild(sensor, "temp")
+	require.NotNil(t, temp)
+	require.True(t, temp.HasRetained)
+	require.Equal(t, "devices/sensor/temp", temp.FullPath)
+
+	humidity := findChild(sensor, "humidity")
+	require.NotNil(t, humidity)
+	require.True(t, humidity.HasRetained)
+}
+
+func findChild(node *TopicTreeNode, name string) *TopicTreeNode {
+	for _, c := range node.Children {
+		if c.Name == name {
+			return c
+		}
+	}
+	return nil
+}

@@ -5,7 +5,9 @@
 package mlist
 
 import (
+	"encoding/json"
 	"net"
+	"strconv"
 	"time"
 
 	"github.com/hashicorp/memberlist"
@@ -57,6 +59,8 @@ func (m *Membership) Setup() error {
 	if err := m.createMemberList(wrapOptions(m.config)); err != nil {
 		return err
 	}
+	// set http port for node discovery
+	m.delegate.SetHttpPort(m.config.HttpPort)
 	// join cluster
 	if len(m.config.Members) > 0 {
 		if _, err := m.list.Join(m.config.Members); err != nil {
@@ -119,10 +123,28 @@ func (m *Membership) LocalNode() *memberlist.Node {
 func (m *Membership) Members() []mb.Member {
 	members := m.aliveMembers()
 	ms := make([]mb.Member, len(members))
-	for i, m := range members {
-		ms[i] = mb.Member{m.Name, m.Addr.String(), int(m.Port), nil}
+	for i, node := range members {
+		tags := m.parseNodeMeta(node.Meta)
+		if node.Name == m.config.NodeName && tags[mb.TagHttpPort] == "" && m.config.HttpPort > 0 {
+			if tags == nil {
+				tags = make(map[string]string)
+			}
+			tags[mb.TagHttpPort] = strconv.Itoa(m.config.HttpPort)
+		}
+		ms[i] = mb.Member{Name: node.Name, Addr: node.Addr.String(), Port: int(node.Port), Tags: tags}
 	}
 	return ms
+}
+
+func (m *Membership) parseNodeMeta(meta []byte) map[string]string {
+	if len(meta) == 0 {
+		return nil
+	}
+	var tags map[string]string
+	if err := json.Unmarshal(meta, &tags); err != nil {
+		return nil
+	}
+	return tags
 }
 
 func (m *Membership) aliveMembers() []*memberlist.Node {

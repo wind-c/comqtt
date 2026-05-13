@@ -3,6 +3,10 @@ storage-path: comqtt.db  #Local storage path in single node mode.
 bridge-way: 0  #Bridge way optional items:0 disable、1 kafka
 bridge-path: ./config/bridge-kafka.yml  #The bridge config file path
 pprof-enable: false #Whether to enable the performance analysis tool http://ip:6060
+dashboard-enable: true #Whether to enable the built-in Web Dashboard
+dashboard:
+  secret-file: #JWT signing secret file path (leave empty to use built-in default)
+  users-file: ./config/dashboard-users.json #Dashboard user credentials file path
 
 auth:
   way: 0  #Authentication way: 0 anonymous, 1 username and password, 2 clientid

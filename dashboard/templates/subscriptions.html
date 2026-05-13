@@ -1,0 +1,47 @@
+{{define "subscriptions"}}{{template "layout" .}}{{end}}
+{{define "title"}}Subscriptions{{end}}
+{{define "content"}}
+<div class="toolbar"><input class="search-box" type="text" id="sub-search" placeholder="Search filter..." oninput="filterSubs()"></div>
+{{if .IsCluster}}
+<div style="display:flex;gap:4px;margin-bottom:8px;border-bottom:1px solid var(--border)" id="sub-tab-bar"></div>
+{{end}}
+<table><thead><tr><th>Topic Filter</th><th>Subscribers</th></tr></thead><tbody id="subs-tbody"></tbody></table>
+<script>
+(function(){
+{{if .IsCluster}}
+function load(){
+  api('/api/v1/cluster/subscriptions').then(function(data){
+    if(!Array.isArray(data)) return;
+    window._subTabs=data;
+    renderTabs(data);
+    if(data.length) switchSubTab(data[0].node);
+  });
+}
+function renderTabs(tabs){
+  document.getElementById('sub-tab-bar').innerHTML=tabs.map(function(t,i){
+    return '<button class="btn" style="border-radius:6px 6px 0 0;border-bottom:none;font-size:0.75rem;padding:4px 10px'+
+      (i===0?';background:var(--bg-secondary);color:var(--text-primary)':'')+
+      '" onclick="switchSubTab(\''+t.node+'\')">'+t.node+' ('+(t.data||[]).length+')</button>';
+  }).join('');
+}
+window.switchSubTab=function(node){
+  var tab=(window._subTabs||[]).find(function(t){ return t.node===node });
+  window._curSubs=tab?tab.data:[];
+  filterSubs();
+  var btns=document.querySelectorAll('#sub-tab-bar button');
+  (window._subTabs||[]).forEach(function(t,i){ if(btns[i]){ btns[i].style.background=t.node===node?'var(--bg-secondary)':''; btns[i].style.color=t.node===node?'var(--text-primary)':''; }});
+};
+{{else}}
+function load(){ api('/api/v1/mqtt/subscriptions').then(function(d){ window._curSubs=d; filterSubs() }); }
+{{end}}
+function filterSubs(){
+  var s=(document.getElementById('sub-search').value||'').toLowerCase();
+  var list=window._curSubs||[];
+  document.getElementById('subs-tbody').innerHTML=list.filter(function(x){ return x.filter.toLowerCase().indexOf(s)>=0 }).map(function(x){
+    return '<tr><td class="mono">'+esc(x.filter)+'</td><td class="mono">'+x.count+'</td></tr>';
+  }).join('');
+}
+load();
+})();
+</script>
+{{end}}

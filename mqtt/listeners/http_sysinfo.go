@@ -90,7 +90,7 @@ func (l *HTTPStats) Init(_ *slog.Logger) error {
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 5 * time.Second,
 		Addr:         l.address,
-		Handler:      mux,
+		Handler:      corsMiddleware(mux),
 	}
 
 	if l.config.TLSConfig != nil {
@@ -133,4 +133,24 @@ func (l *HTTPStats) jsonHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	_, _ = w.Write(out)
+}
+
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			origin = "*"
+		}
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		w.Header().Set("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Authorization,Accept")
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }

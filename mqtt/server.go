@@ -16,6 +16,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -133,6 +134,7 @@ type Server struct {
 	hooks        *Hooks               // hooks contains hooks for extra functionality such as auth and persistent storage
 	inlineClient *Client              // inlineClient is a special client used for inline subscriptions and inline Publish
 	Blacklist    []string             // blacklist of client id
+	blacklistMu  sync.RWMutex
 }
 
 // loop contains interval tickers for the system events loop.
@@ -256,6 +258,12 @@ func (s *Server) Hooks() *Hooks {
 	return s.hooks
 }
 
+func (s *Server) BlacklistMutexLock()   { s.blacklistMu.Lock() }
+func (s *Server) BlacklistMutexUnlock() { s.blacklistMu.Unlock() }
+
+func (s *Server) BlacklistMutexRLock()   { s.blacklistMu.RLock() }
+func (s *Server) BlacklistMutexRUnlock() { s.blacklistMu.RUnlock() }
+
 // AddHook attaches a new Hook to the server. Ideally, this should be called
 // before the server is started with s.Serve().
 func (s *Server) AddHook(hook Hook, config any) error {
@@ -361,7 +369,10 @@ func (s *Server) attachClient(cl *Client, listener string) error {
 	}
 
 	cl.ParseConnect(listener, pk)
-	if slices.Contains(s.Blacklist, cl.ID) {
+	s.BlacklistMutexRLock()
+	blocked := slices.Contains(s.Blacklist, cl.ID)
+	s.BlacklistMutexRUnlock()
+	if blocked {
 		return fmt.Errorf("blacklisted client: %s", cl.ID)
 	}
 
@@ -501,7 +512,7 @@ func (s *Server) validateConnect(cl *Client, pk packets.Packet) packets.Code {
 func (s *Server) inheritClientSession(pk packets.Packet, cl *Client) bool {
 	if existing, ok := s.Clients.Get(pk.Connect.ClientIdentifier); ok {
 		_ = s.DisconnectClient(existing, packets.ErrSessionTakenOver)                                   // [MQTT-3.1.4-3]
-		s.Clients.Delete(existing.ID)                                                                    // prevent race: remove old entry before adding new one
+		s.Clients.Delete(existing.ID)                                                                   // prevent race: remove old entry before adding new one
 		if pk.Connect.Clean || (existing.Properties.Clean && existing.Properties.ProtocolVersion < 5) { // [MQTT-3.1.2-4] [MQTT-3.1.4-4]
 			s.UnsubscribeClient(existing)
 			existing.ClearInflights(math.MaxInt64, 0)

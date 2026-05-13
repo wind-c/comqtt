@@ -837,3 +837,48 @@ func (p *particles) delete(id string) {
 	defer p.Unlock()
 	delete(p.internal, id)
 }
+
+type TopicTreeNode struct {
+	Name            string           `json:"name"`
+	FullPath        string           `json:"full_path"`
+	SubscriberCount int              `json:"subscriber_count"`
+	HasRetained     bool             `json:"has_retained"`
+	Children        []*TopicTreeNode `json:"children,omitempty"`
+}
+
+func (x *TopicsIndex) WalkTopicTree() *TopicTreeNode {
+	return walkParticle(x.root, "")
+}
+
+func walkParticle(p *particle, parentPath string) *TopicTreeNode {
+	p.Lock()
+	defer p.Unlock()
+
+	fullPath := p.key
+	if parentPath != "" {
+		fullPath = parentPath + "/" + p.key
+	}
+
+	count := p.subscriptions.Len()
+	if p.shared != nil {
+		count += p.shared.Len()
+	}
+	if p.inlineSubscriptions != nil {
+		count += p.inlineSubscriptions.Len()
+	}
+	children := make([]*TopicTreeNode, 0, p.particles.len())
+
+	for _, child := range p.particles.getAll() {
+		childNode := walkParticle(child, fullPath)
+		count += childNode.SubscriberCount
+		children = append(children, childNode)
+	}
+
+	return &TopicTreeNode{
+		Name:            p.key,
+		FullPath:        fullPath,
+		SubscriberCount: count,
+		HasRetained:     p.retainPath != "",
+		Children:        children,
+	}
+}
