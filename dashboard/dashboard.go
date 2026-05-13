@@ -9,6 +9,7 @@ import (
 	"html/template"
 	"io/fs"
 	"net/http"
+	"sync"
 )
 
 type Options struct {
@@ -30,13 +31,19 @@ type Dashboard struct {
 var assets embed.FS
 
 func New(opts Options) (*Dashboard, error) {
+	if opts.AuthSecret == "" {
+		opts.AuthSecret = defaultAuthSecret
+	}
+	if opts.UsersFile == "" {
+		opts.UsersFile = "config/dashboard-users.json"
+	}
+	if opts.SiteTitle == "" {
+		opts.SiteTitle = "Comqtt Dashboard"
+	}
+
 	users, err := loadUsers(opts.UsersFile)
 	if err != nil {
 		return nil, err
-	}
-
-	if opts.SiteTitle == "" {
-		opts.SiteTitle = "Comqtt Dashboard"
 	}
 
 	d := &Dashboard{

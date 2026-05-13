@@ -1,0 +1,12 @@
+[
+  {
+    "username": "admin",
+    "hash": "$2a$10$o8uup1NqG7xPsKyBeoILq.7aBHE/KNdNccMtSTwpf2dsHH4VfkXVO",
+    "role": "admin",
+    "must_change": false,
+    "password_set_at": 1778171299,
+    "failed_attempts": 0,
+    "locked_until": 0,
+    "created_at": 1778170078
+  }
+]

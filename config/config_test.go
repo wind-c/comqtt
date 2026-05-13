@@ -85,3 +85,33 @@ func TestParse(t *testing.T) {
 	require.Equal(t, "127.0.0.1:6379", cfg.Redis.Options.Addr)
 	require.Equal(t, 10240, cfg.Cluster.QueueDepth)
 }
+
+func TestDashboardConfigDefaults(t *testing.T) {
+	cfg := New()
+	require.True(t, cfg.DashboardEnable)
+	require.Equal(t, "", cfg.Dashboard.SecretFile)
+	require.Equal(t, "config/dashboard-users.json", cfg.Dashboard.UsersFile)
+}
+
+func TestDashboardConfigFromYaml(t *testing.T) {
+	cfg, err := parse([]byte(`
+dashboard-enable: true
+dashboard:
+  secret-file: /etc/comqtt/secret
+  users-file: /etc/comqtt/users.json
+`))
+	require.NoError(t, err)
+	require.True(t, cfg.DashboardEnable)
+	require.Equal(t, "/etc/comqtt/secret", cfg.Dashboard.SecretFile)
+	require.Equal(t, "/etc/comqtt/users.json", cfg.Dashboard.UsersFile)
+}
+
+func TestDashboardConfigDisabled(t *testing.T) {
+	cfg, err := parse([]byte(`
+dashboard-enable: false
+dashboard:
+  users-file: /etc/comqtt/users.json
+`))
+	require.NoError(t, err)
+	require.False(t, cfg.DashboardEnable)
+}

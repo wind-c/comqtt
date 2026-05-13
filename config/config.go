@@ -67,7 +67,12 @@ var (
 )
 
 func New() *Config {
-	return &Config{}
+	return &Config{
+		DashboardEnable: true,
+		Dashboard: DashboardConfig{
+			UsersFile: "config/dashboard-users.json",
+		},
+	}
 }
 
 func Load(yamlFile string) (*Config, error) {
@@ -88,16 +93,23 @@ func parse(buf []byte) (*Config, error) {
 }
 
 type Config struct {
-	StorageWay  uint        `yaml:"storage-way"`
-	StoragePath string      `yaml:"storage-path"`
-	BridgeWay   uint        `yaml:"bridge-way"`
-	BridgePath  string      `yaml:"bridge-path"`
-	Auth        auth        `yaml:"auth"`
-	Mqtt        mqtt        `yaml:"mqtt"`
-	Cluster     Cluster     `yaml:"cluster"`
-	Redis       redis       `yaml:"redis"`
-	Log         log.Options `yaml:"log"`
-	PprofEnable bool        `yaml:"pprof-enable"`
+	StorageWay      uint            `yaml:"storage-way"`
+	StoragePath     string          `yaml:"storage-path"`
+	BridgeWay       uint            `yaml:"bridge-way"`
+	BridgePath      string          `yaml:"bridge-path"`
+	Auth            auth            `yaml:"auth"`
+	Mqtt            mqtt            `yaml:"mqtt"`
+	Cluster         Cluster         `yaml:"cluster"`
+	Redis           redis           `yaml:"redis"`
+	Log             log.Options     `yaml:"log"`
+	PprofEnable     bool            `yaml:"pprof-enable"`
+	DashboardEnable bool            `yaml:"dashboard-enable"`
+	Dashboard       DashboardConfig `yaml:"dashboard"`
+}
+
+type DashboardConfig struct {
+	SecretFile string `yaml:"secret-file"`
+	UsersFile  string `yaml:"users-file"`
 }
 
 type auth struct {

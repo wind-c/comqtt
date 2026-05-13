@@ -138,16 +138,27 @@ func realMain(ctx context.Context) error {
 	// add http listener
 	handlers := rest.New(server).GenHandlers()
 
-	secret, _ := os.ReadFile("./data/dashboard-secret")
-	dash, err := dashboard.New(dashboard.Options{
-		AuthSecret: string(secret),
-		UsersFile:  "./data/dashboard-users.json",
-		SiteTitle:  "Comqtt Dashboard",
-	})
-	if err != nil {
-		log.Error("dashboard init", "error", err)
-	} else {
-		handlers["/dashboard/"] = dash.Routes().ServeHTTP
+	// init dashboard (conditional on config)
+	if cfg.DashboardEnable {
+		secret := cfg.Dashboard.SecretFile
+		if secret != "" {
+			if data, err := os.ReadFile(secret); err == nil {
+				secret = string(data)
+			} else {
+				log.Warn("failed to read dashboard secret file, using default", "path", cfg.Dashboard.SecretFile, "error", err)
+				secret = ""
+			}
+		}
+		dash, err := dashboard.New(dashboard.Options{
+			AuthSecret: secret,
+			UsersFile:  cfg.Dashboard.UsersFile,
+			SiteTitle:  "Comqtt Dashboard",
+		})
+		if err != nil {
+			log.Error("dashboard init failed, continuing without dashboard", "error", err)
+		} else {
+			handlers["/dashboard/"] = dash.Routes().ServeHTTP
+		}
 	}
 
 	// wire auth management if redis is configured

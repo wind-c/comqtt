@@ -19,6 +19,8 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+const defaultAuthSecret = "comqtt-dashboard-internal-secret-v2"
+
 var (
 	errInvalidCredentials = errors.New("invalid credentials")
 	errTokenExpired       = errors.New("token expired")
