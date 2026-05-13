@@ -201,6 +201,18 @@ func (a *Agent) GetMemberList() []discovery.Member {
 	return a.membership.Members()
 }
 
+// Leader returns the node id of the current Raft leader, or "" if no leader
+// is elected (e.g. mid-election or before the cluster has converged).
+//
+// Exposed for monitoring tooling and external hook authors that need to
+// render cluster topology - the dashboard's cluster page in particular.
+// Trivial wrapper over raftPeer.GetLeader(), which is otherwise unreachable
+// from outside this package.
+func (a *Agent) Leader() string {
+	_, id := a.raftPeer.GetLeader()
+	return id
+}
+
 func getRaftPeerAddr(member *discovery.Member) string {
 	// using serf
 	if raftPort, ok := member.Tags[discovery.TagRaftPort]; ok {
