@@ -168,6 +168,72 @@ func (d *Dashboard) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (d *Dashboard) HandleChangePassword(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
+	username := strings.SplitN(r.Header.Get("X-Dashboard-User"), ":", 2)[0]
+	if username == "" {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var req struct {
+		OldPassword string `json:"old_password"`
+		NewPassword string `json:"new_password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.NewPassword == "" {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	d.usersMu.Lock()
+	defer d.usersMu.Unlock()
+
+	var user *User
+	for i := range d.users {
+		if d.users[i].Username == username {
+			user = &d.users[i]
+			break
+		}
+	}
+	if user == nil {
+		http.Error(w, "user not found", http.StatusNotFound)
+		return
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Hash), []byte(req.OldPassword)); err != nil {
+		http.Error(w, "invalid current password", http.StatusUnauthorized)
+		return
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	user.Hash = string(hash)
+	user.PasswordSetAt = time.Now().Unix()
+	user.MustChange = false
+
+	if d.opts.UsersFile != "" {
+		if err := saveUsers(d.opts.UsersFile, d.users); err != nil {
+			http.Error(w, "failed to save users", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+func saveUsers(file string, users []User) error {
+	data, err := json.MarshalIndent(users, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(file, data, 0600)
+}
+
 func (d *Dashboard) HandleLogout(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "token",

@@ -131,6 +131,8 @@ table.w-full { overflow-x: auto; display: block; }
         <a href="/dashboard/publish">Publish</a>
     </nav>
     <div class="sidebar-footer">
+        <a href="#" onclick="showPwdModal()">Change Password</a>
+        <span style="margin:0 8px;color:var(--border)">|</span>
         <a href="#" onclick="document.getElementById('logout-form').submit()">Logout</a>
         <form id="logout-form" method="post" action="/dashboard/logout" hidden></form>
     </div>
@@ -138,6 +140,18 @@ table.w-full { overflow-x: auto; display: block; }
 <div class="main">
     <header class="header"><h1>{{block "title" .}}Overview{{end}}</h1></header>
     <main class="content">{{template "content" .}}</main>
+</div>
+<div id="pwd-modal" class="modal" style="display:none" onclick="if(event.target===this)closePwdModal()">
+    <div class="modal-box">
+        <h3 style="margin-bottom:16px">Change Password</h3>
+        <div class="form-group"><label>Current Password</label><input id="pwd-old" type="password" autocomplete="current-password"></div>
+        <div class="form-group"><label>New Password</label><input id="pwd-new" type="password" autocomplete="new-password"></div>
+        <div id="pwd-error" class="form-error" style="display:none"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+            <button class="btn" onclick="closePwdModal()">Cancel</button>
+            <button class="btn btn-accent" onclick="changePassword()">Save</button>
+        </div>
+    </div>
 </div>
 </body>
 </html>

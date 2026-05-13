@@ -21,6 +21,7 @@ type Options struct {
 type Dashboard struct {
 	opts     Options
 	users    []User
+	usersMu  sync.Mutex
 	pages    map[string]*template.Template
 	loginTpl *template.Template
 }
@@ -104,6 +105,7 @@ func (d *Dashboard) Routes() http.Handler {
 	protected.HandleFunc("GET /dashboard/publish", d.servePage("publish"))
 	protected.HandleFunc("GET /dashboard/auth", d.servePage("auth"))
 	protected.HandleFunc("GET /dashboard/acl", d.servePage("acl"))
+	protected.HandleFunc("POST /dashboard/profile/password", d.HandleChangePassword)
 
 	mux.Handle("/dashboard/", d.AuthMiddleware(protected))
 
