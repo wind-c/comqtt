@@ -7,17 +7,18 @@ mqtt:
     inline-client: true
 cluster:
   discovery-way: 0
-  node-name: n3
+  node-name: comqtt2
   bind-addr: 0.0.0.0
   bind-port: 7946
   raft-port: 8946
   raft-dir: /data/raft
   raft-bootstrap: false
+  grpc-enable: false
   http-port: 8080
   members:
-    - n1:7946
-    - n2:7946
-    - n3:7946
+    - comqtt1:7946
+    - comqtt2:7946
+    - comqtt3:7946
 redis:
   options:
     addr: redis:6379
@@ -26,7 +27,7 @@ redis:
 log:
   enable: true
   output: 0
-  level: 0
+  level: -4
 dashboard-enable: true
 dashboard:
-  users-file: dashboard-users.json
+  users-file: /app/data/dashboard-users.json
