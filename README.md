@@ -37,9 +37,8 @@ Unless it's a critical issue, new releases typically go out over the weekend. At
 - Single-machine mode supports local storage BBolt, Badger and Redis.
 - Hook design pattern makes it easy to develop plugins for Auth, Bridge, and Storage.
 - Cluster support is based on Gossip and Raft, [Click to Cluster README](cluster/README.md).
-- Built-in Web Dashboard: dark mode UI, client/subscription/retained monitoring,
-  MQTT message publish, auth/ACL management, cluster node overview, password change.
-  Enable via `dashboard-enable: true` in config.
+- Built-in Web Dashboard for broker monitoring and management.
+  Enabled by default. Default login: `admin` / `admin`.
 
 #### Roadmap
 - [x] Dashboard.
