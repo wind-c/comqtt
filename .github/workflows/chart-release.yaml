@@ -33,6 +33,18 @@ jobs:
         with:
           version: v3.15.0
 
+      - name: Ensure gh-pages branch exists
+        run: |
+          if ! git ls-remote --exit-code --heads origin gh-pages; then
+            git checkout --orphan gh-pages
+            git rm -rf --quiet .
+            echo '{}' > index.yaml
+            git add index.yaml
+            git commit -m "Initialize gh-pages"
+            git push origin gh-pages
+            git checkout -
+          fi
+
       - name: Run chart-releaser
         uses: helm/chart-releaser-action@v1.6.0
         with:
