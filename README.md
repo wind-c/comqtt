@@ -116,7 +116,13 @@ helm install cluster deploy/helm/comqtt \
   -f deploy/helm/comqtt/ci/cluster-values.yaml
 ```
 
-Released charts are also available from the GitHub Pages-hosted Helm repository published by the `chart-release` workflow.
+Released charts are available as OCI artifacts on GHCR (recommended):
+
+```sh
+helm install my-broker oci://ghcr.io/wind-c/charts/comqtt
+```
+
+They are also published to a GitHub Pages-hosted Helm repository by the `chart-release` workflow, but this requires GitHub Pages to be enabled in the repository settings. If `helm repo add` returns a 404, use the OCI method above instead.
 
 ## Developing with Comqtt
 ### Importing as a package

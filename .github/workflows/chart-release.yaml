@@ -11,6 +11,7 @@ permissions:
   contents: write
   pages: write
   id-token: write
+  packages: write
 
 jobs:
   release:
@@ -38,3 +39,12 @@ jobs:
           charts_dir: deploy/helm
         env:
           CR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Push chart to GHCR (OCI)
+        run: |
+          CHART_VERSION=$(helm show chart deploy/helm/comqtt | grep '^version:' | awk '{print $2}')
+          helm package deploy/helm/comqtt --destination /tmp
+          helm push /tmp/comqtt-${CHART_VERSION}.tgz oci://ghcr.io/${{ github.repository_owner }}/charts
