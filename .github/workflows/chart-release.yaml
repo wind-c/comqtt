@@ -45,6 +45,6 @@ jobs:
 
       - name: Push chart to GHCR (OCI)
         run: |
-          CHART_VERSION=$(yq '.version' deploy/helm/comqtt/Chart.yaml)
+          CHART_VERSION=$(helm show chart deploy/helm/comqtt | grep '^version:' | awk '{print $2}')
           helm package deploy/helm/comqtt --destination /tmp
           helm push /tmp/comqtt-${CHART_VERSION}.tgz oci://ghcr.io/${{ github.repository_owner }}/charts
