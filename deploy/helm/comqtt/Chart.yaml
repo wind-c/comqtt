@@ -4,7 +4,7 @@ description: |
   comqtt — a lightweight, high-performance MQTT broker (v3.0/v3.1.1/v5.0)
   supporting standalone and clustered (Raft + Gossip) deployments.
 type: application
-version: 0.3.0
+version: 0.4.0
 appVersion: "2.6.0"
 kubeVersion: ">=1.23.0-0"
 home: https://github.com/wind-c/comqtt
@@ -24,6 +24,8 @@ maintainers:
 icon: https://raw.githubusercontent.com/wind-c/comqtt/main/README.md
 annotations:
   artifacthub.io/changes: |
+    - kind: added
+      description: OCI chart publishing to GHCR (oci://ghcr.io/wind-c/charts/comqtt).
     - kind: added
       description: Gateway API support, HTTPRoute (REST API + /metrics) and TCPRoute (MQTT).
     - kind: deprecated

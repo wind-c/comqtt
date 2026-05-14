@@ -25,7 +25,7 @@ helm install my-broker oci://ghcr.io/wind-c/charts/comqtt
 To install a specific version:
 
 ```bash
-helm install my-broker oci://ghcr.io/wind-c/charts/comqtt --version 0.3.0
+helm install my-broker oci://ghcr.io/wind-c/charts/comqtt --version 0.4.0
 ```
 
 ### Helm repository
