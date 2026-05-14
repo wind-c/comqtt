@@ -9,6 +9,32 @@ Resolves [issue #137](https://github.com/wind-c/comqtt/issues/137).
 ## TL;DR
 
 ```bash
+helm install my-broker oci://ghcr.io/wind-c/charts/comqtt
+```
+
+## Install
+
+### OCI (recommended)
+
+Charts are published to GHCR as OCI artifacts alongside the Docker images:
+
+```bash
+helm install my-broker oci://ghcr.io/wind-c/charts/comqtt
+```
+
+To install a specific version:
+
+```bash
+helm install my-broker oci://ghcr.io/wind-c/charts/comqtt --version 0.3.0
+```
+
+### Helm repository
+
+> **Note:** The HTTP Helm repository at `https://wind-c.github.io/comqtt` requires
+> GitHub Pages to be enabled in the repository settings. If you see a 404, the
+> repo admin hasn't enabled it yet — use the OCI method above instead.
+
+```bash
 helm repo add comqtt https://wind-c.github.io/comqtt
 helm install my-broker comqtt/comqtt
 ```
