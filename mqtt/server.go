@@ -587,6 +587,10 @@ func (s *Server) SendConnack(cl *Client, reason packets.Code, present bool, prop
 		properties.ServerKeepAliveFlag = true
 	}
 
+	if reason.Code < packets.ErrUnspecifiedError.Code && cl.Properties.Props.AuthenticationMethod != "" {
+		properties.AuthenticationMethod = cl.Properties.Props.AuthenticationMethod // [MQTT-4.12.0-5]
+	}
+
 	if reason.Code >= packets.ErrUnspecifiedError.Code {
 		if cl.Properties.ProtocolVersion < 5 {
 			if v3reason, ok := packets.V5CodesToV3[reason]; ok { // NB v3 3.2.2.3 Connack return codes
@@ -890,10 +894,16 @@ func (s *Server) processPublish(cl *Client, pk packets.Packet) error {
 
 	if pk.Properties.TopicAliasFlag && pk.Properties.TopicAlias > 0 { // [MQTT-3.3.2-11]
 		pk.TopicName = cl.State.TopicAliases.Inbound.Set(pk.Properties.TopicAlias, pk.TopicName)
+		if cl.Properties.ProtocolVersion == 5 && pk.TopicName == "" {
+			return packets.ErrProtocolViolationNoTopic // [MQTT-3.3.4] unmapped alias with empty topic
+		}
 	}
 
 	if pk.FixedHeader.Qos > s.Options.Capabilities.MaximumQos {
-		pk.FixedHeader.Qos = s.Options.Capabilities.MaximumQos // [MQTT-3.2.2-9] Reduce qos based on server max qos capability
+		if cl.Properties.ProtocolVersion == 5 {
+			return packets.ErrQosNotSupported // [MQTT-3.3.1.2]
+		}
+		pk.FixedHeader.Qos = s.Options.Capabilities.MaximumQos // v3: reduce qos based on server max qos capability
 	}
 
 	pkx, err := s.hooks.OnPublish(cl, pk)
@@ -909,6 +919,10 @@ func (s *Server) processPublish(cl *Client, pk packets.Packet) error {
 			return err
 		}
 		return nil
+	}
+
+	if cl.Properties.ProtocolVersion == 5 && pk.FixedHeader.Retain && s.Options.Capabilities.RetainAvailable == 0 {
+		return packets.ErrRetainNotSupported // [MQTT-3.3.1-3]
 	}
 
 	if pk.FixedHeader.Retain { // [MQTT-3.3.1-5] ![MQTT-3.3.1-8]

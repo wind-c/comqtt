@@ -189,7 +189,7 @@ var fixedHeaderExpected = []fixedHeaderTable{
 		desc:     "invalid publish qos bits 1 + 2 set",
 		rawBytes: []byte{Publish<<4 | 1<<1 | 1<<2, 0x00},
 		header:   FixedHeader{Type: Publish},
-		expect:   ErrProtocolViolationQosOutOfRange,
+		expect:   ErrMalformedQos,
 	},
 	{
 		desc:     "invalid pubrel bits 3,2,1,0 should be 0,0,1,0",

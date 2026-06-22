@@ -291,11 +291,15 @@ func (s Subscription) encode() byte {
 }
 
 // decode decodes subscription bytes into a subscription struct.
-func (s *Subscription) decode(b byte) {
+func (s *Subscription) decode(b byte) error {
+	if b&0xC0 != 0 { // [MQTT-3.8.3-5] reserved bits 6-7 must be zero
+		return ErrMalformedFlags
+	}
 	s.Qos = b & 3                      // byte
 	s.NoLocal = 1&(b>>2) > 0           // bool
 	s.RetainAsPublished = 1&(b>>3) > 0 // bool
 	s.RetainHandling = 3 & (b >> 4)    // byte
+	return nil
 }
 
 // ConnectEncode encodes a connect packet.
@@ -489,8 +493,13 @@ func (pk *Packet) ConnectValidate() Code {
 		}
 	}
 
-	if !pk.Connect.WillFlag && pk.Connect.WillRetain {
-		return ErrProtocolViolationWillFlagSurplusRetain // [MQTT-3.1.2-13]
+	if !pk.Connect.WillFlag {
+		if pk.Connect.WillQos > 0 {
+			return ErrProtocolViolationWillFlagSurplusRetain // [MQTT-3.1.2-11]
+		}
+		if pk.Connect.WillRetain {
+			return ErrProtocolViolationWillFlagSurplusRetain // [MQTT-3.1.2-13]
+		}
 	}
 
 	return CodeSuccess
@@ -956,7 +965,9 @@ func (pk *Packet) SubscribeDecode(buf []byte) error {
 		}
 
 		if pk.ProtocolVersion == 5 {
-			sub.decode(buf[offset])
+			if err := sub.decode(buf[offset]); err != nil {
+				return err
+			}
 			offset += 1
 		} else {
 			option, offset, err = decodeByte(buf, offset)
