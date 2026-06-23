@@ -461,11 +461,18 @@ func TestEstablishConnectionReadError(t *testing.T) {
 	require.ErrorIs(t, retrievedCl.StopCause(), packets.ErrProtocolViolationSecondConnect) // true error is disconnect
 
 	ret := <-recv
-	require.Equal(t, append(
-		packets.TPacketData[packets.Connack].Get(packets.TConnackMinCleanMqtt5).RawBytes,
-		packets.TPacketData[packets.Disconnect].Get(packets.TDisconnectSecondConnect).RawBytes...),
-		ret,
-	)
+	// CONNACK now includes AuthenticationMethod (echoed from connect)
+	connack := []byte{
+		packets.Connack << 4, 11, // fixed header (remaining=11): session+reason+props_len+auth_method_prop
+		0x00,                   // session present = false
+		packets.CodeSuccess.Code, // reason code
+		0x08,                   // properties length (8 bytes)
+		0x15,                   // AuthenticationMethod property ID
+		0x00, 0x05,             // UTF-8 string length
+		'S', 'H', 'A', '-', '1',
+	}
+	disconnect := packets.TPacketData[packets.Disconnect].Get(packets.TDisconnectSecondConnect).RawBytes
+	require.Equal(t, append(connack, disconnect...), ret)
 
 	_ = w.Close()
 	_ = r.Close()
@@ -1466,6 +1473,76 @@ func TestServerProcessPublishInvalidTopic(t *testing.T) {
 	cl, _, _ := newTestClient()
 	err := s.processPublish(cl, *packets.TPacketData[packets.Publish].Get(packets.TPublishSpecDenySysTopic).Packet)
 	require.NoError(t, err) // $SYS Topics should be ignored?
+}
+
+func TestServerProcessPublishRetainNotAvailable(t *testing.T) {
+	s := newServer()
+	cl, _, _ := newTestClient()
+	cl.Properties.ProtocolVersion = 5
+	s.Options.Capabilities.RetainAvailable = 0
+	pkx := *packets.TPacketData[packets.Publish].Get(packets.TPublishRetainMqtt5).Packet
+	err := s.processPublish(cl, pkx)
+	require.Error(t, err)
+	require.ErrorIs(t, err, packets.ErrRetainNotSupported)
+}
+
+func TestServerProcessPublishUnmappedTopicAlias(t *testing.T) {
+	s := newServer()
+	cl, _, _ := newTestClient()
+	cl.Properties.ProtocolVersion = 5
+	pkx := *packets.TPacketData[packets.Publish].Get(packets.TPublishBasicTopicAliasOnly).Packet
+	pkx.ProtocolVersion = 5
+	err := s.processPublish(cl, pkx)
+	require.Error(t, err)
+	require.ErrorIs(t, err, packets.ErrProtocolViolationNoTopic)
+}
+
+func TestServerSendConnackEchoAuthenticationMethod(t *testing.T) {
+	s := newServer()
+	cl, r, w := newTestClient()
+	cl.Properties.ProtocolVersion = 5
+	cl.Properties.Props.AssignedClientID = "mochi"
+	cl.Properties.Props.AuthenticationMethod = "test-method"
+
+	go func() {
+		err := s.SendConnack(cl, packets.CodeSuccess, true, nil)
+		require.NoError(t, err)
+		_ = w.Close()
+	}()
+
+	buf, err := io.ReadAll(r)
+	require.NoError(t, err)
+
+	// Decode CONNACK: first byte = session present + protocol version flags
+	// Then reason code
+	// Then properties (variable length)
+	pk := packets.Packet{
+		FixedHeader:    packets.FixedHeader{Type: packets.Connack},
+		ProtocolVersion: 5,
+	}
+	err = pk.ConnackDecode(buf[2:]) // skip fixed header
+	require.NoError(t, err)
+	require.Equal(t, "test-method", pk.Properties.AuthenticationMethod)
+}
+
+func TestServerProcessPublishQosNotSupported(t *testing.T) {
+	s := newServer()
+	cl, r, w := newTestClient()
+	cl.Properties.ProtocolVersion = 5
+	s.Options.Capabilities.MaximumQos = 0
+
+	errCh := make(chan error, 1)
+	go func() {
+		defer w.Close()
+		pkx := *packets.TPacketData[packets.Publish].Get(packets.TPublishQos1).Packet
+		pkx.ProtocolVersion = 5
+		errCh <- s.processPublish(cl, pkx)
+	}()
+
+	err := <-errCh
+	require.Error(t, err)
+	require.ErrorIs(t, err, packets.ErrQosNotSupported)
+	_, _ = io.ReadAll(r)
 }
 
 func TestServerProcessPublishACLCheckDeny(t *testing.T) {

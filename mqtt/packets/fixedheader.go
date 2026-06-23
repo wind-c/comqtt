@@ -30,7 +30,7 @@ func (fh *FixedHeader) Decode(hb byte) error {
 	switch fh.Type {
 	case Publish:
 		if (hb>>1)&0x01 > 0 && (hb>>1)&0x02 > 0 {
-			return ErrProtocolViolationQosOutOfRange // [MQTT-3.3.1-4]
+			return ErrMalformedQos // [MQTT-3.3.1-4]
 		}
 
 		fh.Dup = (hb>>3)&0x01 > 0 // is duplicate

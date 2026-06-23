@@ -69,6 +69,7 @@ const (
 	TConnectInvalidWillFlagNoPayload
 	TConnectInvalidWillFlagQosOutOfRange
 	TConnectInvalidWillSurplusRetain
+	TConnectInvalidWillSurplusQos
 	TConnectZeroByteUsername
 	TConnectSpecInvalidUTF8D800
 	TConnectSpecInvalidUTF8DFFF
@@ -213,6 +214,7 @@ const (
 	TAuthMalProperties
 	TAuthInvalidReason
 	TAuthInvalidReason2
+	TSubscribeMalformedReservedBits
 )
 
 // TPacketData contains individual encoding and decoding scenarios for each packet type.
@@ -960,6 +962,20 @@ var TPacketData = map[byte]TPacketCases{
 				Connect: ConnectParams{
 					ProtocolName: []byte("MQTT"),
 					WillRetain:   true,
+				},
+			},
+		},
+		{
+			Case:   TConnectInvalidWillSurplusQos,
+			Desc:   "no will flag surplus qos",
+			Group:  "validate",
+			Expect: ErrProtocolViolationWillFlagSurplusRetain,
+			Packet: &Packet{
+				FixedHeader:     FixedHeader{Type: Connect},
+				ProtocolVersion: 4,
+				Connect: ConnectParams{
+					ProtocolName: []byte("MQTT"),
+					WillQos:      2,
 				},
 			},
 		},
@@ -3092,6 +3108,23 @@ var TPacketData = map[byte]TPacketCases{
 					{Filter: "a/b", Identifier: 5},
 					{Filter: "d/f", Identifier: 268435456},
 				},
+			},
+		},
+		{
+			Case:      TSubscribeMalformedReservedBits,
+			Desc:      "malformed reserved bits",
+			Group:     "decode",
+			FailFirst: ErrMalformedFlags,
+			RawBytes: []byte{
+				Subscribe<<4 | 1<<1, 11, // Fixed header
+				0x00, 0x0F, // Packet ID = 15
+				0x00,       // Properties length = 0
+				0x00, 0x05, // Topic filter length = 5
+				'a', '/', 'b', '/', 'c', // Topic filter
+				0xC0, // Option byte (bits 6-7 = 11, reserved non-zero)
+			},
+			Packet: &Packet{
+				ProtocolVersion: 5,
 			},
 		},
 
