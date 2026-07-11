@@ -215,6 +215,7 @@ const (
 	TAuthInvalidReason
 	TAuthInvalidReason2
 	TSubscribeMalformedReservedBits
+	TSubscribeMalformedNoOption
 )
 
 // TPacketData contains individual encoding and decoding scenarios for each packet type.
@@ -3122,6 +3123,21 @@ var TPacketData = map[byte]TPacketCases{
 				0x00, 0x05, // Topic filter length = 5
 				'a', '/', 'b', '/', 'c', // Topic filter
 				0xC0, // Option byte (bits 6-7 = 11, reserved non-zero)
+			},
+			Packet: &Packet{
+				ProtocolVersion: 5,
+			},
+		},
+		{
+			Case:      TSubscribeMalformedNoOption,
+			Desc:      "malformed subscribe v5 - no option byte after empty filter",
+			Group:     "decode",
+			FailFirst: ErrMalformedQos,
+			RawBytes: []byte{
+				Subscribe<<4 | 1<<1, 5, // Fixed header
+				0x00, 0x01, // Packet ID = 1
+				0x00,       // Properties length = 0
+				0x00, 0x00, // Topic filter length = 0 (empty filter)
 			},
 			Packet: &Packet{
 				ProtocolVersion: 5,
