@@ -138,7 +138,7 @@ func MatchTopic(filter string, topic string) (elements []string, matched bool) {
 	elements = make([]string, 0)
 	for i := 0; i < len(filterParts); i++ {
 		if i >= len(topicParts) {
-			matched = false
+			matched = filterParts[i] == "#"
 			return
 		}
 
