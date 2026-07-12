@@ -303,7 +303,7 @@ func TestCanACL(t *testing.T) {
 			ok:    false,
 		},
 		{
-			desc: "allow read on not-acl path (no #)",
+			desc: "deny read on write-only path base (fix # wildcard zero-children)",
 			client: &mqtt.Client{
 				Properties: mqtt.ClientProperties{
 					Username: []byte("mochi"),
@@ -311,7 +311,8 @@ func TestCanACL(t *testing.T) {
 			},
 			topic: "updates",
 			write: false,
-			ok:    true,
+			n:    0,
+			ok:   false,
 		},
 		{
 			desc: "allow write on write-only path",
@@ -500,6 +501,14 @@ func TestMatchTopic(t *testing.T) {
 	el, matched = MatchTopic("a/+/c/+", "a/b/c/d/e")
 	require.False(t, matched)
 	require.Equal(t, []string{"b", "d"}, el)
+
+	el, matched = MatchTopic("a/#", "a")
+	require.True(t, matched)
+	require.Equal(t, []string{}, el)
+
+	el, matched = MatchTopic("a/+", "a")
+	require.False(t, matched)
+	require.Equal(t, make([]string, 0), el)
 }
 
 var (
