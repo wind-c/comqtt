@@ -159,7 +159,7 @@ func MatchTopic(filter string, topic string) (elements []string, matched bool) {
 		}
 	}
 
-	return elements, true
+	return elements, len(topicParts) == len(filterParts)
 }
 
 // Ledger is an auth ledger containing access rules for users and topics.
