@@ -492,6 +492,14 @@ func TestMatchTopic(t *testing.T) {
 	el, matched = MatchTopic(" ", "  ")
 	require.False(t, matched)
 	require.Equal(t, make([]string, 0), el)
+
+	el, matched = MatchTopic("test", "test/child")
+	require.False(t, matched)
+	require.Equal(t, make([]string, 0), el)
+
+	el, matched = MatchTopic("a/+/c/+", "a/b/c/d/e")
+	require.False(t, matched)
+	require.Equal(t, []string{"b", "d"}, el)
 }
 
 var (
