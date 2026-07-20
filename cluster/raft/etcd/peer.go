@@ -232,7 +232,7 @@ func getZapLogger(raftLogLevel string) *zap.Logger {
 func (p *Peer) startRaft() {
 	if !fileutil.Exist(p.snapDir) {
 		if err := os.MkdirAll(p.snapDir, 0750); err != nil {
-			log.Fatal("[raft] failed to create dir for dnapshot", "error", err)
+			log.Fatal("[raft] failed to create dir for snapshot", "error", err)
 		}
 	}
 	p.snapshotter = snap.New(p.logger, p.snapDir)
@@ -295,10 +295,10 @@ func (p *Peer) serveRaft() {
 	addr := net.JoinHostPort(p.conf.BindAddr, strconv.Itoa(p.conf.RaftPort))
 	listener, err := newStoppableListener(addr, p.httpStopC)
 	if err != nil {
-		log.Fatal("[raft] failed ti listen rafthttp", "error", err)
+		log.Fatal("[raft] failed to listen rafthttp", "error", err)
 	}
 
-	log.Info("[raft] http is listeing at", "host", p.genLocalAddr())
+	log.Info("[raft] http is listening at", "host", p.genLocalAddr())
 	err = (&http.Server{Handler: p.transport.Handler()}).Serve(listener)
 	select {
 	case <-p.httpStopC:
@@ -401,7 +401,7 @@ func (p *Peer) serveChannels() {
 // replayWAL replays WAL entries into the raft instance.
 func (p *Peer) replayWAL() *wal.WAL {
 
-	log.Info("[raft] replaying WAL of membe", "id", p.id)
+	log.Info("[raft] replaying WAL of member", "id", p.id)
 	snapshot := p.loadSnapshot()
 	w := p.openWAL(snapshot)
 	_, st, ents, err := w.ReadAll()
@@ -428,7 +428,7 @@ func (p *Peer) loadSnapshot() *raftpb.Snapshot {
 		}
 		snapshot, err := p.snapshotter.LoadNewestAvailable(walSnaps)
 		if err != nil && err != snap.ErrNoSnapshot {
-			log.Fatal("[raft] error loading snapshit", "error", err)
+			log.Fatal("[raft] error loading snapshot", "error", err)
 		}
 		return snapshot
 	}
@@ -444,7 +444,7 @@ func (p *Peer) openWAL(snapshot *raftpb.Snapshot) *wal.WAL {
 		}
 		w, err := wal.Create(p.logger, p.walDir, nil)
 		if err != nil {
-			log.Fatal("[raft] create dir for error", "error", err)
+			log.Fatal("[raft] cannot create wal", "error", err)
 		}
 		w.Close()
 	}
@@ -482,7 +482,7 @@ func (p *Peer) entriesToApply(ents []raftpb.Entry) (nents []raftpb.Entry) {
 	}
 	firstIdx := ents[0].Index
 	if firstIdx > p.appliedIndex+1 {
-		log.Fatal("[raft] fisrt index of committed entry should <= progress.appliedIndex+1", "first-idx", firstIdx, "fapplied-idx", p.appliedIndex)
+		log.Fatal("[raft] first index of committed entry should <= progress.appliedIndex+1", "first-idx", firstIdx, "fapplied-idx", p.appliedIndex)
 	}
 	if p.appliedIndex-firstIdx+1 < uint64(len(ents)) {
 		nents = ents[p.appliedIndex-firstIdx+1:]
@@ -542,7 +542,7 @@ func (p *Peer) publishEntries(ents []raftpb.Entry) (<-chan struct{}, bool) {
 				//	return nil, false
 				//}
 				p.transport.RemovePeer(types.ID(cc.NodeID))
-				log.Info("[raft] node is removed to the cluster", "node", cc.NodeID)
+				log.Info("[raft] node is removed from the cluster", "node", cc.NodeID)
 			}
 		}
 	}
