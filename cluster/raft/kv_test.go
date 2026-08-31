@@ -1,8 +1,11 @@
 package raft
 
 import (
-	"github.com/stretchr/testify/require"
+	"bytes"
+	"encoding/gob"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestKV_Add(t *testing.T) {
@@ -35,6 +38,42 @@ func TestKV_Del(t *testing.T) {
 	require.Equal(t, false, empty)
 	empty = kv.Del("key1", "value1")
 	require.Equal(t, true, empty)
+}
+
+func TestKV_Restore(t *testing.T) {
+	src := NewKV()
+	src.Add("key1", "value1")
+	src.Add("key1", "value2")
+	src.Add("key2", "value3")
+
+	var buf bytes.Buffer
+	require.NoError(t, gob.NewEncoder(&buf).Encode(src.GetAll()))
+
+	dst := NewKV()
+	dst.Add("stale", "valueX") // a snapshot holds the complete state, so this must be discarded
+	require.NoError(t, dst.Restore(&buf))
+
+	require.ElementsMatch(t, []string{"value1", "value2"}, dst.Get("key1"))
+	require.ElementsMatch(t, []string{"value3"}, dst.Get("key2"))
+	require.Empty(t, dst.Get("stale"))
+
+	// the restored map must not share slices with the source
+	dst.Add("key1", "value4")
+	require.ElementsMatch(t, []string{"value1", "value2"}, src.Get("key1"))
+}
+
+func TestKV_RestoreCorrupt(t *testing.T) {
+	src := NewKV()
+	src.Add("key1", "value1")
+	var buf bytes.Buffer
+	require.NoError(t, gob.NewEncoder(&buf).Encode(src.GetAll()))
+
+	kv := NewKV()
+	kv.Add("key2", "value2")
+	require.Error(t, kv.Restore(bytes.NewReader(buf.Bytes()[:buf.Len()/2])))
+	// a failed restore leaves the current state untouched
+	require.ElementsMatch(t, []string{"value2"}, kv.Get("key2"))
+	require.Empty(t, kv.Get("key1"))
 }
 
 func TestKV_DelByValue(t *testing.T) {

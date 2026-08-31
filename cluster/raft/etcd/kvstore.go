@@ -124,8 +124,7 @@ func (s *KVStore) loadSnapshot() (*raftpb.Snapshot, error) {
 }
 
 func (s *KVStore) recoverFromSnapshot(snapshot []byte) error {
-	buffer := bytes.NewBuffer(snapshot)
-	if err := gob.NewDecoder(buffer).Decode(s.GetAll()); err != nil {
+	if err := s.KV.Restore(bytes.NewReader(snapshot)); err != nil {
 		return err
 	}
 	s.notifyReplay()

@@ -5,9 +5,12 @@
 package raft
 
 import (
+	"encoding/gob"
+	"io"
+	"sync"
+
 	"github.com/wind-c/comqtt/v2/cluster/message"
 	"github.com/wind-c/comqtt/v2/cluster/utils"
-	"sync"
 )
 
 type IPeer interface {
@@ -42,6 +45,23 @@ func (k *KV) GetAll() *data {
 		cp[k] = append([]string(nil), v...)
 	}
 	return &cp
+}
+
+// Restore replaces the store contents with gob-encoded data read from r.
+// A raft snapshot holds the complete state up to its index, so existing
+// entries are discarded rather than merged.
+func (k *KV) Restore(r io.Reader) error {
+	var d data
+	if err := gob.NewDecoder(r).Decode(&d); err != nil {
+		return err
+	}
+	if d == nil {
+		d = make(data)
+	}
+	k.Lock()
+	defer k.Unlock()
+	k.data = d
+	return nil
 }
 
 func (k *KV) Get(key string) []string {
