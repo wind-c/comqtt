@@ -69,7 +69,7 @@ func (f *Fsm) Snapshot() (raft.FSMSnapshot, error) {
 }
 
 func (f *Fsm) Restore(ir io.ReadCloser) error {
-	if err := gob.NewDecoder(ir).Decode(f.GetAll()); err != nil {
+	if err := f.KV.Restore(ir); err != nil {
 		return err
 	}
 	f.notifyReplay()
