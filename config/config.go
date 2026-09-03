@@ -14,6 +14,9 @@ import (
 	"errors"
 	"math/big"
 	"os"
+	"reflect"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/wind-c/comqtt/v2/cluster/log"
@@ -80,7 +83,12 @@ func Load(yamlFile string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	return parse(bs)
+	conf, err := parse(bs)
+	if err != nil {
+		return nil, err
+	}
+	applyEnvOverrides(conf)
+	return conf, nil
 }
 
 func parse(buf []byte) (*Config, error) {
@@ -90,6 +98,79 @@ func parse(buf []byte) (*Config, error) {
 		return nil, err
 	}
 	return conf, nil
+}
+
+// envPrefix is the prefix for all environment variable overrides.
+const envPrefix = "COMQTT_"
+
+// applyEnvOverrides walks the Config struct and overrides fields whose
+// corresponding environment variables are set.
+//
+// Env var naming: the key is the dotted yaml path of the field, with the
+// top-level "COMQTT_" prefix, each segment uppercased and any '-' replaced
+// by '_', and segments joined by '_' (not doubled). For example:
+//
+//	cluster.bind-addr      -> COMQTT_CLUSTER_BIND_ADDR
+//	mqtt.tcp               -> COMQTT_MQTT_TCP
+//	redis.options.addr     -> COMQTT_REDIS_OPTIONS_ADDR
+//	dashboard.secret-file  -> COMQTT_DASHBOARD_SECRET_FILE
+//
+// Only scalar fields are overridden (string, uint/int, bool). Composite
+// fields such as slices and maps are not settable via env vars and are
+// silently left to their YAML value. A field is overridden only when the
+// env var is set; an empty string explicitly clears the YAML value.
+func applyEnvOverrides(conf *Config) {
+	applyEnv(reflect.ValueOf(conf).Elem(), envPrefix)
+}
+
+func applyEnv(v reflect.Value, prefix string) {
+	t := v.Type()
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		fieldVal := v.Field(i)
+
+		if !field.IsExported() {
+			continue
+		}
+
+		tag := field.Tag.Get("yaml")
+		if tag == "" || tag == "-" {
+			continue
+		}
+		// Strip any comma-separated options (e.g. "yaml,omitempty").
+		if idx := strings.IndexByte(tag, ','); idx != -1 {
+			tag = tag[:idx]
+		}
+
+		envKey := prefix + strings.ToUpper(strings.ReplaceAll(tag, "-", "_"))
+
+		switch fieldVal.Kind() {
+		case reflect.Struct:
+			applyEnv(fieldVal, envKey+"_")
+		case reflect.String:
+			if val, ok := os.LookupEnv(envKey); ok {
+				fieldVal.SetString(val)
+			}
+		case reflect.Uint:
+			if val, ok := os.LookupEnv(envKey); ok {
+				if n, err := strconv.ParseUint(val, 10, 64); err == nil {
+					fieldVal.SetUint(n)
+				}
+			}
+		case reflect.Int:
+			if val, ok := os.LookupEnv(envKey); ok {
+				if n, err := strconv.ParseInt(val, 10, 64); err == nil {
+					fieldVal.SetInt(n)
+				}
+			}
+		case reflect.Bool:
+			if val, ok := os.LookupEnv(envKey); ok {
+				if b, err := strconv.ParseBool(val); err == nil {
+					fieldVal.SetBool(b)
+				}
+			}
+		}
+	}
 }
 
 type Config struct {
@@ -143,8 +224,8 @@ type redisOptions struct {
 }
 
 type redis struct {
-	HPrefix string `json:"prefix" yaml:"prefix"`
-	Options redisOptions
+	HPrefix string       `json:"prefix" yaml:"prefix"`
+	Options redisOptions `yaml:"options"`
 }
 
 type Cluster struct {

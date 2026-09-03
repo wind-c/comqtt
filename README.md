@@ -84,6 +84,33 @@ or
 ```
 *If you want to obtain the bridge and multiple authentication capabilities, you need to use the configuration file to start.[Click to config example](cmd/config/single.yml).*
 
+### Environment variable overrides
+
+When starting with a configuration file, any scalar value can be overridden
+by an environment variable at deploy time (for example to inject a dynamic
+Kubernetes pod IP as `cluster.bind-addr`).
+
+- Env var name: `COMQTT_` + the dotted yaml path of the field, uppercased
+  with `-` replaced by `_`, segments joined by `_`. Examples:
+
+  | yaml field            | env var                     |
+  |-----------------------|-----------------------------|
+  | `cluster.bind-addr`   | `COMQTT_CLUSTER_BIND_ADDR`  |
+  | `mqtt.tcp`            | `COMQTT_MQTT_TCP`           |
+  | `redis.options.addr`  | `COMQTT_REDIS_OPTIONS_ADDR` |
+  | `dashboard.secret-file` | `COMQTT_DASHBOARD_SECRET_FILE` |
+
+- Supported field kinds: `string`, `int`/`uint`, `bool`. Slices and maps
+  (e.g. `cluster.members`) are not overridable via env vars.
+- A value is overridden only if the env var is set; an empty string
+  explicitly clears the YAML value.
+
+```sh
+COMQTT_CLUSTER_BIND_ADDR=10.244.0.17 \
+COMQTT_CLUSTER_RAFT_BOOTSTRAP=true \
+./comqtt --conf=./config/node1.yml
+```
+
 ### Using Docker
 A simple Dockerfile is provided for running the [cmd/single/main.go](cmd/single/main.go) Websocket, TCP, and Stats server:
 
