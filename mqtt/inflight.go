@@ -77,7 +77,11 @@ func (i *Inflight) Clone() *Inflight {
 func (i *Inflight) GetAll(immediate bool) []packets.Packet {
 	i.RLock()
 	defer i.RUnlock()
+	return i.getAllNoLock(immediate)
+}
 
+// getAllNoLock returns all the inflight messages without locking.
+func (i *Inflight) getAllNoLock(immediate bool) []packets.Packet {
 	m := []packets.Packet{}
 	for _, v := range i.internal {
 		if !immediate || (immediate && v.Expiry < 0) {
@@ -85,8 +89,8 @@ func (i *Inflight) GetAll(immediate bool) []packets.Packet {
 		}
 	}
 
-	sort.Slice(m, func(i, j int) bool {
-		return uint16(m[i].Created) < uint16(m[j].Created)
+	sort.Slice(m, func(a, b int) bool {
+		return m[a].Created < m[b].Created
 	})
 
 	return m
@@ -99,7 +103,7 @@ func (i *Inflight) NextImmediate() (packets.Packet, bool) {
 	i.RLock()
 	defer i.RUnlock()
 
-	m := i.GetAll(true)
+	m := i.getAllNoLock(true)
 	if len(m) > 0 {
 		return m[0], true
 	}
@@ -120,15 +124,21 @@ func (i *Inflight) Delete(id uint16) bool {
 
 // TakeRecieveQuota reduces the receive quota by 1.
 func (i *Inflight) DecreaseReceiveQuota() {
-	if atomic.LoadInt32(&i.receiveQuota) > 0 {
-		atomic.AddInt32(&i.receiveQuota, -1)
+	for {
+		q := atomic.LoadInt32(&i.receiveQuota)
+		if q <= 0 || atomic.CompareAndSwapInt32(&i.receiveQuota, q, q-1) {
+			return
+		}
 	}
 }
 
 // TakeRecieveQuota increases the receive quota by 1.
 func (i *Inflight) IncreaseReceiveQuota() {
-	if atomic.LoadInt32(&i.receiveQuota) < atomic.LoadInt32(&i.maximumReceiveQuota) {
-		atomic.AddInt32(&i.receiveQuota, 1)
+	for {
+		q := atomic.LoadInt32(&i.receiveQuota)
+		if q >= atomic.LoadInt32(&i.maximumReceiveQuota) || atomic.CompareAndSwapInt32(&i.receiveQuota, q, q+1) {
+			return
+		}
 	}
 }
 
@@ -140,15 +150,21 @@ func (i *Inflight) ResetReceiveQuota(n int32) {
 
 // DecreaseSendQuota reduces the send quota by 1.
 func (i *Inflight) DecreaseSendQuota() {
-	if atomic.LoadInt32(&i.sendQuota) > 0 {
-		atomic.AddInt32(&i.sendQuota, -1)
+	for {
+		q := atomic.LoadInt32(&i.sendQuota)
+		if q <= 0 || atomic.CompareAndSwapInt32(&i.sendQuota, q, q-1) {
+			return
+		}
 	}
 }
 
 // IncreaseSendQuota increases the send quota by 1.
 func (i *Inflight) IncreaseSendQuota() {
-	if atomic.LoadInt32(&i.sendQuota) < atomic.LoadInt32(&i.maximumSendQuota) {
-		atomic.AddInt32(&i.sendQuota, 1)
+	for {
+		q := atomic.LoadInt32(&i.sendQuota)
+		if q >= atomic.LoadInt32(&i.maximumSendQuota) || atomic.CompareAndSwapInt32(&i.sendQuota, q, q+1) {
+			return
+		}
 	}
 }
 

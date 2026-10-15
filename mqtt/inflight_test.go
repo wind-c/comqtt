@@ -5,8 +5,11 @@
 package mqtt
 
 import (
+	"runtime"
+	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/wind-c/comqtt/v2/mqtt/packets"
@@ -196,4 +199,112 @@ func TestNextImmediate(t *testing.T) {
 
 	_, ok = cl.State.Inflight.NextImmediate()
 	require.False(t, ok)
+}
+
+func TestInflightGetAllSortedAcrossUint16Boundary(t *testing.T) {
+	cl, _, _ := newTestClient()
+	cl.State.Inflight.Set(packets.Packet{PacketID: 1, Created: 65534})
+	cl.State.Inflight.Set(packets.Packet{PacketID: 2, Created: 65535})
+	cl.State.Inflight.Set(packets.Packet{PacketID: 3, Created: 65536})
+	cl.State.Inflight.Set(packets.Packet{PacketID: 4, Created: 65537})
+
+	got := cl.State.Inflight.GetAll(false)
+	require.Len(t, got, 4)
+	require.Equal(t, []uint16{1, 2, 3, 4}, []uint16{got[0].PacketID, got[1].PacketID, got[2].PacketID, got[3].PacketID})
+}
+
+func TestNextImmediateConcurrentSet(t *testing.T) {
+	cl, _, _ := newTestClient()
+	inf := cl.State.Inflight
+	inf.Set(packets.Packet{PacketID: 1, Created: 1, Expiry: -1})
+
+	stop := make(chan struct{})
+	defer close(stop)
+	go func() {
+		id := uint16(2)
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+				inf.Set(packets.Packet{PacketID: id, Created: int64(id), Expiry: -1})
+				id = 2 + (id+1)%5
+				runtime.Gosched()
+			}
+		}
+	}()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for n := 0; n < 500; n++ {
+			inf.NextImmediate()
+		}
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("NextImmediate blocked indefinitely against a concurrent writer")
+	}
+}
+
+func TestSendQuotaConcurrentBounds(t *testing.T) {
+	i := NewInflights()
+	i.ResetSendQuota(64)
+
+	var wg sync.WaitGroup
+	for w := 0; w < 32; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for n := 0; n < 2000; n++ {
+				i.DecreaseSendQuota()
+			}
+		}()
+	}
+	wg.Wait()
+	require.Equal(t, int32(0), atomic.LoadInt32(&i.sendQuota))
+
+	for w := 0; w < 32; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for n := 0; n < 2000; n++ {
+				i.IncreaseSendQuota()
+			}
+		}()
+	}
+	wg.Wait()
+	require.Equal(t, int32(64), atomic.LoadInt32(&i.sendQuota))
+}
+
+func TestReceiveQuotaConcurrentBounds(t *testing.T) {
+	i := NewInflights()
+	i.ResetReceiveQuota(64)
+
+	var wg sync.WaitGroup
+	for w := 0; w < 32; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for n := 0; n < 2000; n++ {
+				i.DecreaseReceiveQuota()
+			}
+		}()
+	}
+	wg.Wait()
+	require.Equal(t, int32(0), atomic.LoadInt32(&i.receiveQuota))
+
+	for w := 0; w < 32; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for n := 0; n < 2000; n++ {
+				i.IncreaseReceiveQuota()
+			}
+		}()
+	}
+	wg.Wait()
+	require.Equal(t, int32(64), atomic.LoadInt32(&i.receiveQuota))
 }
