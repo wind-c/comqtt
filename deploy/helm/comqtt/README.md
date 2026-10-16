@@ -133,6 +133,7 @@ is rejected by the schema.
 | `serviceAccount.create` | bool | `true` | |
 | `podSecurityContext` | object | non-root, fsGroup 1000 | |
 | `securityContext` | object | drop ALL caps, RO root fs | |
+| `extraEnv` | list | `[]` | Extra env vars for the broker container. Use for `COMQTT_*` config overrides (needs comqtt >= 2.6.6). |
 | `resources.requests` | object | `100m / 128Mi` | |
 | `resources.limits` | object | `{}` | unset by default |
 | `livenessProbe` | object | TCP 1883, period 20s | |
@@ -174,6 +175,47 @@ For the full list of `config.*` keys (storage, auth, mqtt, redis, log) see
 and [cmd/config/node1.yml](https://github.com/wind-c/comqtt/blob/main/cmd/config/node1.yml)
 in the upstream repo. The chart's `config:` block mirrors those files
 verbatim.
+
+## Overriding config with environment variables
+
+The chart renders the `config:` block into a ConfigMap, so most values are set
+with `config.*` keys. For one-off overrides that should not live in the ConfigMap
+— secrets, per-environment addresses, values sourced from the downward API — use
+`extraEnv`. comqtt applies `COMQTT_*` environment variables **on top of** the
+rendered YAML (requires comqtt >= 2.6.6).
+
+Naming rule: `COMQTT_` + the dotted yaml path of the field, uppercased, with `-`
+replaced by `_`.
+
+| yaml field | env var |
+|------------|---------|
+| `mqtt.tcp` | `COMQTT_MQTT_TCP` |
+| `cluster.bind-addr` | `COMQTT_CLUSTER_BIND_ADDR` |
+| `redis.options.addr` | `COMQTT_REDIS_OPTIONS_ADDR` |
+| `dashboard.secret-file` | `COMQTT_DASHBOARD_SECRET_FILE` |
+
+Supported field kinds are `string`, `int`/`uint` and `bool`. Slices and maps —
+`cluster.members`, `cluster.tags` — are **not** overridable this way; set those
+with `config.*` instead. An env var that is set to an empty string explicitly
+clears the YAML value.
+
+```yaml
+extraEnv:
+  # Inject the pod IP instead of templating it into the ConfigMap.
+  - name: COMQTT_CLUSTER_BIND_ADDR
+    valueFrom:
+      fieldRef:
+        fieldPath: status.podIP
+  # Take the dashboard secret from an existing Secret rather than a value.
+  - name: COMQTT_DASHBOARD_SECRET_FILE
+    value: /etc/comqtt/secrets/dashboard_secret
+```
+
+Entries are appended after the chart's own downward-API variables, so a duplicate
+name takes the value given here. Note that in cluster mode the chart already
+renders `cluster.bind-addr` from `status.podIP` via the entrypoint template, so
+`COMQTT_CLUSTER_BIND_ADDR` is only needed if you want to take that from a
+different source.
 
 ## Exposing the broker externally
 
@@ -225,6 +267,11 @@ If Gateway API is not available in your cluster:
 - `ingress.*` (deprecated; HTTP listener only, cannot proxy raw MQTT).
 
 ## Upgrades
+
+- **Chart 0.5.0 bumps `appVersion` from `2.6.0` to `2.6.6`.** Because
+  `image.tag` falls back to `Chart.appVersion`, an upgrade without an explicit
+  `image.tag` will roll your pods onto the `2.6.6` image. Pin `image.tag`
+  beforehand if you need to stage the rollout.
 
 - **Switching `mode=single` ↔ `mode=cluster` is not supported in-place.**
   The on-disk data layouts differ; the chart will refuse to roll a Deployment
