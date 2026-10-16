@@ -11,6 +11,12 @@ on:
     paths:
       - "deploy/helm/**"
       - ".github/workflows/chart-lint-test.yaml"
+  # Manual re-run. Both jobs here are path-filtered, so neither runs for
+  # changes outside deploy/helm -- notably the Dockerfile builder fix in #176,
+  # which only manifests in "Install on kind". Without this there is no way
+  # to verify a non-chart change against a real cluster short of opening a
+  # throwaway chart PR.
+  workflow_dispatch:
 
 jobs:
   lint-test:
