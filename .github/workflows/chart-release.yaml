@@ -6,6 +6,12 @@ on:
       - main
     paths:
       - "deploy/helm/**"
+  # Manual re-run is the only way to recover when publishing half-succeeds:
+  # the push that already triggered this workflow has been consumed, and
+  # with skip_existing it is now safe to run again. Needed whenever the
+  # gh-pages branch or the chart release exists but the index was never
+  # updated.
+  workflow_dispatch:
 
 permissions:
   contents: write
