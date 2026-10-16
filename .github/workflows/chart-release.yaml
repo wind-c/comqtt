@@ -35,20 +35,32 @@ jobs:
 
       - name: Ensure gh-pages branch exists
         run: |
-          if ! git ls-remote --exit-code --heads origin gh-pages; then
+          # Capture the starting branch first: `git checkout --orphan` leaves no
+          # previous branch, so a later `git checkout -` fails with
+          # "pathspec '-' did not match any file(s) known to git" and kills the
+          # job before chart-releaser ever runs.
+          start_branch="$(git rev-parse --abbrev-ref HEAD)"
+          if ! git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
             git checkout --orphan gh-pages
             git rm -rf --quiet .
-            echo '{}' > index.yaml
+            # chart-releaser parses this file as a Helm repo index and aborts
+            # with "no API version specified" if it is not well-formed, so seed
+            # a valid empty index rather than a bare `{}`.
+            printf 'apiVersion: v1\nentries: {}\ngenerated: "1970-01-01T00:00:00Z"\n' > index.yaml
             git add index.yaml
             git commit -m "Initialize gh-pages"
             git push origin gh-pages
-            git checkout -
           fi
+          git checkout "$start_branch"
 
       - name: Run chart-releaser
         uses: helm/chart-releaser-action@v1.6.0
         with:
           charts_dir: deploy/helm
+          # Without this, any re-run aborts with
+          # "tag_name already_exists" because chart-releaser unconditionally
+          # creates a release per chart version. Makes the workflow idempotent.
+          skip_existing: true
         env:
           CR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
