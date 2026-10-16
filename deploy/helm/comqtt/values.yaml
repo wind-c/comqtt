@@ -50,6 +50,27 @@ securityContext:
   runAsNonRoot: true
   runAsUser: 1000
 
+# -- Extra environment variables appended to the comqtt container. Use these to
+#    apply `COMQTT_*` env overrides on top of the rendered config, which
+#    requires comqtt >= 2.6.6. Naming rule: COMQTT_ + the dotted yaml path of
+#    the field, uppercased, with '-' replaced by '_' (e.g. mqtt.tcp ->
+#    COMQTT_MQTT_TCP). Supported kinds are string, int/uint and bool; slices and
+#    maps such as cluster.members are not overridable this way.
+#    Entries are appended after the chart's own downward-API variables, so a
+#    duplicate name takes the value given here.
+extraEnv: []
+#  - name: COMQTT_CLUSTER_BIND_ADDR
+#    valueFrom:
+#      fieldRef:
+#        fieldPath: status.podIP
+#  - name: COMQTT_MQTT_TCP
+#    value: ":1883"
+#  - name: COMQTT_DASHBOARD_SECRET_FILE
+#    valueFrom:
+#      secretKeyRef:
+#        name: comqtt-dashboard
+#        key: secret
+
 # -- Resource requests. `limits` is unset by default to avoid OOM-killing
 #    bursty MQTT workloads; configure them explicitly when needed.
 resources:

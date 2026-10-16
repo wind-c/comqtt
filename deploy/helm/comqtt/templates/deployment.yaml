@@ -43,6 +43,10 @@ spec:
           command: ["/comqtt"]
           args:
             - --conf=/etc/comqtt/config.yml
+          {{- with .Values.extraEnv }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           ports:
             - name: mqtt
               containerPort: 1883
