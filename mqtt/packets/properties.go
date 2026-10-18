@@ -42,6 +42,34 @@ const (
 	PropSharedSubAvailable     byte = 42
 )
 
+// MQTT v5 permits a User Property to be repeated any number of times, and a
+// Subscription Identifier to be repeated per matching filter, so neither has a
+// count limit in the spec. Left unbounded, a single packet can amplify badly:
+// Properties.User is a slice of UserProperty (32 bytes per entry), so a 10 MB
+// property section carrying ~1.4M two-byte properties grows to ~46 MB of
+// slice, and Properties.Copy then duplicates all of it again on top of the
+// packet buffers. One unauthenticated CONNECT can therefore push a broker's
+// RSS up by two orders of magnitude. These caps are generous compared to
+// legitimate use (typical clients send zero or a handful) while bounding that
+// growth.
+const (
+	// MaxUserProperties is the maximum number of User Property entries accepted
+	// in a single packet's property section.
+	MaxUserProperties = 128
+
+	// MaxSubscriptionIdentifiers is the maximum number of Subscription
+	// Identifier entries accepted in a single packet's property section.
+	//
+	// This limit is deliberately far higher than MaxUserProperties. Unlike
+	// User Properties, the legitimate count here is client-driven: MQTT v5
+	// permits one Subscription Identifier per filter in a SUBSCRIBE packet, so
+	// a conforming client needs however many filters it subscribes to at once.
+	// Rejecting a 129-filter SUBSCRIBE with distinct identifiers would break
+	// legal traffic. The cap is still bounded -- one identifier costs a single
+	// int plus at least two wire bytes, so 1024 is only ~8 KB of slice.
+	MaxSubscriptionIdentifiers = 1024
+)
+
 // validPacketProperties indicates which properties are valid for which packet types.
 var validPacketProperties = map[byte]map[byte]byte{
 	PropPayloadFormat:          {Publish: 1, WillProperties: 1},
@@ -403,8 +431,8 @@ func (p *Properties) Decode(pkt byte, b *bytes.Buffer) (n int, err error) {
 		case PropCorrelationData:
 			p.CorrelationData, offset, err = decodeBytes(bt, offset)
 		case PropSubscriptionIdentifier:
-			if p.SubscriptionIdentifier == nil {
-				p.SubscriptionIdentifier = []int{}
+			if len(p.SubscriptionIdentifier) >= MaxSubscriptionIdentifiers {
+				return n + bu, ErrMalformedTooManySubscriptionIdentifiers
 			}
 
 			n, bu, err := DecodeLength(bytes.NewBuffer(bt[offset:]))
@@ -452,12 +480,19 @@ func (p *Properties) Decode(pkt byte, b *bytes.Buffer) (n int, err error) {
 			p.RetainAvailable, offset, err = decodeByte(bt, offset)
 			p.RetainAvailableFlag = true
 		case PropUser:
+			if len(p.User) >= MaxUserProperties {
+				return n + bu, ErrMalformedTooManyUserProperties
+			}
+
 			var k, v string
 			k, offset, err = decodeString(bt, offset)
 			if err != nil {
 				return n + bu, err
 			}
 			v, offset, err = decodeString(bt, offset)
+			if err != nil {
+				return n + bu, err
+			}
 			p.User = append(p.User, UserProperty{Key: k, Val: v})
 		case PropMaximumPacketSize:
 			p.MaximumPacketSize, offset, err = decodeUint32(bt, offset)
