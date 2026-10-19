@@ -720,6 +720,15 @@ func IsSharedFilter(filter string) bool {
 	return strings.EqualFold(prefix, SharePrefix)
 }
 
+// topicLevels returns the number of "/" separated levels in a topic or topic
+// filter. Each level allocates a node in the topic trie.
+func topicLevels(topic string) int {
+	if topic == "" {
+		return 0
+	}
+	return strings.Count(topic, "/") + 1
+}
+
 // TopicFilterDepth returns the number of "/" separated levels a filter inserts
 // into the topic trie, which is what drives the memory cost of a subscription.
 // The "$share/<group>/" prefix is excluded because it is stripped before the
@@ -733,10 +742,7 @@ func TopicFilterDepth(filter string) int {
 		}
 		filter = parts[2]
 	}
-	if filter == "" {
-		return 0
-	}
-	return strings.Count(filter, "/") + 1
+	return topicLevels(filter)
 }
 
 // IsValidFilter returns true if the filter is valid.

@@ -994,6 +994,16 @@ func (s *Server) retainMessage(cl *Client, pk packets.Packet) {
 		return
 	}
 
+	// A retained message allocates one trie node per "/" separated topic level,
+	// exactly as a subscription filter does, so the same depth cap applies here.
+	// An over-deep message is still delivered to current subscribers, it is only
+	// refused storage. Inline clients are trusted, see processPublish.
+	if !cl.Net.Inline && topicLevels(pk.TopicName) > s.Options.Capabilities.maxTopicFilterDepth() {
+		s.Log.Debug("retained message refused, topic exceeds maximum depth",
+			"topic", pk.TopicName, "levels", topicLevels(pk.TopicName), "limit", s.Options.Capabilities.maxTopicFilterDepth())
+		return
+	}
+
 	out := pk.Copy(false)
 	r := s.Topics.RetainMessage(out)
 	s.hooks.OnRetainMessage(cl, pk, r)

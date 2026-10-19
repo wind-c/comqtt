@@ -5,6 +5,7 @@
 package mqtt
 
 import (
+	"io"
 	"net"
 	"strings"
 	"testing"
@@ -146,4 +147,137 @@ options:
 	require.Equal(t, uint16(0), caps.MaximumTopicFilterDepth, "precondition: raw field is zeroed")
 	require.Equal(t, 8, caps.maxTopicFilterDepth(),
 		"the effective limit must fall back to the default, not refuse every filter")
+}
+
+// countTopicNodes returns the number of nodes in a topic tree, including the root.
+func countTopicNodes(n *TopicTreeNode) int {
+	count := 1
+	for _, child := range n.Children {
+		count += countTopicNodes(child)
+	}
+	return count
+}
+
+func TestServerRejectsTooDeepRetainedPublish(t *testing.T) {
+	s := newServer()
+	cl, _, _ := newTestClient()
+	cl.Properties.ProtocolVersion = 5
+
+	deep := "u000/" + strings.Repeat("a/", 32) + "a" // 34 levels, over the limit of 8
+	require.Greater(t, topicLevels(deep), 8)
+
+	before := countTopicNodes(s.Topics.WalkTopicTree())
+	require.NoError(t, s.processPublish(cl, packets.Packet{
+		FixedHeader: packets.FixedHeader{Type: packets.Publish, Retain: true},
+		TopicName:   deep,
+		Payload:     []byte("retained"),
+	}))
+
+	_, ok := s.Topics.Retained.Get(deep)
+	require.False(t, ok, "an over-deep topic must not be retained")
+	require.Equal(t, before, countTopicNodes(s.Topics.WalkTopicTree()),
+		"a refused retained publish must not allocate trie nodes")
+}
+
+func TestServerAcceptsRetainedPublishAtLimit(t *testing.T) {
+	s := newServer()
+	cl, _, _ := newTestClient()
+	cl.Properties.ProtocolVersion = 5
+
+	topic := "a/b/c/d/e/f/g/h" // exactly 8
+	require.Equal(t, 8, topicLevels(topic))
+
+	before := countTopicNodes(s.Topics.WalkTopicTree())
+	require.NoError(t, s.processPublish(cl, packets.Packet{
+		FixedHeader: packets.FixedHeader{Type: packets.Publish, Retain: true},
+		TopicName:   topic,
+		Payload:     []byte("retained"),
+	}))
+
+	pke, ok := s.Topics.Retained.Get(topic)
+	require.True(t, ok, "a topic at the limit must be retained")
+	require.Equal(t, []byte("retained"), pke.Payload)
+	require.Equal(t, before+topicLevels(topic), countTopicNodes(s.Topics.WalkTopicTree()))
+}
+
+// The retained publish cap shares the subscription configuration field.
+func TestRetainedPublishUsesConfiguredLimit(t *testing.T) {
+	s := newServer()
+	s.Options.Capabilities.MaximumTopicFilterDepth = 4
+	cl, _, _ := newTestClient()
+	cl.Properties.ProtocolVersion = 5
+
+	over := "a/b/c/d/e" // 5 levels, over the configured 4
+	require.NoError(t, s.processPublish(cl, packets.Packet{
+		FixedHeader: packets.FixedHeader{Type: packets.Publish, Retain: true},
+		TopicName:   over,
+		Payload:     []byte("retained"),
+	}))
+	_, ok := s.Topics.Retained.Get(over)
+	require.False(t, ok, "the configured limit must apply to retained publishes")
+
+	at := "a/b/c/d" // 4 levels, at the limit
+	require.NoError(t, s.processPublish(cl, packets.Packet{
+		FixedHeader: packets.FixedHeader{Type: packets.Publish, Retain: true},
+		TopicName:   at,
+		Payload:     []byte("retained"),
+	}))
+	_, ok = s.Topics.Retained.Get(at)
+	require.True(t, ok, "a topic at the configured limit must be retained")
+}
+
+// A publish without retain only reads the trie, so it must not be restricted.
+func TestServerAcceptsDeepPublishWithoutRetain(t *testing.T) {
+	s := newServer()
+	cl, _, _ := newTestClient()
+	cl.Properties.ProtocolVersion = 5
+
+	deep := "u000/" + strings.Repeat("a/", 32) + "a"
+	before := countTopicNodes(s.Topics.WalkTopicTree())
+	require.NoError(t, s.processPublish(cl, packets.Packet{
+		FixedHeader: packets.FixedHeader{Type: packets.Publish},
+		TopicName:   deep,
+		Payload:     []byte("published"),
+	}))
+
+	require.Equal(t, before, countTopicNodes(s.Topics.WalkTopicTree()),
+		"a non-retained publish must not touch the trie")
+	require.Zero(t, s.Topics.Retained.Len())
+}
+
+// A refused retained publish must still reach current subscribers.
+func TestServerRefusesTooDeepRetainedPublishButStillDelivers(t *testing.T) {
+	s := newServer()
+
+	sub, subR, _ := newTestClient()
+	sub.ID = "subscriber"
+	sub.Properties.ProtocolVersion = 5
+	s.Clients.Add(sub)
+	require.LessOrEqual(t, subscribeWithFilter(t, s, sub, subR, "u000/#"), packets.CodeGrantedQos2.Code)
+
+	pub, _, _ := newTestClient()
+	pub.ID = "publisher"
+	pub.Properties.ProtocolVersion = 5
+
+	deep := "u000/" + strings.Repeat("a/", 32) + "a"
+	go func() {
+		_ = s.processPublish(pub, packets.Packet{
+			FixedHeader: packets.FixedHeader{Type: packets.Publish, Retain: true},
+			TopicName:   deep,
+			Payload:     []byte("retained"),
+		})
+	}()
+
+	buf := make([]byte, 512)
+	require.NoError(t, subR.SetReadDeadline(time.Now().Add(3*time.Second)))
+	n, err := subR.Read(buf)
+	require.NoError(t, err)
+	require.Greater(t, n, 1)
+	require.Equal(t, byte(packets.Publish), buf[0]>>4, "a refused retained publish must still be delivered")
+
+	// free the writer blocked on the rest of the large packet.
+	go func() { _, _ = io.Copy(io.Discard, subR) }()
+
+	_, ok := s.Topics.Retained.Get(deep)
+	require.False(t, ok, "an over-deep topic must not be retained")
 }
