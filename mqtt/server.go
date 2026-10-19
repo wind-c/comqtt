@@ -76,6 +76,29 @@ type Capabilities struct {
 	SubIDAvailable               byte `yaml:"sub-id-available"`
 }
 
+// UnmarshalYAML decodes a capabilities block on top of DefaultServerCapabilities,
+// so a partial block keeps the defaults for the keys it omits.
+//
+// Without this, the presence of any `capabilities:` key makes yaml allocate a
+// zero-valued struct, so Capabilities stops being nil and New() skips
+// DefaultServerCapabilities entirely. Declaring a single key then silently
+// zeroes every other capability. The worst of them is
+// MaximumMessageExpiryInterval: at zero, ClearInflights matches
+// tk.Created+0 < now for every queued message, so the once-per-second expiry
+// sweep discards the entire offline queue and persistent sessions stop
+// delivering, with nothing logged.
+//
+// Merging per key rather than per field is what keeps explicit zeros working:
+// `maximum-packet-size: 0` (unlimited) and `retain-available: 0` are
+// legitimate values and must not be mistaken for "unset".
+func (c *Capabilities) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	// Capabilities contains only scalars, so copying the default by value is
+	// safe and shares no state with the package-level default.
+	*c = *DefaultServerCapabilities
+	type plain Capabilities
+	return unmarshal((*plain)(c))
+}
+
 // Compatibilities provides flags for using compatibility modes.
 type Compatibilities struct {
 	ObscureNotAuthorized       bool `yaml:"obscure-not-authorized"`    // return unspecified errors instead of not authorized
@@ -201,7 +224,11 @@ func New(opts *Options) *Server {
 // ensureDefaults ensures that the server starts with sane default values, if none are provided.
 func (o *Options) ensureDefaults() {
 	if o.Capabilities == nil {
-		o.Capabilities = DefaultServerCapabilities
+		// Copy rather than assign DefaultServerCapabilities itself: the next
+		// line mutates maximumPacketID, and every caller-supplied Options would
+		// otherwise share one global struct with the process.
+		caps := *DefaultServerCapabilities
+		o.Capabilities = &caps
 	}
 
 	o.Capabilities.maximumPacketID = math.MaxUint16 // spec maximum is 65535
