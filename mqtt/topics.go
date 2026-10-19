@@ -720,6 +720,25 @@ func IsSharedFilter(filter string) bool {
 	return strings.EqualFold(prefix, SharePrefix)
 }
 
+// TopicFilterDepth returns the number of "/" separated levels a filter inserts
+// into the topic trie, which is what drives the memory cost of a subscription.
+// The "$share/<group>/" prefix is excluded because it is stripped before the
+// trie walk, so it adds no nodes.
+func TopicFilterDepth(filter string) int {
+	if IsSharedFilter(filter) {
+		// "$share/<group>/<rest>" -- drop the first two levels, they add no nodes.
+		parts := strings.SplitN(filter, "/", 3)
+		if len(parts) != 3 {
+			return 0
+		}
+		filter = parts[2]
+	}
+	if filter == "" {
+		return 0
+	}
+	return strings.Count(filter, "/") + 1
+}
+
 // IsValidFilter returns true if the filter is valid.
 func IsValidFilter(filter string, forPublish bool) bool {
 	if !forPublish && len(filter) == 0 { // publishing can accept zero-length topic filter if topic alias exists, so we don't enforce for publish.

@@ -51,6 +51,7 @@ var (
 		SharedSubAvailable:           1,              // shared subscriptions are available
 		MinimumProtocolVersion:       3,              // minimum supported mqtt version (3.0.0)
 		MaximumClientWritesPending:   1024 * 8,       // maximum number of pending message writes for a client
+		MaximumTopicFilterDepth:      8,              // maximum number of "/" separated levels in a topic filter
 	}
 
 	ErrListenerIDExists       = errors.New("listener id already exists")                               // a listener with the same id already exists
@@ -74,6 +75,24 @@ type Capabilities struct {
 	RetainAvailable              byte `yaml:"retain-available"`
 	WildcardSubAvailable         byte `yaml:"wildcard-sub-available"`
 	SubIDAvailable               byte `yaml:"sub-id-available"`
+
+	// MaximumTopicFilterDepth is the deepest topic filter, counted in
+	// "/" separated levels, that a client may subscribe to. Each level
+	// allocates a node in the topic trie, and the cluster trie stores one such
+	// node per level per filter, so an unbounded depth turns a single small
+	// SUBSCRIBE into a very large allocation. Set to 0 to fall back to the
+	// default.
+	MaximumTopicFilterDepth uint16 `yaml:"maximum-topic-filter-depth"`
+}
+
+// maxTopicFilterDepth returns the effective filter depth limit. A zero value
+// falls back to the default so that a Capabilities struct built without this
+// field does not end up rejecting every subscription.
+func (c *Capabilities) maxTopicFilterDepth() int {
+	if c.MaximumTopicFilterDepth == 0 {
+		return int(DefaultServerCapabilities.MaximumTopicFilterDepth)
+	}
+	return int(c.MaximumTopicFilterDepth)
 }
 
 // Compatibilities provides flags for using compatibility modes.
@@ -1384,6 +1403,11 @@ func (s *Server) processSubscribe(cl *Client, pk packets.Packet) error {
 			reasonCodes[i] = code.Code // NB 3.9.3 Non-normative 0x91
 			continue
 		} else if !IsValidFilter(sub.Filter, false) {
+			reasonCodes[i] = packets.ErrTopicFilterInvalid.Code
+		} else if TopicFilterDepth(sub.Filter) > s.Options.Capabilities.maxTopicFilterDepth() {
+			// Rejected rather than truncated: a truncated filter no longer
+			// matches what the client asked for, so accepting it would be
+			// worse than refusing it. [MQTT-4.7.3-1]
 			reasonCodes[i] = packets.ErrTopicFilterInvalid.Code
 		} else if sub.NoLocal && IsSharedFilter(sub.Filter) {
 			reasonCodes[i] = packets.ErrProtocolViolationInvalidSharedNoLocal.Code // [MQTT-3.8.3-4]
