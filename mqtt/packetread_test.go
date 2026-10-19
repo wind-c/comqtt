@@ -6,10 +6,12 @@ package mqtt
 
 import (
 	"bytes"
+	"errors"
+	"fmt"
 	"io"
 	"runtime"
 	"testing"
-	"time"
+	"testing/iotest"
 
 	"github.com/stretchr/testify/require"
 	"github.com/wind-c/comqtt/v2/mqtt/packets"
@@ -18,112 +20,203 @@ import (
 // mqttMaxRemaining is the largest Remaining Length an MQTT packet can declare.
 const mqttMaxRemaining = 268435455
 
-// A peer declares the packet size in the fixed header, so before the fix a
-// peer could announce the 256 MB maximum and then fall silent, pinning that
-// much memory in the broker while it waited for bytes that never come.
+// heapLimit separates "memory tracks bytes received" from "memory tracks bytes
+// declared": the declared length used in these tests is 256 MiB, so anything in
+// this range tells the two apart with a wide margin.
+const heapLimit = int64(8 << 20)
+
+// eofWithLastBytes returns the final bytes and io.EOF from the same Read call.
+// The io.Reader contract permits it ("It may return the (n, err) either from
+// the same call or from the next call"), crypto/tls does exactly that when a
+// close_notify arrives behind the last data, and io.ReadFull treats it as
+// success. A loop that inspects the error before checking whether the body is
+// complete gets this wrong, so it is pinned explicitly here as well as through
+// the iotest reader below.
+type eofWithLastBytes struct {
+	data []byte
+	off  int
+}
+
+func (r *eofWithLastBytes) Read(p []byte) (int, error) {
+	if r.off >= len(r.data) {
+		return 0, io.EOF
+	}
+	n := copy(p, r.data[r.off:])
+	r.off += n
+	if r.off >= len(r.data) {
+		return n, io.EOF
+	}
+	return n, nil
+}
+
+// TestReadRemainingMatchesReadFull pins readRemaining to the behaviour of the
+// io.ReadFull it replaced — same bytes, same success/failure split, same error
+// — across readers that hand back data in every way the contract allows.
+func TestReadRemainingMatchesReadFull(t *testing.T) {
+	sentinel := errors.New("sentinel")
+
+	readers := []struct {
+		name string
+		make func([]byte) io.Reader
+	}{
+		{"fills the whole buffer", func(b []byte) io.Reader { return bytes.NewReader(b) }},
+		{"one byte per Read", func(b []byte) io.Reader { return iotest.OneByteReader(bytes.NewReader(b)) }},
+		{"half the buffer per Read", func(b []byte) io.Reader { return iotest.HalfReader(bytes.NewReader(b)) }},
+		{"final bytes with io.EOF", func(b []byte) io.Reader { return &eofWithLastBytes{data: b} }},
+		{"final bytes with io.EOF (stdlib)", func(b []byte) io.Reader { return iotest.DataErrReader(bytes.NewReader(b)) }},
+		{"stops half way", func(b []byte) io.Reader { return bytes.NewReader(b[:len(b)/2]) }},
+		{"always an error", func(b []byte) io.Reader { return iotest.ErrReader(sentinel) }},
+	}
+
+	sizes := []int{
+		0,
+		1,
+		maxPacketPreallocBytes - 1, // last size before the growth path
+		maxPacketPreallocBytes,     // last size on the single-allocation path
+		maxPacketPreallocBytes + 1, // first size on the growth path
+		maxPacketPreallocBytes + 7,
+		256 * 1024,
+		256*1024 + 777,
+	}
+
+	for _, size := range sizes {
+		body := make([]byte, size)
+		for i := range body {
+			body[i] = byte(i*31 + 7)
+		}
+
+		for _, rd := range readers {
+			t.Run(fmt.Sprintf("%s/size=%d", rd.name, size), func(t *testing.T) {
+				want := make([]byte, size)
+				_, wantErr := io.ReadFull(rd.make(body), want)
+
+				got, gotErr := readRemaining(rd.make(body), size)
+
+				if wantErr != nil {
+					require.Error(t, gotErr, "io.ReadFull failed, so readRemaining must too")
+					require.ErrorIs(t, gotErr, wantErr, "error must match io.ReadFull")
+					require.Nil(t, got)
+					return
+				}
+
+				require.NoError(t, gotErr, "io.ReadFull succeeded, so readRemaining must too")
+				require.Len(t, got, size)
+				require.Equal(t, want, got, "bytes must match io.ReadFull")
+			})
+		}
+	}
+}
+
+// A peer declares the body size in the fixed header, so before the fix it could
+// announce the 256 MB protocol maximum and then fall silent, pinning that much
+// memory in the broker while it waited for bytes that never come.
+//
+// io.Pipe is synchronous — Write returns only once a Read has consumed the
+// bytes — so the write completing is proof the reader took them and is now
+// blocked wanting more. That makes the measurement deterministic instead of a
+// race against a sleep.
 func TestReadRemainingDoesNotReserveDeclaredLength(t *testing.T) {
 	const sent = 16
 
 	pr, pw := io.Pipe()
-	defer pw.Close()
 
+	consumed := make(chan struct{})
 	go func() {
 		_, _ = pw.Write(bytes.Repeat([]byte{'x'}, sent))
-		// then say nothing further, exactly as the attack does
-		time.Sleep(30 * time.Second)
+		close(consumed)
 	}()
 
 	runtime.GC()
 	var before runtime.MemStats
 	runtime.ReadMemStats(&before)
 
-	type result struct {
-		p   []byte
-		err error
-	}
-	res := make(chan result, 1)
+	done := make(chan error, 1)
 	go func() {
-		p, err := readRemaining(pr, mqttMaxRemaining)
-		res <- result{p, err}
+		_, err := readRemaining(pr, mqttMaxRemaining)
+		done <- err
 	}()
 
-	// Let the reader reach the point where it is blocked waiting for more. A
-	// pre-allocating implementation has already committed the full declared
-	// length by now; an incremental one has committed only what arrived.
-	time.Sleep(750 * time.Millisecond)
+	<-consumed
+
 	runtime.GC()
 	var after runtime.MemStats
 	runtime.ReadMemStats(&after)
 
-	grew := int64(after.HeapAlloc) - int64(before.HeapAlloc)
-	require.Less(t, grew, int64(8<<20),
-		"declaring %d bytes and sending %d grew the heap by %d bytes; memory must track bytes received, not bytes declared",
-		mqttMaxRemaining, sent, grew)
+	require.Less(t, int64(after.HeapAlloc)-int64(before.HeapAlloc), heapLimit,
+		"declaring %d bytes and sending %d must not commit the declared length",
+		mqttMaxRemaining, sent)
 
 	select {
-	case r := <-res:
-		t.Fatalf("readRemaining returned before the peer finished: len=%d err=%v", len(r.p), r.err)
+	case err := <-done:
+		t.Fatalf("readRemaining returned before the peer finished: %v", err)
 	default:
 	}
 
 	pw.Close()
-	<-res // reap the reader
+	require.ErrorIs(t, <-done, io.ErrUnexpectedEOF)
 }
 
-// The same property, exercised through the real receive path rather than the
-// helper, so the guarantee is pinned where it is actually relied upon.
+// The same guarantee at the call site the broker actually depends on. A
+// declared length arrives before any authentication happens —
+// readConnectionPacket reads CONNECT through ReadPacket — so a single
+// unauthenticated connection must not be able to commit 256 MiB.
 func TestClientReadPacketDoesNotReserveDeclaredLength(t *testing.T) {
 	const sent = 16
 
-	cl, _, w := newTestClient()
-	defer w.Close()
+	// newTestClient builds the client on the second end of a net.Pipe, so r is
+	// the peer side. Writing to the client's own end would send bytes towards
+	// an end nobody reads, which is what the original version of this test did:
+	// it asserted on the heap while never actually delivering a body byte.
+	cl, r, _ := newTestClient()
+	defer r.Close() //nolint:errcheck
 
-	type result struct {
-		pk  packets.Packet
-		err error
-	}
-	res := make(chan result, 1)
+	consumed := make(chan struct{})
 	go func() {
-		pk, err := cl.ReadPacket(&packets.FixedHeader{
+		_, _ = r.Write(bytes.Repeat([]byte{'x'}, sent))
+		close(consumed)
+	}()
+
+	runtime.GC()
+	var before runtime.MemStats
+	runtime.ReadMemStats(&before)
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := cl.ReadPacket(&packets.FixedHeader{
 			Type: packets.Publish, Remaining: mqttMaxRemaining,
 		})
-		res <- result{pk, err}
+		done <- err
 	}()
 
-	// net.Pipe is unbuffered, so the write has to race the reader.
-	go func() {
-		// A PUBLISH fixed header announcing the maximum Remaining Length.
-		_, _ = w.Write([]byte{byte(packets.Publish), 0xFF, 0xFF, 0xFF, 0x7F})
-		_, _ = w.Write(bytes.Repeat([]byte{'x'}, sent))
-	}()
+	<-consumed
 
-	time.Sleep(750 * time.Millisecond)
 	runtime.GC()
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
+	var after runtime.MemStats
+	runtime.ReadMemStats(&after)
 
-	// One connection must not be able to cost hundreds of MiB on its own.
-	require.Less(t, m.HeapAlloc, uint64(64<<20),
-		"a single connection announcing %d bytes held the heap at %d bytes", mqttMaxRemaining, m.HeapAlloc)
+	require.Less(t, int64(after.HeapAlloc)-int64(before.HeapAlloc), heapLimit,
+		"a single connection announcing %d bytes must not commit the declared length",
+		mqttMaxRemaining)
 
 	select {
-	case <-res:
-		t.Fatal("ReadPacket returned before the peer finished sending")
+	case err := <-done:
+		t.Fatalf("ReadPacket returned before the peer finished: %v", err)
 	default:
 	}
 
-	w.Close()
-	<-res // reap the reader
+	r.Close()
+	require.ErrorIs(t, <-done, io.ErrUnexpectedEOF,
+		"a connection cut short mid-body must surface the same error io.ReadFull produced")
 }
 
-// The incremental path must still deliver the exact bytes of a genuinely large
+// The growth path must still deliver the exact bytes of a genuinely large
 // packet; the fix is about when memory is committed, not about truncating.
 func TestReadRemainingLargeBodyIsDeliveredIntact(t *testing.T) {
 	for _, size := range []int{
-		maxPacketPreallocBytes - 1, // fast path
-		maxPacketPreallocBytes,     // fast path, boundary
-		maxPacketPreallocBytes + 1, // incremental path
-		1024 * 1024,                // incremental, several growth steps
+		maxPacketPreallocBytes - 1, // single-allocation path
+		maxPacketPreallocBytes,     // boundary
+		maxPacketPreallocBytes + 1, // growth path
+		1024 * 1024,                // several growth steps
 	} {
 		body := make([]byte, size)
 		for i := range body {

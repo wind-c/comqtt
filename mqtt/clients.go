@@ -478,6 +478,16 @@ func (cl *Client) ReadFixedHeader(fh *packets.FixedHeader) error {
 // broker's memory proportional to real traffic. Bodies up to
 // maxPacketPreallocBytes keep the previous single-allocation path, which is the
 // overwhelmingly common case and is unchanged.
+//
+// A peer that declares a large body and then sends nothing still reserves
+// maxPacketPreallocBytes while it waits. That residue is deliberate: it is the
+// same order as the goroutine and socket the connection already costs, so
+// holding a connection open can no longer be made to cost more than opening
+// one.
+//
+// The error behaviour matches io.ReadFull, which this replaces: a body cut
+// short is io.ErrUnexpectedEOF when at least one byte arrived, and r's own
+// error otherwise.
 func readRemaining(r io.Reader, size int) ([]byte, error) {
 	if size <= maxPacketPreallocBytes {
 		p := make([]byte, size)
@@ -504,9 +514,17 @@ func readRemaining(r io.Reader, size int) ([]byte, error) {
 		m, err := r.Read(p[len(p):cap(p)])
 		p = p[:len(p)+m]
 		if err != nil {
+			if len(p) >= size {
+				// The body is complete. io.ReadAtLeast clears err whenever the
+				// minimum is reached, so a read that completes the body is a
+				// success even when it reports an error alongside the bytes.
+				// crypto/tls does exactly this: it returns (n, io.EOF) from the
+				// same Read when a close_notify arrives behind the last data.
+				return p, nil
+			}
 			if err == io.EOF && len(p) > 0 {
-				// match io.ReadFull: a peer that stopped mid-body is an
-				// unexpected end, not a clean one
+				// a peer that stopped mid-body is an unexpected end, not a
+				// clean one
 				return nil, io.ErrUnexpectedEOF
 			}
 			return nil, err
