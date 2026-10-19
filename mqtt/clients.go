@@ -90,6 +90,18 @@ func (cl *Clients) Delete(id string) {
 	delete(cl.internal, id)
 }
 
+// CompareAndDelete removes a client only if the map still holds that exact
+// client, so a stale cleanup cannot drop a newer connection with the same id.
+func (cl *Clients) CompareAndDelete(id string, val *Client) bool {
+	cl.Lock()
+	defer cl.Unlock()
+	if cur, ok := cl.internal[id]; ok && cur == val {
+		delete(cl.internal, id)
+		return true
+	}
+	return false
+}
+
 // GetByListener returns clients matching a listener id.
 func (cl *Clients) GetByListener(id string) []*Client {
 	cl.RLock()

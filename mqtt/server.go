@@ -8,6 +8,7 @@ package mqtt
 import (
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"math"
 	"net"
 	"os"
@@ -135,6 +136,22 @@ type Server struct {
 	inlineClient *Client              // inlineClient is a special client used for inline subscriptions and inline Publish
 	Blacklist    []string             // blacklist of client id
 	blacklistMu  sync.RWMutex
+	establishMu  keyedMutex // serializes session establishment per client id
+}
+
+// keyedMutex is a fixed set of striped locks keyed by string. It serializes
+// critical sections for a single key without blocking unrelated keys.
+type keyedMutex struct {
+	stripes [64]sync.Mutex
+}
+
+// lock locks the stripe for key and returns the unlock function.
+func (k *keyedMutex) lock(key string) func() {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(key))
+	m := &k.stripes[h.Sum32()%uint32(len(k.stripes))]
+	m.Lock()
+	return m.Unlock
 }
 
 // loop contains interval tickers for the system events loop.
@@ -404,8 +421,12 @@ func (s *Server) attachClient(cl *Client, listener string) error {
 
 	s.hooks.OnSessionEstablish(cl, pk)
 
+	// Takeover must be atomic per client id or a concurrent connection with
+	// the same id can stay live but untracked. [MQTT-3.1.4-3]
+	unlock := s.establishMu.lock(cl.ID)
 	sessionPresent := s.inheritClientSession(pk, cl)
 	s.Clients.Add(cl) // [MQTT-4.1.0-1]
+	unlock()
 
 	err = s.SendConnack(cl, code, sessionPresent, nil) // [MQTT-3.1.4-5] [MQTT-3.2.0-1] [MQTT-3.2.0-2] &[MQTT-3.14.0-1]
 	if err != nil {
@@ -438,7 +459,7 @@ func (s *Server) attachClient(cl *Client, listener string) error {
 	if expire && atomic.LoadUint32(&cl.State.isTakenOver) == 0 {
 		cl.ClearInflights(math.MaxInt64, 0)
 		s.UnsubscribeClient(cl)
-		s.Clients.Delete(cl.ID) // [MQTT-4.1.0-2] ![MQTT-3.1.2-23]
+		s.Clients.CompareAndDelete(cl.ID, cl) // [MQTT-4.1.0-2] ![MQTT-3.1.2-23]
 	}
 
 	return err
@@ -1840,7 +1861,9 @@ func (s *Server) clearExpiredClients(dt int64) {
 
 		if disconnected+int64(expire) < dt {
 			s.hooks.OnClientExpired(client)
-			s.Clients.Delete(id) // [MQTT-4.1.0-2]
+			// A client may have reconnected since the snapshot; only delete
+			// if the map still holds this exact (disconnected) client.
+			s.Clients.CompareAndDelete(id, client) // [MQTT-4.1.0-2]
 		}
 	}
 }
