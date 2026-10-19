@@ -74,12 +74,16 @@ options:
     retain-available: 0
     maximum-qos: 0
     topic-alias-maximum: 0
+    receive-maximum: 0
 `)
 
 	require.Equal(t, uint32(0), opts.Capabilities.MaximumPacketSize, "0 means unlimited")
 	require.Equal(t, byte(0), opts.Capabilities.RetainAvailable)
 	require.Equal(t, byte(0), opts.Capabilities.MaximumQos)
 	require.Equal(t, uint16(0), opts.Capabilities.TopicAliasMaximum)
+	// The default is 1024, so this proves the explicit zero was kept rather
+	// than replaced by the default.
+	require.Equal(t, uint16(0), opts.Capabilities.ReceiveMaximum)
 	// ...while omitted keys still fall back to the defaults
 	require.Equal(t, int64(86400), opts.Capabilities.MaximumMessageExpiryInterval)
 }

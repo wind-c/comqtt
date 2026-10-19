@@ -113,6 +113,24 @@ func TestClientsDelete(t *testing.T) {
 	require.Nil(t, cl.internal["t1"])
 }
 
+func TestClientsCompareAndDelete(t *testing.T) {
+	cl := NewClients()
+	c1 := &Client{ID: "t1"}
+	c2 := &Client{ID: "t1"}
+	cl.Add(c1)
+
+	// a different client pointer with the same id must not be deleted
+	require.False(t, cl.CompareAndDelete("t1", c2))
+	require.Contains(t, cl.internal, "t1")
+
+	require.True(t, cl.CompareAndDelete("t1", c1))
+	_, ok := cl.Get("t1")
+	require.False(t, ok)
+
+	// deleting an id that is no longer tracked is a no-op
+	require.False(t, cl.CompareAndDelete("t1", c1))
+}
+
 func TestClientsGetByListener(t *testing.T) {
 	cl := NewClients()
 	cl.Add(&Client{ID: "t1", State: ClientState{open: context.Background()}, Net: ClientConnection{Listener: "tcp1"}})

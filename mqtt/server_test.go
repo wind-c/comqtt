@@ -95,6 +95,30 @@ func (h *DelayHook) OnDisconnect(cl *Client, err error, expire bool) {
 	time.Sleep(h.DisconnectDelay)
 }
 
+// takeoverBarrierHook blocks every connection inside OnSessionEstablish until
+// released, so concurrent same-id connects hit the takeover window together.
+type takeoverBarrierHook struct {
+	HookBase
+	arrive  chan struct{}
+	release chan struct{}
+}
+
+func (h *takeoverBarrierHook) SetOpts(l *slog.Logger, opts *HookOptions) {
+	h.Log = l
+	h.Opts = opts
+}
+
+func (h *takeoverBarrierHook) ID() string { return "takeover-barrier" }
+
+func (h *takeoverBarrierHook) Provides(b byte) bool {
+	return bytes.Contains([]byte{OnSessionEstablish}, []byte{b})
+}
+
+func (h *takeoverBarrierHook) OnSessionEstablish(cl *Client, pk packets.Packet) {
+	h.arrive <- struct{}{}
+	<-h.release
+}
+
 func newServer() *Server {
 	cc := *DefaultServerCapabilities
 	cc.MaximumMessageExpiryInterval = 0
@@ -644,6 +668,81 @@ func TestEstablishConnectionInheritExistingTrueTakeover(t *testing.T) {
 
 	_, _ = w2.Write(packets.TPacketData[packets.Disconnect].Get(packets.TDisconnect).RawBytes)
 	require.NoError(t, <-o2)
+}
+
+func TestEstablishConnectionConcurrentTakeover(t *testing.T) {
+	s := newServer()
+	defer s.Close()
+
+	const n = 16
+	hook := &takeoverBarrierHook{
+		arrive:  make(chan struct{}, n),
+		release: make(chan struct{}),
+	}
+	require.NoError(t, s.AddHook(hook, nil))
+
+	// mqtt 5, clean start, session expiry 0, client id "zen"
+	connectBytes := []byte{
+		packets.Connect << 4, 21, // Fixed header
+		0, 4, // Protocol Name - MSB+LSB
+		'M', 'Q', 'T', 'T', // Protocol Name
+		5,      // Protocol Version
+		1 << 1, // Packet Flags
+		0, 30,  // Keepalive
+		5,              // Properties length
+		17, 0, 0, 0, 0, // Session Expiry Interval (17)
+		0, 3, // Client ID - MSB+LSB
+		'z', 'e', 'n', // Client ID "zen"
+	}
+
+	results := make(chan error, n)
+	conns := make([]net.Conn, n)
+	for i := 0; i < n; i++ {
+		r, w := net.Pipe()
+		conns[i] = w
+		go func(r net.Conn) {
+			results <- s.EstablishConnection("tcp", r)
+		}(r)
+		go func(w net.Conn) { _, _ = io.Copy(io.Discard, w) }(w) // drain connack/disconnect writes
+		go func(w net.Conn) {
+			_, _ = w.Write(connectBytes)
+		}(w)
+	}
+
+	// park all connections at the session establish hook, then release together
+	for i := 0; i < n; i++ {
+		select {
+		case <-hook.arrive:
+		case <-time.After(5 * time.Second):
+			t.Fatalf("only %d of %d connections reached session establish", i, n)
+		}
+	}
+	close(hook.release)
+
+	// takeover is serialized: every connection but the last one is dropped
+	for i := 0; i < n-1; i++ {
+		select {
+		case err := <-results:
+			require.Error(t, err)
+		case <-time.After(5 * time.Second):
+			t.Fatalf("only %d of %d duplicate connections were disconnected", i, n-1)
+		}
+	}
+
+	require.Equal(t, 1, s.Clients.Len())
+	_, ok := s.Clients.Get("zen")
+	require.True(t, ok)
+
+	// closing the survivor must drop the id entirely
+	for _, w := range conns {
+		_ = w.Close()
+	}
+	select {
+	case <-results:
+	case <-time.After(5 * time.Second):
+		t.Fatal("surviving connection did not exit after close")
+	}
+	require.Equal(t, 0, s.Clients.Len())
 }
 
 func TestEstablishConnectionResentPendingInflightsError(t *testing.T) {
