@@ -97,30 +97,16 @@ func (c *Capabilities) maxTopicFilterDepth() int {
 }
 
 // UnmarshalYAML decodes a capabilities block on top of DefaultServerCapabilities,
-// so a partial block keeps the defaults for the keys it omits.
+// so a partial block keeps the defaults for the keys it omits. Without it, any
+// `capabilities:` key makes yaml allocate a zero-valued struct, and declaring
+// one key silently zeroes every other capability.
 //
-// Without this, the presence of any `capabilities:` key makes yaml allocate a
-// zero-valued struct, so Capabilities stops being nil and New() skips
-// DefaultServerCapabilities entirely. Declaring a single key then silently
-// zeroes every other capability. The worst of them is
-// MaximumMessageExpiryInterval: at zero, ClearInflights matches
-// tk.Created+0 < now for every queued message, so the once-per-second expiry
-// sweep discards the entire offline queue and persistent sessions stop
-// delivering, with nothing logged.
-//
-// Merging per key rather than per field is what keeps explicit zeros working:
-// `maximum-packet-size: 0` (unlimited) and `retain-available: 0` are
-// legitimate values and must not be mistaken for "unset".
-//
-// The seeding is unconditional, so decoding a capabilities block into a
-// Capabilities that was already populated in Go overwrites those values with
-// the defaults first. That is inherent to the merge: with plain scalars there
-// is no way to tell "unset" from "explicitly zero". The Go path is unaffected
-// otherwise: Options.Capabilities is only merged over the defaults when it
-// comes from a YAML document.
+// Merging per key keeps explicit zeros working: `maximum-packet-size: 0` and
+// `retain-available: 0` are legitimate values, not "unset". The seeding is
+// unconditional, so decoding into an already populated Capabilities overwrites
+// it with the defaults first.
 func (c *Capabilities) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	// Capabilities contains only scalars, so copying the default by value is
-	// safe and shares no state with the package-level default.
+	// Capabilities holds only scalars, so copying the default by value shares no state.
 	*c = *DefaultServerCapabilities
 	type plain Capabilities
 	return unmarshal((*plain)(c))
