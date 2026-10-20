@@ -74,6 +74,7 @@ func TestAcceptRetryBacksOffBetweenAttempts(t *testing.T) {
 
 // Close() is the only reliable stop signal: the error a closed listener
 // produces differs by listener type, so done is checked instead.
+
 // repeatErr builds a script of n identical failures. make([]error, n) would
 // produce n nil errors, which the scripted accept treats as success.
 func repeatErr(err error, n int) []error {

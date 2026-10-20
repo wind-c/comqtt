@@ -53,9 +53,7 @@ func TestServeSurvivesTransientAcceptError(t *testing.T) {
 }
 
 // The client-visible consequence of a dead listener is worse than a refused
-// connection: the OS listening socket is never closed, so dials keep succeeding
-// at the TCP level and then hang until the client's own timeout, each one
-// occupying an accept queue slot. After the fix the client is served normally.
+// connection: dials keep succeeding and then hang, occupying an accept slot.
 func TestClientIsServedAfterTransientAcceptError(t *testing.T) {
 	base, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)

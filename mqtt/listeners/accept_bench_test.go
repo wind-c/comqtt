@@ -11,11 +11,8 @@ import (
 )
 
 // fastListener stands in for a real listener so the benchmark measures the
-// wrapper, not the accept syscall.
-//
-// The benchmarks hold it in a net.Listener interface variable, the way the real
-// code does. A concrete type would devirtualise and hide the cost of taking a
-// method value, which is the thing under test here.
+// wrapper, not the accept syscall. It is held in a net.Listener variable, the
+// way the real code does, so the method value is not devirtualised away.
 type fastListener struct{ net.Listener }
 
 func (fastListener) Accept() (net.Conn, error) { return nil, nil }
