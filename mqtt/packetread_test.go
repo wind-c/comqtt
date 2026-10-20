@@ -26,12 +26,8 @@ const mqttMaxRemaining = 268435455
 const heapLimit = int64(8 << 20)
 
 // eofWithLastBytes returns the final bytes and io.EOF from the same Read call.
-// The io.Reader contract permits it ("It may return the (n, err) either from
-// the same call or from the next call"), crypto/tls does exactly that when a
-// close_notify arrives behind the last data, and io.ReadFull treats it as
-// success. A loop that inspects the error before checking whether the body is
-// complete gets this wrong, so it is pinned explicitly here as well as through
-// the iotest reader below.
+// The io.Reader contract permits it, crypto/tls does it when a close_notify
+// arrives behind the last data, and io.ReadFull treats it as success.
 type eofWithLastBytes struct {
 	data []byte
 	off  int
@@ -151,12 +147,8 @@ func TestReadRemainingMatchesReadFull(t *testing.T) {
 
 // A peer declares the body size in the fixed header, so before the fix it could
 // announce the 256 MB protocol maximum and then fall silent, pinning that much
-// memory in the broker while it waited for bytes that never come.
-//
-// io.Pipe is synchronous — Write returns only once a Read has consumed the
-// bytes — so the write completing is proof the reader took them and is now
-// blocked wanting more. That makes the measurement deterministic instead of a
-// race against a sleep.
+// memory in the broker. io.Pipe is synchronous, so the write completing is proof
+// the reader took the bytes and is blocked wanting more.
 func TestReadRemainingDoesNotReserveDeclaredLength(t *testing.T) {
 	const sent = 16
 
