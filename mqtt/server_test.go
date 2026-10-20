@@ -1263,7 +1263,8 @@ func TestInjectPacketPublishAndReceive(t *testing.T) {
 	sender.ID = "sender"
 	s.Clients.Add(sender)
 
-	receiver, r2, w2 := newTestClient()
+	counter := new(writeCounter)
+	receiver, r2, w2 := newTestClientCounted(counter)
 	receiver.ID = "receiver"
 	s.Clients.Add(receiver)
 	s.Topics.Subscribe(receiver.ID, packets.Subscription{Filter: "a/b/c"})
@@ -1280,10 +1281,11 @@ func TestInjectPacketPublishAndReceive(t *testing.T) {
 	go func() {
 		err := s.InjectPacket(sender, *packets.TPacketData[packets.Publish].Get(packets.TPublishBasic).Packet)
 		require.NoError(t, err)
-		_ = w1.Close()
-		time.Sleep(time.Millisecond * 10)
-		_ = w2.Close()
 	}()
+
+	waitForWrites(t, counter, 1)
+	_ = w1.Close()
+	_ = w2.Close()
 
 	require.Equal(t, packets.TPacketData[packets.Publish].Get(packets.TPublishBasic).RawBytes, <-receiverBuf)
 }
@@ -1299,7 +1301,8 @@ func TestServerPublishAndReceive(t *testing.T) {
 	sender.ID = "sender"
 	s.Clients.Add(sender)
 
-	receiver, r2, w2 := newTestClient()
+	counter := new(writeCounter)
+	receiver, r2, w2 := newTestClientCounted(counter)
 	receiver.ID = "receiver"
 	s.Clients.Add(receiver)
 	s.Topics.Subscribe(receiver.ID, packets.Subscription{Filter: "a/b/c"})
@@ -1317,10 +1320,11 @@ func TestServerPublishAndReceive(t *testing.T) {
 		pkx := *packets.TPacketData[packets.Publish].Get(packets.TPublishBasic).Packet
 		err := s.Publish(pkx.TopicName, pkx.Payload, pkx.FixedHeader.Retain, pkx.FixedHeader.Qos)
 		require.NoError(t, err)
-		_ = w1.Close()
-		time.Sleep(time.Millisecond * 10)
-		_ = w2.Close()
 	}()
+
+	waitForWrites(t, counter, 1)
+	_ = w1.Close()
+	_ = w2.Close()
 
 	require.Equal(t, packets.TPacketData[packets.Publish].Get(packets.TPublishBasic).RawBytes, <-receiverBuf)
 }
@@ -1364,7 +1368,8 @@ func TestServerProcessPacketPublishAndReceive(t *testing.T) {
 	sender.ID = "sender"
 	s.Clients.Add(sender)
 
-	receiver, r2, w2 := newTestClient()
+	counter := new(writeCounter)
+	receiver, r2, w2 := newTestClientCounted(counter)
 	receiver.ID = "receiver"
 	s.Clients.Add(receiver)
 	s.Topics.Subscribe(receiver.ID, packets.Subscription{Filter: "a/b/c"})
@@ -1382,10 +1387,11 @@ func TestServerProcessPacketPublishAndReceive(t *testing.T) {
 	go func() {
 		err := s.processPacket(sender, *packets.TPacketData[packets.Publish].Get(packets.TPublishRetain).Packet)
 		require.NoError(t, err)
-		time.Sleep(time.Millisecond * 10)
-		_ = w1.Close()
-		_ = w2.Close()
 	}()
+
+	waitForWrites(t, counter, 1)
+	_ = w1.Close()
+	_ = w2.Close()
 
 	require.Equal(t, packets.TPacketData[packets.Publish].Get(packets.TPublishBasic).RawBytes, <-receiverBuf)
 	require.Equal(t, 1, len(s.Topics.Messages("a/b/c")))
@@ -1900,11 +1906,12 @@ func TestPublishToSubscribersSelfNoLocal(t *testing.T) {
 
 func TestPublishToSubscribers(t *testing.T) {
 	s := newServer()
-	cl, r1, w1 := newTestClient()
+	counter := new(writeCounter)
+	cl, r1, w1 := newTestClientCounted(counter)
 	cl.ID = "cl1"
-	cl2, r2, w2 := newTestClient()
+	cl2, r2, w2 := newTestClientCounted(counter)
 	cl2.ID = "cl2"
-	cl3, r3, w3 := newTestClient()
+	cl3, r3, w3 := newTestClientCounted(counter)
 	cl3.ID = "cl3"
 	s.Clients.Add(cl)
 	s.Clients.Add(cl2)
@@ -1942,11 +1949,14 @@ func TestPublishToSubscribers(t *testing.T) {
 
 	go func() {
 		s.publishToSubscribers(*packets.TPacketData[packets.Publish].Get(packets.TPublishBasic).Packet)
-		time.Sleep(time.Millisecond)
-		_ = w1.Close()
-		_ = w2.Close()
-		_ = w3.Close()
 	}()
+
+	// cl1 receives the publish, and exactly one of the two shared subscribers
+	// receives it, so two writes are delivered in total.
+	waitForWrites(t, counter, 2)
+	_ = w1.Close()
+	_ = w2.Close()
+	_ = w3.Close()
 
 	require.Equal(t, packets.TPacketData[packets.Publish].Get(packets.TPublishBasic).RawBytes, <-cl1Recv)
 	rcv2 := <-cl2Recv
@@ -1968,7 +1978,8 @@ func TestPublishToSubscribers(t *testing.T) {
 func TestPublishToSubscribersMessageExpiryDelta(t *testing.T) {
 	s := newServer()
 	s.Options.Capabilities.MaximumMessageExpiryInterval = 86400
-	cl, r1, w1 := newTestClient()
+	counter := new(writeCounter)
+	cl, r1, w1 := newTestClientCounted(counter)
 	cl.ID = "cl1"
 	cl.Properties.ProtocolVersion = 5
 	s.Clients.Add(cl)
@@ -1986,9 +1997,10 @@ func TestPublishToSubscribersMessageExpiryDelta(t *testing.T) {
 		pkx := *packets.TPacketData[packets.Publish].Get(packets.TPublishBasic).Packet
 		pkx.Created = time.Now().Unix() - 30
 		s.publishToSubscribers(pkx)
-		time.Sleep(time.Millisecond)
-		_ = w1.Close()
 	}()
+
+	waitForWrites(t, counter, 1)
+	_ = w1.Close()
 
 	b := <-cl1Recv
 	pk := new(packets.Packet)
@@ -1998,7 +2010,8 @@ func TestPublishToSubscribersMessageExpiryDelta(t *testing.T) {
 
 func TestPublishToSubscribersIdentifiers(t *testing.T) {
 	s := newServer()
-	cl, r, w := newTestClient()
+	counter := new(writeCounter)
+	cl, r, w := newTestClientCounted(counter)
 	cl.Properties.ProtocolVersion = 5
 	s.Clients.Add(cl)
 	subbed, _ := s.Topics.Subscribe(cl.ID, packets.Subscription{Filter: "a/b/+", Identifier: 2})
@@ -2008,18 +2021,19 @@ func TestPublishToSubscribersIdentifiers(t *testing.T) {
 	subbed, _ = s.Topics.Subscribe(cl.ID, packets.Subscription{Filter: "d/e/f", Identifier: 4})
 	require.True(t, subbed)
 
-	go func() {
-		s.publishToSubscribers(*packets.TPacketData[packets.Publish].Get(packets.TPublishBasic).Packet)
-		time.Sleep(time.Millisecond)
-		_ = w.Close()
-	}()
-
 	receiverBuf := make(chan []byte)
 	go func() {
 		buf, err := io.ReadAll(r)
 		require.NoError(t, err)
 		receiverBuf <- buf
 	}()
+
+	go func() {
+		s.publishToSubscribers(*packets.TPacketData[packets.Publish].Get(packets.TPublishBasic).Packet)
+	}()
+
+	waitForWrites(t, counter, 1)
+	_ = w.Close()
 
 	require.Equal(t, packets.TPacketData[packets.Publish].Get(packets.TPublishSubscriberIdentifier).RawBytes, <-receiverBuf)
 }
@@ -2053,20 +2067,13 @@ func TestPublishToClientServerDowngradeQos(t *testing.T) {
 	s := newServer()
 	s.Options.Capabilities.MaximumQos = 1
 
-	cl, r, w := newTestClient()
+	counter := new(writeCounter)
+	cl, r, w := newTestClientCounted(counter)
 	s.Clients.Add(cl)
 
 	_, ok := cl.State.Inflight.Get(1)
 	require.False(t, ok)
 	cl.State.packetID = 6 // just to match the same packet id (7) in the fixtures
-
-	go func() {
-		pkx := *packets.TPacketData[packets.Publish].Get(packets.TPublishQos1).Packet
-		pkx.FixedHeader.Qos = 2
-		_, _ = s.publishToClient(cl, packets.Subscription{Filter: "a/b/c", Qos: 2}, pkx)
-		time.Sleep(time.Microsecond * 100)
-		_ = w.Close()
-	}()
 
 	receiverBuf := make(chan []byte)
 	go func() {
@@ -2074,6 +2081,15 @@ func TestPublishToClientServerDowngradeQos(t *testing.T) {
 		require.NoError(t, err)
 		receiverBuf <- buf
 	}()
+
+	go func() {
+		pkx := *packets.TPacketData[packets.Publish].Get(packets.TPublishQos1).Packet
+		pkx.FixedHeader.Qos = 2
+		_, _ = s.publishToClient(cl, packets.Subscription{Filter: "a/b/c", Qos: 2}, pkx)
+	}()
+
+	waitForWrites(t, counter, 1)
+	_ = w.Close()
 
 	require.Equal(t, packets.TPacketData[packets.Publish].Get(packets.TPublishQos1).RawBytes, <-receiverBuf)
 }
@@ -2082,20 +2098,13 @@ func TestPublishToClientSubscriptionDowngradeQos(t *testing.T) {
 	s := newServer()
 	s.Options.Capabilities.MaximumQos = 2
 
-	cl, r, w := newTestClient()
+	counter := new(writeCounter)
+	cl, r, w := newTestClientCounted(counter)
 	s.Clients.Add(cl)
 
 	_, ok := cl.State.Inflight.Get(1)
 	require.False(t, ok)
 	cl.State.packetID = 6 // just to match the same packet id (7) in the fixtures
-
-	go func() {
-		pkx := *packets.TPacketData[packets.Publish].Get(packets.TPublishQos1).Packet
-		pkx.FixedHeader.Qos = 2
-		_, _ = s.publishToClient(cl, packets.Subscription{Filter: "a/b/c", Qos: 1}, pkx)
-		time.Sleep(time.Microsecond * 100)
-		_ = w.Close()
-	}()
 
 	receiverBuf := make(chan []byte)
 	go func() {
@@ -2103,6 +2112,15 @@ func TestPublishToClientSubscriptionDowngradeQos(t *testing.T) {
 		require.NoError(t, err)
 		receiverBuf <- buf
 	}()
+
+	go func() {
+		pkx := *packets.TPacketData[packets.Publish].Get(packets.TPublishQos1).Packet
+		pkx.FixedHeader.Qos = 2
+		_, _ = s.publishToClient(cl, packets.Subscription{Filter: "a/b/c", Qos: 1}, pkx)
+	}()
+
+	waitForWrites(t, counter, 1)
+	_ = w.Close()
 
 	require.Equal(t, packets.TPacketData[packets.Publish].Get(packets.TPublishQos1).RawBytes, <-receiverBuf)
 }
@@ -2136,18 +2154,11 @@ func TestPublishToClientExceedClientWritesPending(t *testing.T) {
 
 func TestPublishToClientServerTopicAlias(t *testing.T) {
 	s := newServer()
-	cl, r, w := newTestClient()
+	counter := new(writeCounter)
+	cl, r, w := newTestClientCounted(counter)
 	cl.Properties.ProtocolVersion = 5
 	cl.Properties.Props.TopicAliasMaximum = 5
 	s.Clients.Add(cl)
-
-	go func() {
-		pkx := *packets.TPacketData[packets.Publish].Get(packets.TPublishBasicMqtt5).Packet
-		_, _ = s.publishToClient(cl, packets.Subscription{Filter: pkx.TopicName}, pkx)
-		_, _ = s.publishToClient(cl, packets.Subscription{Filter: pkx.TopicName}, pkx)
-		time.Sleep(time.Millisecond)
-		_ = w.Close()
-	}()
 
 	receiverBuf := make(chan []byte)
 	go func() {
@@ -2155,6 +2166,15 @@ func TestPublishToClientServerTopicAlias(t *testing.T) {
 		require.NoError(t, err)
 		receiverBuf <- buf
 	}()
+
+	go func() {
+		pkx := *packets.TPacketData[packets.Publish].Get(packets.TPublishBasicMqtt5).Packet
+		_, _ = s.publishToClient(cl, packets.Subscription{Filter: pkx.TopicName}, pkx)
+		_, _ = s.publishToClient(cl, packets.Subscription{Filter: pkx.TopicName}, pkx)
+	}()
+
+	waitForWrites(t, counter, 2)
+	_ = w.Close()
 
 	ret := <-receiverBuf
 	pk1 := make([]byte, len(packets.TPacketData[packets.Publish].Get(packets.TPublishBasicMqtt5).RawBytes))
@@ -2870,25 +2890,32 @@ func TestServerProcessPacketSubscribeInvalidSharedNoLocal(t *testing.T) {
 
 func TestServerProcessSubscribeWithRetain(t *testing.T) {
 	s := newServer()
-	cl, r, w := newTestClient()
+	counter := new(writeCounter)
+	cl, r, w := newTestClientCounted(counter)
 
 	retained := s.Topics.RetainMessage(*packets.TPacketData[packets.Publish].Get(packets.TPublishRetain).Packet)
 	require.Equal(t, int64(1), retained)
 
+	receiverBuf := make(chan []byte)
+	go func() {
+		buf, err := io.ReadAll(r)
+		require.NoError(t, err)
+		receiverBuf <- buf
+	}()
+
 	go func() {
 		err := s.processPacket(cl, *packets.TPacketData[packets.Subscribe].Get(packets.TSubscribe).Packet)
 		require.NoError(t, err)
-
-		time.Sleep(time.Millisecond)
-		_ = w.Close()
 	}()
 
-	buf, err := io.ReadAll(r)
-	require.NoError(t, err)
+	// The suback and the retained publish are both written to the client.
+	waitForWrites(t, counter, 2)
+	_ = w.Close()
+
 	require.Equal(t, append(
 		packets.TPacketData[packets.Suback].Get(packets.TSuback).RawBytes,
 		packets.TPacketData[packets.Publish].Get(packets.TPublishRetain).RawBytes...,
-	), buf)
+	), <-receiverBuf)
 }
 
 func TestServerProcessSubscribeDowngradeQos(t *testing.T) {
@@ -2954,26 +2981,33 @@ func TestServerProcessSubscribeWithRetainHandling2(t *testing.T) {
 
 func TestServerProcessSubscribeWithNotRetainAsPublished(t *testing.T) {
 	s := newServer()
-	cl, r, w := newTestClient()
+	counter := new(writeCounter)
+	cl, r, w := newTestClientCounted(counter)
 	s.Clients.Add(cl)
 
 	retained := s.Topics.RetainMessage(*packets.TPacketData[packets.Publish].Get(packets.TPublishRetain).Packet)
 	require.Equal(t, int64(1), retained)
 
+	receiverBuf := make(chan []byte)
+	go func() {
+		buf, err := io.ReadAll(r)
+		require.NoError(t, err)
+		receiverBuf <- buf
+	}()
+
 	go func() {
 		err := s.processPacket(cl, *packets.TPacketData[packets.Subscribe].Get(packets.TSubscribeRetainAsPublished).Packet)
 		require.NoError(t, err)
-
-		time.Sleep(time.Millisecond)
-		_ = w.Close()
 	}()
 
-	buf, err := io.ReadAll(r)
-	require.NoError(t, err)
+	// The suback and the retained publish are both written to the client.
+	waitForWrites(t, counter, 2)
+	_ = w.Close()
+
 	require.Equal(t, append(
 		packets.TPacketData[packets.Suback].Get(packets.TSuback).RawBytes,
 		packets.TPacketData[packets.Publish].Get(packets.TPublishRetain).RawBytes...,
-	), buf)
+	), <-receiverBuf)
 }
 
 func TestServerProcessSubscribeNoConnection(t *testing.T) {
@@ -4242,7 +4276,8 @@ func TestConvertMessageMapToSlice(t *testing.T) {
 // TestSendRetainedMessagesToClient tests the sendRetainedMessagesToClient helper function
 func TestSendRetainedMessagesToClient(t *testing.T) {
 	s := newServer()
-	cl, r, w := newTestClient()
+	counter := new(writeCounter)
+	cl, r, w := newTestClientCounted(counter)
 	s.Clients.Add(cl)
 
 	messages := []packets.Packet{
@@ -4251,11 +4286,17 @@ func TestSendRetainedMessagesToClient(t *testing.T) {
 
 	go func() {
 		s.sendRetainedMessagesToClient(cl, packets.Subscription{Filter: "a/b/c"}, messages)
-		time.Sleep(time.Millisecond)
-		_ = w.Close()
 	}()
 
-	buf, err := io.ReadAll(r)
-	require.NoError(t, err)
-	require.NotEmpty(t, buf)
+	receiverBuf := make(chan []byte)
+	go func() {
+		buf, err := io.ReadAll(r)
+		require.NoError(t, err)
+		receiverBuf <- buf
+	}()
+
+	waitForWrites(t, counter, 1)
+	_ = w.Close()
+
+	require.NotEmpty(t, <-receiverBuf)
 }

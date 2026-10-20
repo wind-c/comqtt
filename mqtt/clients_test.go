@@ -24,9 +24,40 @@ const pkInfo = "packet type %v, %s"
 var errClientStop = errors.New("test stop")
 
 func newTestClient() (cl *Client, r net.Conn, w net.Conn) {
+	cl, r, w = newTestClientConn(nil)
+	return
+}
+
+// writeCounter counts the writes a broker makes to a test client.
+type writeCounter struct {
+	n atomic.Int32
+}
+
+// countingConn counts the writes that complete on the underlying connection.
+type countingConn struct {
+	net.Conn
+	counter *writeCounter
+}
+
+func (c *countingConn) Write(b []byte) (int, error) {
+	n, err := c.Conn.Write(b)
+	if err == nil {
+		c.counter.n.Add(1)
+	}
+	return n, err
+}
+
+// newTestClientConn builds a test client whose connection is wrapped by wrap,
+// if wrap is not nil. A wrapper can observe the writes the broker makes.
+func newTestClientConn(wrap func(net.Conn) net.Conn) (cl *Client, r net.Conn, w net.Conn) {
 	r, w = net.Pipe()
 
-	cl = newClient(w, &ops{
+	conn := net.Conn(w)
+	if wrap != nil {
+		conn = wrap(conn)
+	}
+
+	cl = newClient(conn, &ops{
 		info:  new(system.Info),
 		hooks: new(Hooks),
 		log:   logger,
@@ -51,6 +82,30 @@ func newTestClient() (cl *Client, r net.Conn, w net.Conn) {
 	go cl.WriteLoop()
 
 	return
+}
+
+// newTestClientCounted returns a test client whose connection is wrapped so
+// that completed writes are counted. A write to a pipe completes only once the
+// reader has taken the bytes, so the count is a delivery signal rather than a
+// timing guess.
+func newTestClientCounted(counter *writeCounter) (cl *Client, r net.Conn, w net.Conn) {
+	return newTestClientConn(func(c net.Conn) net.Conn {
+		return &countingConn{Conn: c, counter: counter}
+	})
+}
+
+// waitForWrites blocks until n writes have completed. It must be called from
+// the test goroutine, not from a helper goroutine.
+func waitForWrites(t *testing.T, counter *writeCounter, n int) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for int(counter.n.Load()) < n {
+		if time.Now().After(deadline) {
+			t.Errorf("timed out waiting for %d writes, got %d", n, counter.n.Load())
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
 }
 
 func TestNewInflights(t *testing.T) {
