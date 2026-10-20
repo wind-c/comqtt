@@ -60,6 +60,8 @@ var (
 	ErrMalformedVariableByteInteger           = Code{Code: 0x81, Reason: "malformed packet: variable byte integer out of range"}
 	ErrMalformedBadProperty                   = Code{Code: 0x81, Reason: "malformed packet: unknown property"}
 	ErrMalformedProperties                    = Code{Code: 0x81, Reason: "malformed packet: properties"}
+	ErrMalformedTooManyUserProperties         = Code{Code: 0x81, Reason: "malformed packet: too many user properties"}
+	ErrMalformedTooManySubscriptionIdentifiers = Code{Code: 0x81, Reason: "malformed packet: too many subscription identifiers"}
 	ErrMalformedWillProperties                = Code{Code: 0x81, Reason: "malformed packet: will properties"}
 	ErrMalformedSessionPresent                = Code{Code: 0x81, Reason: "malformed packet: session present"}
 	ErrMalformedReasonCode                    = Code{Code: 0x81, Reason: "malformed packet: reason code"}

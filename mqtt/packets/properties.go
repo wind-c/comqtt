@@ -42,6 +42,20 @@ const (
 	PropSharedSubAvailable     byte = 42
 )
 
+// MQTT v5 puts no count limit on repeated User Property or Subscription
+// Identifier entries, so both are capped here: a single packet carrying them
+// amplifies the property section without bound.
+const (
+	// MaxUserProperties is the maximum number of User Property entries accepted
+	// in a single packet's property section.
+	MaxUserProperties = 128
+
+	// MaxSubscriptionIdentifiers is the maximum number of Subscription
+	// Identifier entries accepted in a single packet's property section. The
+	// count is client-driven, so this is far higher than MaxUserProperties.
+	MaxSubscriptionIdentifiers = 1024
+)
+
 // validPacketProperties indicates which properties are valid for which packet types.
 var validPacketProperties = map[byte]map[byte]byte{
 	PropPayloadFormat:          {Publish: 1, WillProperties: 1},
@@ -403,8 +417,8 @@ func (p *Properties) Decode(pkt byte, b *bytes.Buffer) (n int, err error) {
 		case PropCorrelationData:
 			p.CorrelationData, offset, err = decodeBytes(bt, offset)
 		case PropSubscriptionIdentifier:
-			if p.SubscriptionIdentifier == nil {
-				p.SubscriptionIdentifier = []int{}
+			if len(p.SubscriptionIdentifier) >= MaxSubscriptionIdentifiers {
+				return n + bu, ErrMalformedTooManySubscriptionIdentifiers
 			}
 
 			n, bu, err := DecodeLength(bytes.NewBuffer(bt[offset:]))
@@ -452,12 +466,19 @@ func (p *Properties) Decode(pkt byte, b *bytes.Buffer) (n int, err error) {
 			p.RetainAvailable, offset, err = decodeByte(bt, offset)
 			p.RetainAvailableFlag = true
 		case PropUser:
+			if len(p.User) >= MaxUserProperties {
+				return n + bu, ErrMalformedTooManyUserProperties
+			}
+
 			var k, v string
 			k, offset, err = decodeString(bt, offset)
 			if err != nil {
 				return n + bu, err
 			}
 			v, offset, err = decodeString(bt, offset)
+			if err != nil {
+				return n + bu, err
+			}
 			p.User = append(p.User, UserProperty{Key: k, Val: v})
 		case PropMaximumPacketSize:
 			p.MaximumPacketSize, offset, err = decodeUint32(bt, offset)
