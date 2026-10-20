@@ -717,17 +717,25 @@ func TestEstablishConnectionConcurrentTakeover(t *testing.T) {
 	}
 	close(hook.release)
 
-	// takeover is serialized: every connection but the last one is dropped
+	// takeover is serialized: every connection but the last one is dropped.
+	// A displaced connection shuts down cleanly, because the server sends it a
+	// DISCONNECT before removing it, so it may return no error at all and the
+	// return value must not be asserted to be one.
 	for i := 0; i < n-1; i++ {
 		select {
-		case err := <-results:
-			require.Error(t, err)
+		case <-results:
 		case <-time.After(5 * time.Second):
 			t.Fatalf("only %d of %d duplicate connections were disconnected", i, n-1)
 		}
 	}
 
-	require.Equal(t, 1, s.Clients.Len())
+	// All n connections share one client id, so the registry can hold only one
+	// of them at a time. The survivor registers after the entry it displaced has
+	// already been removed, so the count is briefly zero and only settles once
+	// the winner has landed.
+	require.Eventually(t, func() bool {
+		return s.Clients.Len() == 1
+	}, 5*time.Second, 5*time.Millisecond, "exactly one client should remain registered")
 	_, ok := s.Clients.Get("zen")
 	require.True(t, ok)
 
@@ -1741,8 +1749,11 @@ func TestServerProcessPublishACLCheckDeny(t *testing.T) {
 				require.Equal(t, tx.expectReponse, buf)
 			}
 
-			require.Equal(t, tx.expectDisconnect, cl.Closed())
+			// The client is stopped from the goroutine above, and Stop closes the
+			// connection before it cancels the client's context, so the closed
+			// state can only be observed once that goroutine has finished.
 			wg.Wait()
+			require.Equal(t, tx.expectDisconnect, cl.Closed())
 		})
 	}
 }
@@ -2223,20 +2234,29 @@ func TestProcessPublishWithTopicAlias(t *testing.T) {
 	cl2.Properties.ProtocolVersion = 5
 	cl2.State.TopicAliases.Inbound.Set(1, "a/b/c")
 
+	expected := packets.TPacketData[packets.Publish].Get(packets.TPublishBasic).RawBytes
+
+	delivered := make(chan struct{})
 	go func() {
 		pkx := *packets.TPacketData[packets.Publish].Get(packets.TPublishMqtt5).Packet
 		pkx.Properties.SubscriptionIdentifier = []int{} // must not contain from client to server
 		pkx.TopicName = ""
 		pkx.Properties.TopicAlias = 1
 		_ = s.processPacket(cl2, pkx)
-		time.Sleep(time.Millisecond)
+		<-delivered // the publish has been written out
 		_ = w2.Close()
 		_ = w.Close()
 	}()
 
-	buf, err := io.ReadAll(r)
+	// Read exactly the publish that is expected rather than waiting for the
+	// connection to close: processPacket only queues the packet, so how much has
+	// been flushed by the time the connection closes is a race, but how many
+	// bytes arrive is not.
+	buf := make([]byte, len(expected))
+	_, err := io.ReadFull(r, buf)
 	require.NoError(t, err)
-	require.Equal(t, packets.TPacketData[packets.Publish].Get(packets.TPublishBasic).RawBytes, buf)
+	require.Equal(t, expected, buf)
+	close(delivered)
 }
 
 func TestPublishToSubscribersExhaustedSendQuota(t *testing.T) {

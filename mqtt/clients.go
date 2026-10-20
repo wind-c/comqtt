@@ -24,6 +24,10 @@ import (
 const (
 	defaultKeepalive             uint16 = 10 // the default connection keepalive value in seconds
 	defaultClientProtocolVersion byte   = 4  // the default mqtt protocol version of connecting clients (if somehow unspecified).
+
+	// maxPacketPreallocBytes is the largest body allocated up front from the
+	// declared Remaining Length. Larger bodies are read incrementally.
+	maxPacketPreallocBytes = 1024 * 64
 )
 
 // Client session inheritance way
@@ -460,17 +464,61 @@ func (cl *Client) ReadFixedHeader(fh *packets.FixedHeader) error {
 	return nil
 }
 
+// readRemaining reads exactly size bytes from r. A body larger than
+// maxPacketPreallocBytes is grown as it arrives, so a peer cannot reserve
+// memory it never sends. Errors match io.ReadFull.
+func readRemaining(r io.Reader, size int) ([]byte, error) {
+	if size <= maxPacketPreallocBytes {
+		p := make([]byte, size)
+		if _, err := io.ReadFull(r, p); err != nil {
+			return nil, err
+		}
+		return p, nil
+	}
+
+	p := make([]byte, 0, maxPacketPreallocBytes)
+	for len(p) < size {
+		if len(p) == cap(p) {
+			// grow geometrically, but never past the declared length
+			n := cap(p) * 2
+			if n > size {
+				n = size
+			}
+			grown := make([]byte, len(p), n)
+			copy(grown, p)
+			p = grown
+		}
+
+		m, err := r.Read(p[len(p):cap(p)])
+		p = p[:len(p)+m]
+		if err != nil {
+			if len(p) >= size {
+				// io.ReadAtLeast clears err once the minimum is reached, so a
+				// read that completes the body succeeds even with an error
+				return p, nil
+			}
+			if err == io.EOF && len(p) > 0 {
+				// the peer stopped mid-body
+				return nil, io.ErrUnexpectedEOF
+			}
+			return nil, err
+		}
+	}
+
+	return p, nil
+}
+
 // ReadPacket reads the remaining buffer into an MQTT packet.
 func (cl *Client) ReadPacket(fh *packets.FixedHeader) (pk packets.Packet, err error) {
 	atomic.AddInt64(&cl.ops.info.PacketsReceived, 1)
 
 	pk.ProtocolVersion = cl.Properties.ProtocolVersion // inherit client protocol version for decoding
 	pk.FixedHeader = *fh
-	p := make([]byte, pk.FixedHeader.Remaining)
-	n, err := io.ReadFull(cl.Net.bconn, p)
+	p, err := readRemaining(cl.Net.bconn, pk.FixedHeader.Remaining)
 	if err != nil {
 		return pk, err
 	}
+	n := len(p)
 
 	atomic.AddInt64(&cl.ops.info.BytesReceived, int64(n))
 	cl.bytesRecv.Add(int64(n))
