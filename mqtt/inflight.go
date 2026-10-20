@@ -90,7 +90,14 @@ func (i *Inflight) getAllNoLock(immediate bool) []packets.Packet {
 	}
 
 	sort.Slice(m, func(a, b int) bool {
-		return m[a].Created < m[b].Created
+		if m[a].Created != m[b].Created {
+			return m[a].Created < m[b].Created
+		}
+		// Created is a unixtime with one-second resolution, so messages
+		// published in the same second tie and the map order above is
+		// randomised. Packet ids ascend, are unique and survive resend and
+		// session restore, so they make this a total order [MQTT-4.6.0-1].
+		return m[a].PacketID < m[b].PacketID
 	})
 
 	return m
