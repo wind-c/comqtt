@@ -22,6 +22,7 @@ type TCP struct { // [MQTT-4.2.0-1]
 	config  *Config      // configuration values for the listener
 	log     *slog.Logger // server logger
 	end     uint32       // ensure the close methods are only called once
+	done    chan struct{}
 }
 
 // NewTCP initialises and returns a new TCP listener, listening on an address.
@@ -34,6 +35,7 @@ func NewTCP(id, address string, config *Config) *TCP {
 		id:      id,
 		address: address,
 		config:  config,
+		done:    make(chan struct{}),
 	}
 }
 
@@ -69,24 +71,25 @@ func (l *TCP) Init(log *slog.Logger) error {
 // Serve starts waiting for new TCP connections, and calls the establish
 // connection callback for any received.
 func (l *TCP) Serve(establish EstablishFn) {
-	for {
-		if atomic.LoadUint32(&l.end) == 1 {
-			return
-		}
+	accept := l.listen.Accept
 
-		conn, err := l.listen.Accept()
+	for {
+		conn, err := acceptRetry(accept, isNetClosed, l.done, l.log)
 		if err != nil {
 			return
 		}
 
-		if atomic.LoadUint32(&l.end) == 0 {
-			go func() {
-				err = establish(l.id, conn)
-				if err != nil {
-					l.log.Warn("", "error", err)
-				}
-			}()
+		if atomic.LoadUint32(&l.end) == 1 {
+			// Raced with Close: nothing will ever serve this connection.
+			conn.Close()
+			return
 		}
+
+		go func() {
+			if err := establish(l.id, conn); err != nil {
+				l.log.Warn("", "error", err)
+			}
+		}()
 	}
 }
 
@@ -96,6 +99,8 @@ func (l *TCP) Close(closeClients CloseFn) {
 	defer l.Unlock()
 
 	if atomic.CompareAndSwapUint32(&l.end, 0, 1) {
+		// Unblocks Serve if it is sleeping in an accept backoff.
+		close(l.done)
 		closeClients(l.id)
 	}
 
