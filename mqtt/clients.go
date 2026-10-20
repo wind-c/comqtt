@@ -25,10 +25,8 @@ const (
 	defaultKeepalive             uint16 = 10 // the default connection keepalive value in seconds
 	defaultClientProtocolVersion byte   = 4  // the default mqtt protocol version of connecting clients (if somehow unspecified).
 
-	// maxPacketPreallocBytes is the largest packet body that is allocated up
-	// front from the declared Remaining Length. Anything larger is read
-	// incrementally, so the broker only ever holds memory for bytes the peer
-	// has actually sent.
+	// maxPacketPreallocBytes is the largest body allocated up front from the
+	// declared Remaining Length. Larger bodies are read incrementally.
 	maxPacketPreallocBytes = 1024 * 64
 )
 
@@ -466,28 +464,9 @@ func (cl *Client) ReadFixedHeader(fh *packets.FixedHeader) error {
 	return nil
 }
 
-// readRemaining reads exactly size bytes from r.
-//
-// A packet body is sized by a length field the peer declares in the fixed
-// header, before a single body byte has arrived. Allocating that much up front
-// lets a peer that announces the 256 MB protocol maximum and then falls silent
-// pin that much memory in the broker while it waits, so a handful of
-// connections is enough to exhaust the process.
-//
-// Larger bodies are therefore grown as data actually arrives, keeping the
-// broker's memory proportional to real traffic. Bodies up to
-// maxPacketPreallocBytes keep the previous single-allocation path, which is the
-// overwhelmingly common case and is unchanged.
-//
-// A peer that declares a large body and then sends nothing still reserves
-// maxPacketPreallocBytes while it waits. That residue is deliberate: it is the
-// same order as the goroutine and socket the connection already costs, so
-// holding a connection open can no longer be made to cost more than opening
-// one.
-//
-// The error behaviour matches io.ReadFull, which this replaces: a body cut
-// short is io.ErrUnexpectedEOF when at least one byte arrived, and r's own
-// error otherwise.
+// readRemaining reads exactly size bytes from r. A body larger than
+// maxPacketPreallocBytes is grown as it arrives, so a peer cannot reserve
+// memory it never sends. Errors match io.ReadFull.
 func readRemaining(r io.Reader, size int) ([]byte, error) {
 	if size <= maxPacketPreallocBytes {
 		p := make([]byte, size)
@@ -500,8 +479,7 @@ func readRemaining(r io.Reader, size int) ([]byte, error) {
 	p := make([]byte, 0, maxPacketPreallocBytes)
 	for len(p) < size {
 		if len(p) == cap(p) {
-			// grow geometrically to bound reallocation count, but never past
-			// the length the peer declared
+			// grow geometrically, but never past the declared length
 			n := cap(p) * 2
 			if n > size {
 				n = size
@@ -515,16 +493,12 @@ func readRemaining(r io.Reader, size int) ([]byte, error) {
 		p = p[:len(p)+m]
 		if err != nil {
 			if len(p) >= size {
-				// The body is complete. io.ReadAtLeast clears err whenever the
-				// minimum is reached, so a read that completes the body is a
-				// success even when it reports an error alongside the bytes.
-				// crypto/tls does exactly this: it returns (n, io.EOF) from the
-				// same Read when a close_notify arrives behind the last data.
+				// io.ReadAtLeast clears err once the minimum is reached, so a
+				// read that completes the body succeeds even with an error
 				return p, nil
 			}
 			if err == io.EOF && len(p) > 0 {
-				// a peer that stopped mid-body is an unexpected end, not a
-				// clean one
+				// the peer stopped mid-body
 				return nil, io.ErrUnexpectedEOF
 			}
 			return nil, err
