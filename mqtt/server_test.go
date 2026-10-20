@@ -149,7 +149,14 @@ func TestOptionsSetDefaults(t *testing.T) {
 	opts.ensureDefaults()
 
 	require.Equal(t, defaultSysTopicInterval, opts.SysTopicResendInterval)
-	require.Equal(t, DefaultServerCapabilities, opts.Capabilities)
+
+	// Options must start from the package defaults. maximumPacketID is compared
+	// separately because ensureDefaults deliberately overrides it with the spec
+	// maximum. This compares values, not the pointer, since Capabilities is a copy.
+	got := *opts.Capabilities
+	require.Equal(t, uint32(65535), got.maximumPacketID)
+	got.maximumPacketID = DefaultServerCapabilities.maximumPacketID
+	require.Equal(t, *DefaultServerCapabilities, got)
 
 	opts = new(Options)
 	opts.ensureDefaults()

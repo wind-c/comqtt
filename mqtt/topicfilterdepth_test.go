@@ -128,10 +128,9 @@ func TestMaximumTopicFilterDepthDefaultIs8(t *testing.T) {
 	require.Equal(t, uint16(8), DefaultServerCapabilities.MaximumTopicFilterDepth)
 }
 
-// A partial capabilities block leaves the raw field at zero. maxTopicFilterDepth
-// must still yield the default so subscriptions keep working; without the
-// fallback a partial config would refuse every SUBSCRIBE. (The zeroing itself
-// is tracked separately -- see the capabilities default-merge change.)
+// A partial capabilities block must still yield the default limit, so
+// subscriptions keep working; without the fallback a partial config would
+// refuse every SUBSCRIBE.
 func TestMaximumTopicFilterDepthSurvivesPartialConfig(t *testing.T) {
 	var wrapper struct {
 		Options Options `yaml:"options"`
@@ -144,9 +143,22 @@ options:
 
 	caps := wrapper.Options.Capabilities
 	require.NotNil(t, caps)
-	require.Equal(t, uint16(0), caps.MaximumTopicFilterDepth, "precondition: raw field is zeroed")
 	require.Equal(t, 8, caps.maxTopicFilterDepth(),
-		"the effective limit must fall back to the default, not refuse every filter")
+		"the effective limit must be the default, not refuse every filter")
+
+	var explicit struct {
+		Options Options `yaml:"options"`
+	}
+	require.NoError(t, yaml.Unmarshal([]byte(`
+options:
+  capabilities:
+    maximum-topic-filter-depth: 0
+`), &explicit))
+
+	require.Equal(t, uint16(0), explicit.Options.Capabilities.MaximumTopicFilterDepth,
+		"an explicit zero must be kept")
+	require.Equal(t, 8, explicit.Options.Capabilities.maxTopicFilterDepth(),
+		"an explicit zero must still fall back to the default")
 }
 
 // countTopicNodes returns the number of nodes in a topic tree, including the root.

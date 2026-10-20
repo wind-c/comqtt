@@ -209,7 +209,7 @@ A number of configurable options are available which can be used to alter the be
 
 ```go
 server := mqtt.New(&mqtt.Options{
-  Capabilities: mqtt.Capabilities{
+  Capabilities: &mqtt.Capabilities{
     MaximumSessionExpiryInterval: 3600,
     Compatibilities: mqtt.Compatibilities{
       ObscureNotAuthorized: true,
@@ -220,6 +220,8 @@ server := mqtt.New(&mqtt.Options{
   SysTopicResendInterval: 10,
 })
 ```
+
+`Options.Capabilities` is a pointer, and setting it replaces the package defaults entirely: every capability you do not list keeps its zero value, not its default. So set each capability you rely on explicitly. A YAML `capabilities:` block behaves differently - it is merged over the defaults, so omitted keys keep their default and only the keys you write are changed.
 
 Review the mqtt.Options, mqtt.Capabilities, and mqtt.Compatibilities structs for a comprehensive list of options.
 

@@ -96,6 +96,18 @@ func (c *Capabilities) maxTopicFilterDepth() int {
 	return int(c.MaximumTopicFilterDepth)
 }
 
+// UnmarshalYAML decodes a capabilities block on top of DefaultServerCapabilities,
+// so a partial block keeps the defaults for the keys it omits. Without it, any
+// `capabilities:` key makes yaml allocate a zero-valued struct, and declaring
+// one key silently zeroes every other capability. Merging per key keeps
+// explicit zeros working: `maximum-packet-size: 0` is a legitimate value.
+func (c *Capabilities) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	// Capabilities holds only scalars, so copying the default by value shares no state.
+	*c = *DefaultServerCapabilities
+	type plain Capabilities
+	return unmarshal((*plain)(c))
+}
+
 // Compatibilities provides flags for using compatibility modes.
 type Compatibilities struct {
 	ObscureNotAuthorized       bool `yaml:"obscure-not-authorized"`    // return unspecified errors instead of not authorized
@@ -237,7 +249,11 @@ func New(opts *Options) *Server {
 // ensureDefaults ensures that the server starts with sane default values, if none are provided.
 func (o *Options) ensureDefaults() {
 	if o.Capabilities == nil {
-		o.Capabilities = DefaultServerCapabilities
+		// Copy rather than assign DefaultServerCapabilities itself: the next
+		// line mutates maximumPacketID, and every caller-supplied Options would
+		// otherwise share one global struct with the process.
+		caps := *DefaultServerCapabilities
+		o.Capabilities = &caps
 	}
 
 	o.Capabilities.maximumPacketID = math.MaxUint16 // spec maximum is 65535
