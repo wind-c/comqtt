@@ -35,9 +35,7 @@ func buildPropertySection(kind byte, n int) []byte {
 }
 
 // A CONNECT property section must not be able to grow the User slice without
-// bound: a ~10 MB section of two-byte properties previously produced ~46 MB of
-// slice, duplicated again by Properties.Copy, from a single unauthenticated
-// packet.
+// bound: a ~10 MB section produced ~46 MB of slice from a single packet.
 func TestPropertiesDecodeUserPropertyLimit(t *testing.T) {
 	p := new(Properties)
 	_, err := p.Decode(Connect, bytes.NewBuffer(buildPropertySection(PropUser, MaxUserProperties)))
@@ -85,10 +83,9 @@ func TestPropertiesDecodeSubscriptionIdentifierLimitExceeded(t *testing.T) {
 	require.LessOrEqual(t, len(p.SubscriptionIdentifier), MaxSubscriptionIdentifiers)
 }
 
-// MQTT v5 permits one Subscription Identifier per filter in a SUBSCRIBE
-// packet, so a conforming client needs as many as it has filters. Regression
-// guard: an earlier revision capped this at 128 and rejected legal
-// 129-filter SUBSCRIBEs.
+// MQTT v5 permits one Subscription Identifier per filter in a SUBSCRIBE, so a
+// conforming client needs as many as it has filters. An earlier revision
+// capped this at 128 and rejected legal 129-filter SUBSCRIBEs.
 func TestPropertiesDecodeSubscriptionIdentifiersForManyFilters(t *testing.T) {
 	const filters = 512 // well beyond any realistic client, still legal
 
