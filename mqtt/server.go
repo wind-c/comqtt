@@ -449,6 +449,9 @@ func (s *Server) attachClient(cl *Client, listener string) error {
 
 	err = s.SendConnack(cl, code, sessionPresent, nil) // [MQTT-3.1.4-5] [MQTT-3.2.0-1] [MQTT-3.2.0-2] &[MQTT-3.14.0-1]
 	if err != nil {
+		// The client is registered at this point, and returning here skips the
+		// cleanup at the end of this function, so it has to be removed again.
+		s.Clients.CompareAndDelete(cl.ID, cl)
 		return fmt.Errorf("ack connection packet: %w", err)
 	}
 
