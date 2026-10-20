@@ -49,11 +49,50 @@ func (r *eofWithLastBytes) Read(p []byte) (int, error) {
 	return n, nil
 }
 
+// partialThenError delivers part of the data and then fails with something
+// other than io.EOF, which is what a reset or a timeout looks like.
+type partialThenError struct {
+	data []byte
+	off  int
+	err  error
+}
+
+func (r *partialThenError) Read(p []byte) (int, error) {
+	if r.off >= len(r.data) {
+		return 0, r.err
+	}
+	n := copy(p, r.data[r.off:])
+	r.off += n
+	if r.off >= len(r.data) {
+		return n, r.err
+	}
+	return n, nil
+}
+
+// TestReadRemainingDoesNotOverRead pins the invariant that the growth path
+// consumes exactly the declared body and no more. A regression that narrowed
+// the read window to p[len(p):] would swallow the first bytes of the next
+// packet on the connection, and nothing else in the suite would notice.
+func TestReadRemainingDoesNotOverRead(t *testing.T) {
+	const body = maxPacketPreallocBytes + 4096
+	const tail = 64
+
+	stream := bytes.NewReader(make([]byte, body+tail))
+
+	p, err := readRemaining(stream, body)
+	require.NoError(t, err)
+	require.Len(t, p, body)
+
+	require.Equal(t, tail, stream.Len(),
+		"readRemaining consumed %d bytes past the declared body", body+tail-stream.Len())
+}
+
 // TestReadRemainingMatchesReadFull pins readRemaining to the behaviour of the
 // io.ReadFull it replaced — same bytes, same success/failure split, same error
 // — across readers that hand back data in every way the contract allows.
 func TestReadRemainingMatchesReadFull(t *testing.T) {
 	sentinel := errors.New("sentinel")
+	reset := errors.New("connection reset")
 
 	readers := []struct {
 		name string
@@ -66,6 +105,9 @@ func TestReadRemainingMatchesReadFull(t *testing.T) {
 		{"final bytes with io.EOF (stdlib)", func(b []byte) io.Reader { return iotest.DataErrReader(bytes.NewReader(b)) }},
 		{"stops half way", func(b []byte) io.Reader { return bytes.NewReader(b[:len(b)/2]) }},
 		{"always an error", func(b []byte) io.Reader { return iotest.ErrReader(sentinel) }},
+		{"partial data then a reset", func(b []byte) io.Reader {
+			return &partialThenError{data: b[:len(b)/2], err: reset}
+		}},
 	}
 
 	sizes := []int{
