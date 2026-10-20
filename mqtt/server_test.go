@@ -152,9 +152,7 @@ func TestOptionsSetDefaults(t *testing.T) {
 
 	// Options must start from the package defaults. maximumPacketID is compared
 	// separately because ensureDefaults deliberately overrides it with the spec
-	// maximum; every other field must match DefaultServerCapabilities.
-	// Note this compares values, not the pointer: Options.Capabilities is a
-	// copy, so asserting pointer identity would lock in the shared-state bug.
+	// maximum. This compares values, not the pointer, since Capabilities is a copy.
 	got := *opts.Capabilities
 	require.Equal(t, uint32(65535), got.maximumPacketID)
 	got.maximumPacketID = DefaultServerCapabilities.maximumPacketID

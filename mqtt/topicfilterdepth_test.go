@@ -130,8 +130,7 @@ func TestMaximumTopicFilterDepthDefaultIs8(t *testing.T) {
 
 // A partial capabilities block must still yield the default limit, so
 // subscriptions keep working; without the fallback a partial config would
-// refuse every SUBSCRIBE. The block is merged over the defaults, so the raw
-// field may already carry the default; an explicit zero must still fall back.
+// refuse every SUBSCRIBE.
 func TestMaximumTopicFilterDepthSurvivesPartialConfig(t *testing.T) {
 	var wrapper struct {
 		Options Options `yaml:"options"`

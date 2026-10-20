@@ -99,12 +99,8 @@ func (c *Capabilities) maxTopicFilterDepth() int {
 // UnmarshalYAML decodes a capabilities block on top of DefaultServerCapabilities,
 // so a partial block keeps the defaults for the keys it omits. Without it, any
 // `capabilities:` key makes yaml allocate a zero-valued struct, and declaring
-// one key silently zeroes every other capability.
-//
-// Merging per key keeps explicit zeros working: `maximum-packet-size: 0` and
-// `retain-available: 0` are legitimate values, not "unset". The seeding is
-// unconditional, so decoding into an already populated Capabilities overwrites
-// it with the defaults first.
+// one key silently zeroes every other capability. Merging per key keeps
+// explicit zeros working: `maximum-packet-size: 0` is a legitimate value.
 func (c *Capabilities) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	// Capabilities holds only scalars, so copying the default by value shares no state.
 	*c = *DefaultServerCapabilities
