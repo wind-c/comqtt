@@ -111,6 +111,41 @@ COMQTT_CLUSTER_RAFT_BOOTSTRAP=true \
 ./comqtt --conf=./config/node1.yml
 ```
 
+### Handling large connection bursts
+
+A listening TCP socket can only hold a limited number of connections that
+have completed the TCP handshake but not yet been handed to the process —
+the kernel accept queue. Its depth is a system setting, and comqtt does not
+override it. When many clients reconnect in the same instant and the queue
+overflows, the surplus connections are refused and those clients fail to
+reconnect.
+
+This is a property of the operating system rather than of the broker. On one
+test machine comqtt completed 2000 reconnects in under 700 ms when they were
+spread over time, while only about 350 of 2000 were accepted when they all
+arrived in the same instant. The limit there was queue depth, not throughput,
+so rate is not the thing to tune.
+
+Deepen the queue on the host:
+
+| Platform | Setting |
+|---|---|
+| Linux | `sysctl -w net.core.somaxconn=4096` |
+| macOS / BSD | `sysctl -w kern.ipc.somaxconn=4096` |
+
+Persist it in `/etc/sysctl.d/` on Linux or `/etc/sysctl.conf` on macOS.
+Containers normally inherit the host value; where the setting is
+namespaced, set it on the pod and check the container's `nofile` limit is
+high enough for the whole fleet.
+
+Clients should also reconnect with exponential backoff plus jitter rather
+than in lockstep. A thundering herd is the only thing that overflows the
+queue, and spreading reconnects avoids it entirely. This is standard practice
+for connected fleets rather than a requirement of the MQTT specification,
+which defines no reconnection backoff, but device SDKs generally provide
+one — for example AWS IoT exposes `min_reconnect_delay_ms`,
+`max_reconnect_delay_ms` and `retry_jitter_mode`.
+
 ### Using Docker
 A simple Dockerfile is provided for running the [cmd/single/main.go](cmd/single/main.go) Websocket, TCP, and Stats server:
 
