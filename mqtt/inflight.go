@@ -94,16 +94,9 @@ func (i *Inflight) getAllNoLock(immediate bool) []packets.Packet {
 			return m[a].Created < m[b].Created
 		}
 		// Created is a unixtime with one-second resolution, so messages
-		// published within the same second tie. sort.Slice is unstable and the
-		// slice above came out of a map with Go's randomised iteration order,
-		// so tied messages were left in an arbitrary order that changed on
-		// every call -- resends of a persistent session could therefore go
-		// out rotated rather than in their original order [MQTT-4.6.0-1].
-		//
-		// Packet ids are handed out in ascending order, are the map key so
-		// they are unique, and are preserved across resend and session
-		// restore, which makes this a strict total order and the result
-		// deterministic regardless of the underlying map order.
+		// published in the same second tie and the map order above is
+		// randomised. Packet ids ascend, are unique and survive resend and
+		// session restore, so they make this a total order [MQTT-4.6.0-1].
 		return m[a].PacketID < m[b].PacketID
 	})
 
