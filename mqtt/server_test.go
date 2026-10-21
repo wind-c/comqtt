@@ -1283,11 +1283,15 @@ func TestInjectPacketPublishAndReceive(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
-	waitForWrites(t, counter, 1)
-	_ = w1.Close()
+	delivered := waitForWrites(counter, 1)
 	_ = w2.Close()
+	require.True(t, delivered, "the publish was not delivered to the receiver")
 
 	require.Equal(t, packets.TPacketData[packets.Publish].Get(packets.TPublishBasic).RawBytes, <-receiverBuf)
+
+	// The sender is not part of the assertion, so its connection is closed
+	// only once the receiver has been checked.
+	_ = w1.Close()
 }
 
 func TestServerPublishAndReceive(t *testing.T) {
@@ -1322,11 +1326,15 @@ func TestServerPublishAndReceive(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
-	waitForWrites(t, counter, 1)
-	_ = w1.Close()
+	delivered := waitForWrites(counter, 1)
 	_ = w2.Close()
+	require.True(t, delivered, "the publish was not delivered to the receiver")
 
 	require.Equal(t, packets.TPacketData[packets.Publish].Get(packets.TPublishBasic).RawBytes, <-receiverBuf)
+
+	// The sender is not part of the assertion, so its connection is closed
+	// only once the receiver has been checked.
+	_ = w1.Close()
 }
 
 func TestServerPublishNoInlineClient(t *testing.T) {
@@ -1389,12 +1397,16 @@ func TestServerProcessPacketPublishAndReceive(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
-	waitForWrites(t, counter, 1)
-	_ = w1.Close()
+	delivered := waitForWrites(counter, 1)
 	_ = w2.Close()
+	require.True(t, delivered, "the publish was not delivered to the receiver")
 
 	require.Equal(t, packets.TPacketData[packets.Publish].Get(packets.TPublishBasic).RawBytes, <-receiverBuf)
 	require.Equal(t, 1, len(s.Topics.Messages("a/b/c")))
+
+	// The sender is not part of the assertion, so its connection is closed
+	// only once the receiver has been checked.
+	_ = w1.Close()
 }
 
 func TestServerBuildAck(t *testing.T) {
@@ -1953,10 +1965,11 @@ func TestPublishToSubscribers(t *testing.T) {
 
 	// cl1 receives the publish, and exactly one of the two shared subscribers
 	// receives it, so two writes are delivered in total.
-	waitForWrites(t, counter, 2)
+	delivered := waitForWrites(counter, 2)
 	_ = w1.Close()
 	_ = w2.Close()
 	_ = w3.Close()
+	require.True(t, delivered, "the publishes were not delivered to the client")
 
 	require.Equal(t, packets.TPacketData[packets.Publish].Get(packets.TPublishBasic).RawBytes, <-cl1Recv)
 	rcv2 := <-cl2Recv
@@ -1999,13 +2012,17 @@ func TestPublishToSubscribersMessageExpiryDelta(t *testing.T) {
 		s.publishToSubscribers(pkx)
 	}()
 
-	waitForWrites(t, counter, 1)
+	delivered := waitForWrites(counter, 1)
 	_ = w1.Close()
+	require.True(t, delivered, "the publish was not delivered to the client")
 
 	b := <-cl1Recv
 	pk := new(packets.Packet)
 	pk.ProtocolVersion = 5
-	require.Equal(t, uint32(s.Options.Capabilities.MaximumMessageExpiryInterval-30), binary.BigEndian.Uint32(b[11:15]))
+	require.GreaterOrEqual(t, len(b), 15, "the publish must carry the expiry interval")
+	// The interval is derived from the time the publish was created, so it is
+	// one second lower if the clock ticks between the two readings.
+	require.InDelta(t, uint32(s.Options.Capabilities.MaximumMessageExpiryInterval-30), binary.BigEndian.Uint32(b[11:15]), 1)
 }
 
 func TestPublishToSubscribersIdentifiers(t *testing.T) {
@@ -2032,7 +2049,8 @@ func TestPublishToSubscribersIdentifiers(t *testing.T) {
 		s.publishToSubscribers(*packets.TPacketData[packets.Publish].Get(packets.TPublishBasic).Packet)
 	}()
 
-	waitForWrites(t, counter, 1)
+	delivered := waitForWrites(counter, 1)
+	require.True(t, delivered, "the publish was not delivered to the client")
 	_ = w.Close()
 
 	require.Equal(t, packets.TPacketData[packets.Publish].Get(packets.TPublishSubscriberIdentifier).RawBytes, <-receiverBuf)
@@ -2088,7 +2106,8 @@ func TestPublishToClientServerDowngradeQos(t *testing.T) {
 		_, _ = s.publishToClient(cl, packets.Subscription{Filter: "a/b/c", Qos: 2}, pkx)
 	}()
 
-	waitForWrites(t, counter, 1)
+	delivered := waitForWrites(counter, 1)
+	require.True(t, delivered, "the publish was not delivered to the client")
 	_ = w.Close()
 
 	require.Equal(t, packets.TPacketData[packets.Publish].Get(packets.TPublishQos1).RawBytes, <-receiverBuf)
@@ -2119,7 +2138,8 @@ func TestPublishToClientSubscriptionDowngradeQos(t *testing.T) {
 		_, _ = s.publishToClient(cl, packets.Subscription{Filter: "a/b/c", Qos: 1}, pkx)
 	}()
 
-	waitForWrites(t, counter, 1)
+	delivered := waitForWrites(counter, 1)
+	require.True(t, delivered, "the publish was not delivered to the client")
 	_ = w.Close()
 
 	require.Equal(t, packets.TPacketData[packets.Publish].Get(packets.TPublishQos1).RawBytes, <-receiverBuf)
@@ -2173,15 +2193,17 @@ func TestPublishToClientServerTopicAlias(t *testing.T) {
 		_, _ = s.publishToClient(cl, packets.Subscription{Filter: pkx.TopicName}, pkx)
 	}()
 
-	waitForWrites(t, counter, 2)
+	delivered := waitForWrites(counter, 2)
+	require.True(t, delivered, "the publishes were not delivered to the client")
 	_ = w.Close()
 
 	ret := <-receiverBuf
-	pk1 := make([]byte, len(packets.TPacketData[packets.Publish].Get(packets.TPublishBasicMqtt5).RawBytes))
-	pk2 := make([]byte, len(packets.TPacketData[packets.Publish].Get(packets.TPublishBasicMqtt5).RawBytes)-5)
-	copy(pk1, ret[:len(packets.TPacketData[packets.Publish].Get(packets.TPublishBasicMqtt5).RawBytes)])
-	copy(pk2, ret[len(packets.TPacketData[packets.Publish].Get(packets.TPublishBasicMqtt5).RawBytes):])
-	require.Equal(t, append(pk1, pk2...), ret)
+	full := packets.TPacketData[packets.Publish].Get(packets.TPublishBasicMqtt5).RawBytes
+	require.Equal(t, full, ret[:len(full)])
+	// The first publish carries the topic name in full. The second reuses the
+	// alias, so the five byte topic name is dropped and the packet is five
+	// bytes shorter.
+	require.Len(t, ret, 2*len(full)-5)
 }
 
 func TestPublishToClientMqtt3RetainFalseLeverageNoConn(t *testing.T) {
@@ -2909,7 +2931,8 @@ func TestServerProcessSubscribeWithRetain(t *testing.T) {
 	}()
 
 	// The suback and the retained publish are both written to the client.
-	waitForWrites(t, counter, 2)
+	delivered := waitForWrites(counter, 2)
+	require.True(t, delivered, "the publishes were not delivered to the client")
 	_ = w.Close()
 
 	require.Equal(t, append(
@@ -3001,7 +3024,8 @@ func TestServerProcessSubscribeWithNotRetainAsPublished(t *testing.T) {
 	}()
 
 	// The suback and the retained publish are both written to the client.
-	waitForWrites(t, counter, 2)
+	delivered := waitForWrites(counter, 2)
+	require.True(t, delivered, "the publishes were not delivered to the client")
 	_ = w.Close()
 
 	require.Equal(t, append(
@@ -4053,7 +4077,8 @@ func (h *MockStorageHook) StoredRetainedMessages() ([]storage.Message, error) {
 // TestPublishRetainedToClientWithRedis tests publishRetainedToClient with Redis storage
 func TestPublishRetainedToClientWithRedis(t *testing.T) {
 	s := newServer()
-	cl, r, w := newTestClient()
+	counter := new(writeCounter)
+	cl, r, w := newTestClientCounted(counter)
 	s.Clients.Add(cl)
 
 	// Add local retained message
@@ -4082,21 +4107,31 @@ func TestPublishRetainedToClientWithRedis(t *testing.T) {
 	require.True(t, subbed)
 	require.Equal(t, 1, count)
 
+	receiverBuf := make(chan []byte)
 	go func() {
-		s.publishRetainedToClient(cl, packets.Subscription{Filter: "test/#"}, false)
-		time.Sleep(time.Millisecond)
-		_ = w.Close()
+		buf, err := io.ReadAll(r)
+		require.NoError(t, err)
+		receiverBuf <- buf
 	}()
 
-	buf, err := io.ReadAll(r)
-	require.NoError(t, err)
-	require.NotEmpty(t, buf)
+	go func() {
+		s.publishRetainedToClient(cl, packets.Subscription{Filter: "test/#"}, false)
+	}()
+
+	delivered := waitForWrites(counter, 2)
+	_ = w.Close()
+	require.True(t, delivered, "the retained messages were not delivered to the client")
+
+	buf := <-receiverBuf
+	require.Contains(t, string(buf), "redis message")
+	require.Contains(t, string(buf), "local message")
 }
 
 // TestPublishRetainedToClientRedisOverwritesLocal tests that Redis messages overwrite local ones
 func TestPublishRetainedToClientRedisOverwritesLocal(t *testing.T) {
 	s := newServer()
-	cl, r, w := newTestClient()
+	counter := new(writeCounter)
+	cl, r, w := newTestClientCounted(counter)
 	s.Clients.Add(cl)
 
 	// Add local retained message
@@ -4123,21 +4158,32 @@ func TestPublishRetainedToClientRedisOverwritesLocal(t *testing.T) {
 	subbed, _ := s.Topics.Subscribe(cl.ID, packets.Subscription{Filter: "test/topic", Qos: 0})
 	require.True(t, subbed)
 
+	receiverBuf := make(chan []byte)
 	go func() {
-		s.publishRetainedToClient(cl, packets.Subscription{Filter: "test/topic"}, false)
-		time.Sleep(time.Millisecond)
-		_ = w.Close()
+		buf, err := io.ReadAll(r)
+		require.NoError(t, err)
+		receiverBuf <- buf
 	}()
 
-	buf, err := io.ReadAll(r)
-	require.NoError(t, err)
-	require.NotEmpty(t, buf)
+	go func() {
+		s.publishRetainedToClient(cl, packets.Subscription{Filter: "test/topic"}, false)
+	}()
+
+	delivered := waitForWrites(counter, 1)
+	_ = w.Close()
+	require.True(t, delivered, "the retained message was not delivered to the client")
+
+	// The Redis message overwrites the local one, so only it is delivered.
+	buf := <-receiverBuf
+	require.Contains(t, string(buf), "redis message")
+	require.NotContains(t, string(buf), "local message")
 }
 
 // TestPublishRetainedToClientRedisErrorFallback tests fallback to local when Redis fails
 func TestPublishRetainedToClientRedisErrorFallback(t *testing.T) {
 	s := newServer()
-	cl, r, w := newTestClient()
+	counter := new(writeCounter)
+	cl, r, w := newTestClientCounted(counter)
 	s.Clients.Add(cl)
 
 	// Add local retained message
@@ -4156,15 +4202,23 @@ func TestPublishRetainedToClientRedisErrorFallback(t *testing.T) {
 	subbed, _ := s.Topics.Subscribe(cl.ID, packets.Subscription{Filter: "test/topic", Qos: 0})
 	require.True(t, subbed)
 
+	receiverBuf := make(chan []byte)
 	go func() {
-		s.publishRetainedToClient(cl, packets.Subscription{Filter: "test/topic"}, false)
-		time.Sleep(time.Millisecond)
-		_ = w.Close()
+		buf, err := io.ReadAll(r)
+		require.NoError(t, err)
+		receiverBuf <- buf
 	}()
 
-	buf, err := io.ReadAll(r)
-	require.NoError(t, err)
-	require.NotEmpty(t, buf)
+	go func() {
+		s.publishRetainedToClient(cl, packets.Subscription{Filter: "test/topic"}, false)
+	}()
+
+	delivered := waitForWrites(counter, 1)
+	_ = w.Close()
+	require.True(t, delivered, "the retained message was not delivered to the client")
+
+	// The Redis lookup failed, so the local message is served instead.
+	require.Contains(t, string(<-receiverBuf), "local message")
 }
 
 // TestShouldSkipRetainedMessage tests the shouldSkipRetainedMessage helper function
@@ -4295,8 +4349,14 @@ func TestSendRetainedMessagesToClient(t *testing.T) {
 		receiverBuf <- buf
 	}()
 
-	waitForWrites(t, counter, 1)
+	delivered := waitForWrites(counter, 1)
+	require.True(t, delivered, "the publish was not delivered to the client")
 	_ = w.Close()
 
-	require.NotEmpty(t, <-receiverBuf)
+	// The client is a v4 client, so publishToClient clears the retain flag
+	// before sending; the rest of the packet is unchanged.
+	expected := append([]byte(nil), packets.TPacketData[packets.Publish].Get(packets.TPublishRetain).RawBytes...)
+	expected[0] &^= 0x01
+
+	require.Equal(t, expected, <-receiverBuf)
 }

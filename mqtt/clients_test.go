@@ -94,18 +94,25 @@ func newTestClientCounted(counter *writeCounter) (cl *Client, r net.Conn, w net.
 	})
 }
 
-// waitForWrites blocks until n writes have completed. It must be called from
-// the test goroutine, not from a helper goroutine.
-func waitForWrites(t *testing.T, counter *writeCounter, n int) {
-	t.Helper()
+// waitForWrites blocks until n writes have completed and reports whether they
+// did. A write to a pipe completes only once the reader has taken the bytes,
+// so a completed write means the data has been delivered.
+//
+// It is for the case where the number of packets is what matters, or where
+// the bytes are read by a separate goroutine. When the expected length is
+// known and the read itself is the assertion, read exactly that many bytes
+// with io.ReadFull instead: a pipe write blocks until a reader takes the
+// bytes, so the counter cannot be used when the test goroutine is the only
+// reader.
+func waitForWrites(counter *writeCounter, n int) bool {
 	deadline := time.Now().Add(5 * time.Second)
 	for int(counter.n.Load()) < n {
 		if time.Now().After(deadline) {
-			t.Errorf("timed out waiting for %d writes, got %d", n, counter.n.Load())
-			return
+			return false
 		}
 		time.Sleep(time.Millisecond)
 	}
+	return true
 }
 
 func TestNewInflights(t *testing.T) {
