@@ -4,8 +4,8 @@ description: |
   comqtt — a lightweight, high-performance MQTT broker (v3.0/v3.1.1/v5.0)
   supporting standalone and clustered (Raft + Gossip) deployments.
 type: application
-version: 0.5.0
-appVersion: "2.6.6"
+version: 0.5.1
+appVersion: "2.6.7"
 kubeVersion: ">=1.23.0-0"
 home: https://github.com/wind-c/comqtt
 sources:
