@@ -1283,8 +1283,9 @@ func TestInjectPacketPublishAndReceive(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
-	require.True(t, waitForWrites(counter, 1), "the publish was not delivered to the receiver")
+	delivered := waitForWrites(counter, 1)
 	_ = w2.Close()
+	require.True(t, delivered, "the publish was not delivered to the receiver")
 
 	require.Equal(t, packets.TPacketData[packets.Publish].Get(packets.TPublishBasic).RawBytes, <-receiverBuf)
 
@@ -1325,8 +1326,9 @@ func TestServerPublishAndReceive(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
-	require.True(t, waitForWrites(counter, 1), "the publish was not delivered to the receiver")
+	delivered := waitForWrites(counter, 1)
 	_ = w2.Close()
+	require.True(t, delivered, "the publish was not delivered to the receiver")
 
 	require.Equal(t, packets.TPacketData[packets.Publish].Get(packets.TPublishBasic).RawBytes, <-receiverBuf)
 
@@ -1395,8 +1397,9 @@ func TestServerProcessPacketPublishAndReceive(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
-	require.True(t, waitForWrites(counter, 1), "the publish was not delivered to the receiver")
+	delivered := waitForWrites(counter, 1)
 	_ = w2.Close()
+	require.True(t, delivered, "the publish was not delivered to the receiver")
 
 	require.Equal(t, packets.TPacketData[packets.Publish].Get(packets.TPublishBasic).RawBytes, <-receiverBuf)
 	require.Equal(t, 1, len(s.Topics.Messages("a/b/c")))
@@ -1962,10 +1965,11 @@ func TestPublishToSubscribers(t *testing.T) {
 
 	// cl1 receives the publish, and exactly one of the two shared subscribers
 	// receives it, so two writes are delivered in total.
-	require.True(t, waitForWrites(counter, 2), "the publishes were not delivered to the client")
+	delivered := waitForWrites(counter, 2)
 	_ = w1.Close()
 	_ = w2.Close()
 	_ = w3.Close()
+	require.True(t, delivered, "the publishes were not delivered to the client")
 
 	require.Equal(t, packets.TPacketData[packets.Publish].Get(packets.TPublishBasic).RawBytes, <-cl1Recv)
 	rcv2 := <-cl2Recv
@@ -2008,8 +2012,9 @@ func TestPublishToSubscribersMessageExpiryDelta(t *testing.T) {
 		s.publishToSubscribers(pkx)
 	}()
 
-	require.True(t, waitForWrites(counter, 1), "the publish was not delivered to the client")
+	delivered := waitForWrites(counter, 1)
 	_ = w1.Close()
+	require.True(t, delivered, "the publish was not delivered to the client")
 
 	b := <-cl1Recv
 	pk := new(packets.Packet)
@@ -2042,7 +2047,8 @@ func TestPublishToSubscribersIdentifiers(t *testing.T) {
 		s.publishToSubscribers(*packets.TPacketData[packets.Publish].Get(packets.TPublishBasic).Packet)
 	}()
 
-	require.True(t, waitForWrites(counter, 1), "the publish was not delivered to the client")
+	delivered := waitForWrites(counter, 1)
+	require.True(t, delivered, "the publish was not delivered to the client")
 	_ = w.Close()
 
 	require.Equal(t, packets.TPacketData[packets.Publish].Get(packets.TPublishSubscriberIdentifier).RawBytes, <-receiverBuf)
@@ -2098,7 +2104,8 @@ func TestPublishToClientServerDowngradeQos(t *testing.T) {
 		_, _ = s.publishToClient(cl, packets.Subscription{Filter: "a/b/c", Qos: 2}, pkx)
 	}()
 
-	require.True(t, waitForWrites(counter, 1), "the publish was not delivered to the client")
+	delivered := waitForWrites(counter, 1)
+	require.True(t, delivered, "the publish was not delivered to the client")
 	_ = w.Close()
 
 	require.Equal(t, packets.TPacketData[packets.Publish].Get(packets.TPublishQos1).RawBytes, <-receiverBuf)
@@ -2129,7 +2136,8 @@ func TestPublishToClientSubscriptionDowngradeQos(t *testing.T) {
 		_, _ = s.publishToClient(cl, packets.Subscription{Filter: "a/b/c", Qos: 1}, pkx)
 	}()
 
-	require.True(t, waitForWrites(counter, 1), "the publish was not delivered to the client")
+	delivered := waitForWrites(counter, 1)
+	require.True(t, delivered, "the publish was not delivered to the client")
 	_ = w.Close()
 
 	require.Equal(t, packets.TPacketData[packets.Publish].Get(packets.TPublishQos1).RawBytes, <-receiverBuf)
@@ -2183,17 +2191,17 @@ func TestPublishToClientServerTopicAlias(t *testing.T) {
 		_, _ = s.publishToClient(cl, packets.Subscription{Filter: pkx.TopicName}, pkx)
 	}()
 
-	require.True(t, waitForWrites(counter, 2), "the publishes were not delivered to the client")
+	delivered := waitForWrites(counter, 2)
+	require.True(t, delivered, "the publishes were not delivered to the client")
 	_ = w.Close()
 
 	ret := <-receiverBuf
 	full := packets.TPacketData[packets.Publish].Get(packets.TPublishBasicMqtt5).RawBytes
-	require.GreaterOrEqual(t, len(ret), len(full), "the client must receive the whole publish")
-	pk1 := make([]byte, len(full))
-	pk2 := make([]byte, len(ret)-len(full))
-	copy(pk1, ret[:len(full)])
-	copy(pk2, ret[len(full):])
-	require.Equal(t, append(pk1, pk2...), ret)
+	require.Equal(t, full, ret[:len(full)])
+	// The first publish carries the topic name in full. The second reuses the
+	// alias, so the five byte topic name is dropped and the packet is five
+	// bytes shorter.
+	require.Len(t, ret, 2*len(full)-5)
 }
 
 func TestPublishToClientMqtt3RetainFalseLeverageNoConn(t *testing.T) {
@@ -2921,7 +2929,8 @@ func TestServerProcessSubscribeWithRetain(t *testing.T) {
 	}()
 
 	// The suback and the retained publish are both written to the client.
-	require.True(t, waitForWrites(counter, 2), "the publishes were not delivered to the client")
+	delivered := waitForWrites(counter, 2)
+	require.True(t, delivered, "the publishes were not delivered to the client")
 	_ = w.Close()
 
 	require.Equal(t, append(
@@ -3013,7 +3022,8 @@ func TestServerProcessSubscribeWithNotRetainAsPublished(t *testing.T) {
 	}()
 
 	// The suback and the retained publish are both written to the client.
-	require.True(t, waitForWrites(counter, 2), "the publishes were not delivered to the client")
+	delivered := waitForWrites(counter, 2)
+	require.True(t, delivered, "the publishes were not delivered to the client")
 	_ = w.Close()
 
 	require.Equal(t, append(
@@ -4307,7 +4317,8 @@ func TestSendRetainedMessagesToClient(t *testing.T) {
 		receiverBuf <- buf
 	}()
 
-	require.True(t, waitForWrites(counter, 1), "the publish was not delivered to the client")
+	delivered := waitForWrites(counter, 1)
+	require.True(t, delivered, "the publish was not delivered to the client")
 	_ = w.Close()
 
 	// The client is a v4 client, so publishToClient clears the retain flag
