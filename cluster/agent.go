@@ -351,6 +351,11 @@ func (a *Agent) processRelayMsg(msg *message.Message) {
 			return
 		}
 		offset := len(msg.Payload) - pk.FixedHeader.Remaining          // Unpack fixedheader.
+		if offset < 0 {
+			// The peer declared a body longer than the payload it sent, so
+			// there is nothing to unpack.
+			return
+		}
 		if err := pk.PublishDecode(msg.Payload[offset:]); err == nil { // Unpack skips fixedheader
 			a.mqttServer.PublishToSubscribers(pk, false)
 			OnPublishPacketLog(DirectionInbound, msg.NodeID, msg.ClientID, pk.TopicName, pk.PacketID)
@@ -371,6 +376,10 @@ func (a *Agent) processRelayMsg(msg *message.Message) {
 }
 
 func (a *Agent) readFixedHeader(b []byte, fh *packets.FixedHeader) error {
+	if len(b) == 0 {
+		return packets.ErrMalformedPacket
+	}
+
 	err := fh.Decode(b[0])
 	if err != nil {
 		return err
