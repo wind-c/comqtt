@@ -2020,7 +2020,9 @@ func TestPublishToSubscribersMessageExpiryDelta(t *testing.T) {
 	pk := new(packets.Packet)
 	pk.ProtocolVersion = 5
 	require.GreaterOrEqual(t, len(b), 15, "the publish must carry the expiry interval")
-	require.Equal(t, uint32(s.Options.Capabilities.MaximumMessageExpiryInterval-30), binary.BigEndian.Uint32(b[11:15]))
+	// The interval is derived from the time the publish was created, so it is
+	// one second lower if the clock ticks between the two readings.
+	require.InDelta(t, uint32(s.Options.Capabilities.MaximumMessageExpiryInterval-30), binary.BigEndian.Uint32(b[11:15]), 1)
 }
 
 func TestPublishToSubscribersIdentifiers(t *testing.T) {
@@ -4075,7 +4077,8 @@ func (h *MockStorageHook) StoredRetainedMessages() ([]storage.Message, error) {
 // TestPublishRetainedToClientWithRedis tests publishRetainedToClient with Redis storage
 func TestPublishRetainedToClientWithRedis(t *testing.T) {
 	s := newServer()
-	cl, r, w := newTestClient()
+	counter := new(writeCounter)
+	cl, r, w := newTestClientCounted(counter)
 	s.Clients.Add(cl)
 
 	// Add local retained message
@@ -4104,21 +4107,31 @@ func TestPublishRetainedToClientWithRedis(t *testing.T) {
 	require.True(t, subbed)
 	require.Equal(t, 1, count)
 
+	receiverBuf := make(chan []byte)
 	go func() {
-		s.publishRetainedToClient(cl, packets.Subscription{Filter: "test/#"}, false)
-		time.Sleep(time.Millisecond)
-		_ = w.Close()
+		buf, err := io.ReadAll(r)
+		require.NoError(t, err)
+		receiverBuf <- buf
 	}()
 
-	buf, err := io.ReadAll(r)
-	require.NoError(t, err)
-	require.NotEmpty(t, buf)
+	go func() {
+		s.publishRetainedToClient(cl, packets.Subscription{Filter: "test/#"}, false)
+	}()
+
+	delivered := waitForWrites(counter, 2)
+	_ = w.Close()
+	require.True(t, delivered, "the retained messages were not delivered to the client")
+
+	buf := <-receiverBuf
+	require.Contains(t, string(buf), "redis message")
+	require.Contains(t, string(buf), "local message")
 }
 
 // TestPublishRetainedToClientRedisOverwritesLocal tests that Redis messages overwrite local ones
 func TestPublishRetainedToClientRedisOverwritesLocal(t *testing.T) {
 	s := newServer()
-	cl, r, w := newTestClient()
+	counter := new(writeCounter)
+	cl, r, w := newTestClientCounted(counter)
 	s.Clients.Add(cl)
 
 	// Add local retained message
@@ -4145,21 +4158,32 @@ func TestPublishRetainedToClientRedisOverwritesLocal(t *testing.T) {
 	subbed, _ := s.Topics.Subscribe(cl.ID, packets.Subscription{Filter: "test/topic", Qos: 0})
 	require.True(t, subbed)
 
+	receiverBuf := make(chan []byte)
 	go func() {
-		s.publishRetainedToClient(cl, packets.Subscription{Filter: "test/topic"}, false)
-		time.Sleep(time.Millisecond)
-		_ = w.Close()
+		buf, err := io.ReadAll(r)
+		require.NoError(t, err)
+		receiverBuf <- buf
 	}()
 
-	buf, err := io.ReadAll(r)
-	require.NoError(t, err)
-	require.NotEmpty(t, buf)
+	go func() {
+		s.publishRetainedToClient(cl, packets.Subscription{Filter: "test/topic"}, false)
+	}()
+
+	delivered := waitForWrites(counter, 1)
+	_ = w.Close()
+	require.True(t, delivered, "the retained message was not delivered to the client")
+
+	// The Redis message overwrites the local one, so only it is delivered.
+	buf := <-receiverBuf
+	require.Contains(t, string(buf), "redis message")
+	require.NotContains(t, string(buf), "local message")
 }
 
 // TestPublishRetainedToClientRedisErrorFallback tests fallback to local when Redis fails
 func TestPublishRetainedToClientRedisErrorFallback(t *testing.T) {
 	s := newServer()
-	cl, r, w := newTestClient()
+	counter := new(writeCounter)
+	cl, r, w := newTestClientCounted(counter)
 	s.Clients.Add(cl)
 
 	// Add local retained message
@@ -4178,15 +4202,23 @@ func TestPublishRetainedToClientRedisErrorFallback(t *testing.T) {
 	subbed, _ := s.Topics.Subscribe(cl.ID, packets.Subscription{Filter: "test/topic", Qos: 0})
 	require.True(t, subbed)
 
+	receiverBuf := make(chan []byte)
 	go func() {
-		s.publishRetainedToClient(cl, packets.Subscription{Filter: "test/topic"}, false)
-		time.Sleep(time.Millisecond)
-		_ = w.Close()
+		buf, err := io.ReadAll(r)
+		require.NoError(t, err)
+		receiverBuf <- buf
 	}()
 
-	buf, err := io.ReadAll(r)
-	require.NoError(t, err)
-	require.NotEmpty(t, buf)
+	go func() {
+		s.publishRetainedToClient(cl, packets.Subscription{Filter: "test/topic"}, false)
+	}()
+
+	delivered := waitForWrites(counter, 1)
+	_ = w.Close()
+	require.True(t, delivered, "the retained message was not delivered to the client")
+
+	// The Redis lookup failed, so the local message is served instead.
+	require.Contains(t, string(<-receiverBuf), "local message")
 }
 
 // TestShouldSkipRetainedMessage tests the shouldSkipRetainedMessage helper function
