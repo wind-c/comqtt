@@ -2005,6 +2005,7 @@ func TestPublishToSubscribersMessageExpiryDelta(t *testing.T) {
 	b := <-cl1Recv
 	pk := new(packets.Packet)
 	pk.ProtocolVersion = 5
+	require.GreaterOrEqual(t, len(b), 15, "the publish must carry the expiry interval")
 	require.Equal(t, uint32(s.Options.Capabilities.MaximumMessageExpiryInterval-30), binary.BigEndian.Uint32(b[11:15]))
 }
 
@@ -2177,10 +2178,12 @@ func TestPublishToClientServerTopicAlias(t *testing.T) {
 	_ = w.Close()
 
 	ret := <-receiverBuf
-	pk1 := make([]byte, len(packets.TPacketData[packets.Publish].Get(packets.TPublishBasicMqtt5).RawBytes))
-	pk2 := make([]byte, len(packets.TPacketData[packets.Publish].Get(packets.TPublishBasicMqtt5).RawBytes)-5)
-	copy(pk1, ret[:len(packets.TPacketData[packets.Publish].Get(packets.TPublishBasicMqtt5).RawBytes)])
-	copy(pk2, ret[len(packets.TPacketData[packets.Publish].Get(packets.TPublishBasicMqtt5).RawBytes):])
+	full := packets.TPacketData[packets.Publish].Get(packets.TPublishBasicMqtt5).RawBytes
+	require.GreaterOrEqual(t, len(ret), len(full), "the client must receive the whole publish")
+	pk1 := make([]byte, len(full))
+	pk2 := make([]byte, len(ret)-len(full))
+	copy(pk1, ret[:len(full)])
+	copy(pk2, ret[len(full):])
 	require.Equal(t, append(pk1, pk2...), ret)
 }
 
@@ -4298,5 +4301,10 @@ func TestSendRetainedMessagesToClient(t *testing.T) {
 	waitForWrites(t, counter, 1)
 	_ = w.Close()
 
-	require.NotEmpty(t, <-receiverBuf)
+	// The client is a v4 client, so publishToClient clears the retain flag
+	// before sending; the rest of the packet is unchanged.
+	expected := append([]byte(nil), packets.TPacketData[packets.Publish].Get(packets.TPublishRetain).RawBytes...)
+	expected[0] &^= 0x01
+
+	require.Equal(t, expected, <-receiverBuf)
 }
