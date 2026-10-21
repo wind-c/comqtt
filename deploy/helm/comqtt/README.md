@@ -268,6 +268,18 @@ If Gateway API is not available in your cluster:
 
 ## Upgrades
 
+- **Chart 0.5.1 bumps `appVersion` from `2.6.6` to `2.6.7`.** Because
+  `image.tag` falls back to `Chart.appVersion`, an upgrade without an explicit
+  `image.tag` will roll your pods onto the `2.6.7` image. Pin `image.tag`
+  beforehand if you need to stage the rollout.
+
+  Broker 2.6.7 fixes two remotely reachable defects: an unauthenticated peer
+  could make the broker hold 256 MB per connection by declaring a large packet
+  body and then going quiet, and a partial `capabilities:` block in the
+  configuration zeroed every capability that was not listed, which silently
+  stopped persistent sessions from delivering. See the
+  [release notes](https://github.com/wind-c/comqtt/releases/tag/v2.6.7).
+
 - **Chart 0.5.0 bumps `appVersion` from `2.6.0` to `2.6.6`.** Because
   `image.tag` falls back to `Chart.appVersion`, an upgrade without an explicit
   `image.tag` will roll your pods onto the `2.6.6` image. Pin `image.tag`
