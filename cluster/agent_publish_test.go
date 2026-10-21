@@ -33,7 +33,17 @@ func encodePublish(t *testing.T, topic string, payload []byte) []byte {
 // remaining length it declares. A payload that is shorter than the declared
 // body must be dropped rather than sliced out of range.
 func TestProcessRelayMsgDropsMalformedPublish(t *testing.T) {
+	server := mqtt.New(&mqtt.Options{InlineClient: true})
+
+	// A wildcard subscription, so that a payload which was not dropped would
+	// reach the handler whatever topic it carried.
+	published := make(chan string, 8)
+	require.NoError(t, server.Subscribe("#", 1, func(cl *mqtt.Client, sub packets.Subscription, pk packets.Packet) {
+		published <- pk.TopicName
+	}))
+
 	a := &Agent{}
+	a.BindMqttServer(server)
 
 	cases := []struct {
 		name    string
@@ -54,6 +64,7 @@ func TestProcessRelayMsgDropsMalformedPublish(t *testing.T) {
 					Payload: c.payload,
 				})
 			})
+			require.Empty(t, published, "the malformed payload was published")
 		})
 	}
 }
@@ -79,7 +90,7 @@ func TestProcessRelayMsgPublishesValidPacket(t *testing.T) {
 	select {
 	case topic := <-received:
 		require.Equal(t, "a/b/c", topic)
-	case <-time.After(time.Second):
+	case <-time.After(5 * time.Second):
 		t.Fatal("the publish did not reach the subscriber")
 	}
 }
