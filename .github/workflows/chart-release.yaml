@@ -67,6 +67,9 @@ jobs:
           # "tag_name already_exists" because chart-releaser unconditionally
           # creates a release per chart version. Makes the workflow idempotent.
           skip_existing: true
+          # The action defaults this to true, which would replace the broker
+          # release as the repository's "Latest" on every chart bump.
+          mark_as_latest: false
         env:
           CR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
