@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/hashicorp/memberlist"
@@ -41,6 +42,7 @@ func (b *Broadcast) Finished() {
 type Delegate struct {
 	sync.RWMutex
 	stop       chan struct{}
+	stopOnce   sync.Once
 	msgCh      chan<- []byte
 	State      map[string]int64
 	Broadcasts *memberlist.TransmitLimitedQueue
@@ -51,6 +53,7 @@ type Delegate struct {
 
 func NewDelegate(inboundMsgCh chan<- []byte) *Delegate {
 	d := &Delegate{
+		stop:  make(chan struct{}),
 		msgCh: inboundMsgCh,
 		State: make(map[string]int64, 2),
 	}
@@ -58,9 +61,12 @@ func NewDelegate(inboundMsgCh chan<- []byte) *Delegate {
 	return d
 }
 
+// Stop signals the queue pruner to exit. msgCh is owned by the agent and is
+// left open so an in-flight NotifyMsg can't panic on a closed channel.
 func (d *Delegate) Stop() {
-	d.stop <- struct{}{}
-	close(d.msgCh)
+	d.stopOnce.Do(func() {
+		close(d.stop)
+	})
 }
 
 func (d *Delegate) NotifyMsg(msg []byte) {
@@ -80,9 +86,13 @@ func (d *Delegate) SetHttpPort(port int) {
 	d.httpPort = port
 }
 
+// LocalState implements memberlist.Delegate. Delegate methods are called
+// concurrently, so the map write needs the same lock as MergeRemoteState.
 func (d *Delegate) LocalState(join bool) []byte {
+	d.Lock()
+	defer d.Unlock()
 	if d.server != nil {
-		d.State[d.LocalNode.Name] = d.server.Info.ClientsConnected
+		d.State[d.LocalNode.Name] = atomic.LoadInt64(&d.server.Info.ClientsConnected)
 	}
 	bs, _ := json.Marshal(d.State)
 	return bs
@@ -90,6 +100,18 @@ func (d *Delegate) LocalState(join bool) []byte {
 
 func (d *Delegate) GetBroadcasts(overhead, limit int) [][]byte {
 	return d.Broadcasts.GetBroadcasts(overhead, limit)
+}
+
+// Stats returns a copy of the per-node client counts so callers can't race
+// the gossip handlers updating the map.
+func (d *Delegate) Stats() map[string]int64 {
+	d.RLock()
+	defer d.RUnlock()
+	m := make(map[string]int64, len(d.State))
+	for k, v := range d.State {
+		m[k] = v
+	}
+	return m
 }
 
 func (d *Delegate) MergeRemoteState(buf []byte, join bool) {
