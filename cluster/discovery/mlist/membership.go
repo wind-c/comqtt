@@ -199,7 +199,7 @@ func (m *Membership) Broadcast(msg []byte) {
 }
 
 func (m *Membership) Stat() map[string]int64 {
-	return m.delegate.State
+	return m.delegate.Stats()
 }
 
 func (m *Membership) Stop() {
