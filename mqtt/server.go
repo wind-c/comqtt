@@ -1734,6 +1734,12 @@ func (s *Server) sendLWT(cl *Client) {
 
 	modifiedLWT := s.hooks.OnWill(cl, cl.Properties.Will)
 
+	if !cl.Net.Inline && !s.hooks.OnACLCheck(cl, modifiedLWT.TopicName, true) {
+		s.Log.Debug("will message denied by acl", "client", cl.ID, "topic", modifiedLWT.TopicName)
+		atomic.StoreUint32(&cl.Properties.Will.Flag, 0)
+		return
+	}
+
 	pk := packets.Packet{
 		FixedHeader: packets.FixedHeader{
 			Type:   packets.Publish,
@@ -1946,8 +1952,16 @@ func (s *Server) clearExpiredInflights(now int64) {
 func (s *Server) sendDelayedLWT(dt int64) {
 	for id, pk := range s.loop.willDelayed.GetAll() {
 		if dt > pk.Expiry {
+			cl, ok := s.Clients.Get(id)
+			if ok && !cl.Net.Inline && !s.hooks.OnACLCheck(cl, pk.TopicName, true) {
+				s.Log.Debug("will message denied by acl", "client", cl.ID, "topic", pk.TopicName)
+				cl.Properties.Will = Will{} // [MQTT-3.1.2-10]
+				s.loop.willDelayed.Delete(id)
+				continue
+			}
+
 			s.publishToSubscribers(pk) // [MQTT-3.1.2-8]
-			if cl, ok := s.Clients.Get(id); ok {
+			if ok {
 				if pk.FixedHeader.Retain {
 					s.retainMessage(cl, pk)
 				}
