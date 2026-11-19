@@ -6,9 +6,23 @@ import (
 	"net"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	quic "github.com/quic-go/quic-go"
 )
+
+// maxIncomingStreams is the maximum number of MQTT connections (QUIC streams)
+// a single peer may hold open on one QUIC connection. Every accepted stream
+// starts a goroutine and allocates client state before authentication, so the
+// quic-go default of 100 lets one handshake reserve far too much.
+const maxIncomingStreams int64 = 16
+
+// establishReadTimeout bounds the first read on a new stream. MQTT requires a
+// CONNECT packet first, and until it is fully read the stream holds a goroutine
+// and client state before authentication. Once the client is authenticated the
+// server replaces this deadline with the keepalive deadline, so established
+// sessions are unaffected. It is a variable so tests can shorten it.
+var establishReadTimeout = 10 * time.Second
 
 type (
 	QuicListener interface {
@@ -61,12 +75,16 @@ func (l *QUIC) Protocol() string {
 func (l *QUIC) Init(log *slog.Logger) error {
 	l.log = log
 
+	config := &quic.Config{
+		MaxIncomingStreams: maxIncomingStreams,
+	}
+
 	var err error
 
 	if l.config.ZeroRTT {
-		l.listen, err = quic.ListenAddrEarly(l.address, l.config.TLSConfig, nil)
+		l.listen, err = quic.ListenAddrEarly(l.address, l.config.TLSConfig, config)
 	} else {
-		l.listen, err = quic.ListenAddr(l.address, l.config.TLSConfig, nil)
+		l.listen, err = quic.ListenAddr(l.address, l.config.TLSConfig, config)
 	}
 
 	return err
@@ -102,6 +120,9 @@ func (l *QUIC) handleConn(
 		netConn := newQUICNet(conn, stream)
 
 		if atomic.LoadUint32(&l.end) == 0 {
+			// Bound the unauthenticated CONNECT read (see establishReadTimeout).
+			_ = netConn.SetReadDeadline(time.Now().Add(establishReadTimeout))
+
 			go func() {
 				if err := establish(l.id, netConn); err != nil {
 					l.log.Warn("", "error", err)
