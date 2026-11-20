@@ -26,7 +26,7 @@ func MatchTopic(filter string, topic string) bool {
 
 	for i := 0; i < len(filterParts); i++ {
 		if i >= len(topicParts) {
-			return false
+			return filterParts[i] == "#"
 		}
 
 		if filterParts[i] == "+" {
@@ -42,5 +42,5 @@ func MatchTopic(filter string, topic string) bool {
 		}
 	}
 
-	return true
+	return len(topicParts) == len(filterParts)
 }
